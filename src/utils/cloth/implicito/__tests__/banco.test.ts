@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { aMarcoDelHilo } from '../malla';
 import { separacion, telaSI } from '../tela';
-import { CUSICK, escenaCusick, escenaVoladizo, laminaPlana } from '../banco/escenas';
-import { aplastados, caidaCusick, peirce, puntaDelVoladizo } from '../banco/medidas';
+import { CUSICK, escenaCusick, escenaPeirceApoyada, escenaVoladizo, laminaPlana, MESA_DE_PEIRCE } from '../banco/escenas';
+import { aplastados, caidaCusick, peirce, peirceApoyado, puntaDelVoladizo } from '../banco/medidas';
 import { elasticaExacta } from '../banco/elastica';
 
 describe('el banco: escenas y medidas', () => {
@@ -73,5 +73,39 @@ describe('el banco: escenas y medidas', () => {
     const p = puntaDelVoladizo(e.malla.x, e.malla, 0.015);
     expect(p.x).toBeCloseTo(0.015, 6);
     expect(p.y).toBeCloseTo(0, 12);
+  });
+
+  it('el voladizo apoyado: la tira sobre la mesa sin sujetar, con vértices en el borde y el hilo de cada dirección', () => {
+    const e = escenaPeirceApoyada(20, 160, 'bies', 5);
+    const { x, patron, fijos } = e.malla;
+    expect(fijos).toBeUndefined();
+    expect(e.obstaculos).toEqual([{ tipo: 'pedestal', ...MESA_DE_PEIRCE }]);
+    let enBorde = 0, enPunta = 0;
+    for (let i = 0; i < x.length / 3; i++) {
+      expect(x[3 * i + 1]).toBeCloseTo(MESA_DE_PEIRCE.tapa + 0.003, 12);
+      if (Math.abs(patron[2 * i] - MESA_DE_PEIRCE.radio) < 1e-6) enBorde++;
+      if (Math.abs(patron[2 * i] - (MESA_DE_PEIRCE.radio + 0.02)) < 1e-6) enPunta++;
+    }
+    expect(enBorde).toBeGreaterThan(3);
+    expect(enPunta).toBeGreaterThan(3);
+    expect(e.hilo).toEqual([Math.SQRT1_2, Math.SQRT1_2]);
+    expect(escenaPeirceApoyada(20, 160, 'urdimbre', 5).hilo).toEqual([1, 0]);
+    expect(escenaPeirceApoyada(20, 160, 'trama', 5).hilo).toEqual([0, 1]);
+  });
+
+  it('el voladizo apoyado mide la cuerda desde el borde, a la altura de la tira apoyada, hasta la punta', () => {
+    const e = escenaPeirceApoyada(20, 160, 'urdimbre', 5);
+    const x = Float64Array.from(e.malla.x);
+    const R = MESA_DE_PEIRCE.radio, th = Math.PI / 6, y0 = x[1];
+    // lo que sale de la mesa gira 30° alrededor del borde
+    for (let i = 0; i < x.length / 3; i++) {
+      const u = e.malla.patron[2 * i] - R;
+      if (u <= 0) continue;
+      x[3 * i] = R + u * Math.cos(th);
+      x[3 * i + 1] = y0 - u * Math.sin(th);
+    }
+    const r = peirceApoyado(x, e.malla, 0.02, 0.16);
+    expect(r.angulo).toBeCloseTo(30, 9);
+    expect(r.alturaApoyada).toBeCloseTo(y0, 12);
   });
 });

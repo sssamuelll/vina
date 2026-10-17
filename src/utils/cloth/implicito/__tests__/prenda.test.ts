@@ -95,4 +95,20 @@ describe('la prenda: varias piezas, cada una con su hilo', () => {
     expect(costurasDePrenda(prenda, [costuraAB([0, nA, 1], [0, 1])]).lados[0].a).toEqual([0, 1]);
     expect(() => costurasDePrenda(prenda, [costuraAB([nA + 5], [0])])).toThrow(new RegExp(`vértice ${nA + 5}`));
   });
+
+  it('los t de cada lado viajan con sus vértices, y los puntos de costura los usan', () => {
+    const A = mallaDeContorno(rectangulo(0, 0, 50, 30), 10), nA = A.x.length / 3;
+    const prenda = armarPrenda([
+      { id: 'A', x: Float64Array.from([...A.x, 0.2, 0, 0.2]), patron: Float64Array.from([...A.patron, 0.2, 0.2]), tris: A.tris },
+      { id: 'B', ...A },
+    ]);
+    const quitado = costuraAB([0, nA, 1], [0, 1]);
+    quitado.lados = { ...quitado.lados!, ta: [0, 0.4, 1], tb: [0.1, 0.9] };
+    // el vértice quitado se lleva su t
+    expect(costurasDePrenda(prenda, [quitado]).lados[0]).toMatchObject({ ta: [0, 1], tb: [0.1, 0.9] });
+    const parcial = costuraAB([0, 1, 2], [0, 1]);
+    parcial.lados = { ...parcial.lados!, ta: [0, 0.5, 1], tb: [0, 0.8] };
+    // el vértice del medio de A (t = 0,5) va al punto de B en t = 0,5: s = 0,5/0,8
+    expect(costurasDePrenda(prenda, [parcial]).puntos.find((p) => p.a === 1)!.s).toBeCloseTo(0.625, 12);
+  });
 });

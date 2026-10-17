@@ -385,8 +385,9 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 
 ## 7. Enmiendas de la entrega 4
 
-Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6 y R13 el
-2026-10-16.
+Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
+el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
+la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -411,3 +412,101 @@ Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el 
   separación. Anticiparlos los hacía competir con los planos de los vértices de tela sobre un cuerpo liso (la tela se
   trababa o temblaba). *Costo:* una punta que entra muy rápido se rescata un cuadro tarde. Plan
   `2026-10-14-la-prenda-en-la-cpu.md`.
+- **E7 (§4.3.3).** El largo de reposo de una costura baja cada cuadro lo mismo que antes (×0,97¹⁵), pero nunca más de
+  `cierreMaximo`: `L ← max(L·0,97¹⁵, L − cierreMaximo)`, con `cierreMaximo` = 5 mm por cuadro. Una costura que arranca a
+  menos de `cierreMaximo/(1 − 0,97¹⁵)` ≈ 13,6 mm cierra como antes. Sin tope, con huecos de decenas de centímetros en la
+  colocación, el primer cuadro tiraba de cada costura más de un tercio de su hueco. *Costo:* la flexión cruza las costuras
+  cuando cierran todas, y con el tope eso espera a la más abierta: unos G/5 cuadros por cada G mm de hueco (en la
+  camiseta, 63 cuadros; sin tope, 18). 5 mm es el valor de partida: entre 2, 5 y 10 mm, medidos el 2026-10-16 con una
+  corrida por tope y antes del arreglo de las costuras parciales, los triángulos aplastados quedan dentro del ruido de la
+  GPU; se queda porque con 2 mm las costuras chicas pasan 136 cuadros sin bisagra y porque 5 mm dio la menor costura
+  máxima en esas corridas. La regla del plan, fijada antes de medir, escogía 2 mm: el valor espera la ratificación de
+  Samuel. Plan `2026-10-16-la-camiseta-a-s2.md`.
+- **E8 (§4.3.3). La puntada no cede.** Un punto de costura cuyo vértice queda a menos de `5·cierreMaximo` (25 mm,
+  cinco cuadros de cierre) de su punto se cose: el vértice deja de ser una incógnita y se mueve con su punto del otro
+  lado, `x_a = (1 − s)·x_b0 + s·x_b1 + d`. El desfase `d` arranca en la separación de ese momento y baja cada cuadro
+  con la ley de E7 hasta 0. El paso se resuelve en las incógnitas que quedan: lo que empuja al vértice cosido lo
+  cargan sus dos vértices del otro lado, y el resorte de ese punto se apaga. Se cose en cadena: un vértice puede
+  coserse a un punto cuyos vértices ya están cosidos a otra costura, o sostener puntos de otras costuras, hasta tres
+  niveles y sin ciclos. Cada vértice depende de un solo punto, y decide el orden de los puntos (en cada costura,
+  primero los vértices de A sobre B). Los puntos de vuelta (los vértices de B sobre A) nunca se cosen, y se apagan
+  cuando sus dos vértices de A ya están cosidos, porque la línea de la costura ya es la de B; en una esquina donde la
+  cadena no alcanza, sigue el resorte. Tampoco se cose un punto cuya línea hasta su punto entra en un obstáculo más
+  hondo que la separación (se miran sus siete puntos intermedios): cerrar a través del cuerpo deja la tela adentro, y
+  ese punto sigue con su resorte. Medido el 2026-10-16 en la GPU a 5 mm: el resorte de 1000 N/m cede ante el contacto
+  (un par vale 2000 N/m), 1-2 mm donde empujan otras capas o pliegues y 10-18 mm donde el cuerpo queda entre los dos
+  bordes. Con 20000 N/m casi todo cierra, pero el gradiente conjugado no converge ni con 600 iteraciones y los
+  aplastados suben. Con la puntada, la mediana queda en 0 mm y las costuras cierran salvo en las esquinas (1-3 mm) y
+  donde el cuerpo queda entre los bordes (5-15 mm). *Costo:* mientras cierra, el desfase une los dos bordes como una
+  varilla de hasta 25 mm, y un vértice cosido ya no se desliza a lo largo de la costura. Plan
+  `2026-10-16-la-camiseta-a-s2.md`.
+- **E9 (§4.1.4). La meseta de pandeo termina.** Pasado un encogimiento de 10 % (`TOPE_DE_PANDEO`, o el `topePandeo` de
+  la tela), la tela vuelve a resistir como al estirar: ψ suma ½·k·(ε + tope)². Con la meseta sin fin, un triángulo
+  podía encogerse casi gratis: en la camiseta a 5 mm, 1,53 % de los triángulos quedaba con menos de la mitad de su
+  área. Sin meseta bajan a 0,17 %, pero el disco Cusick pierde el rango entre mallas (10,1 puntos: la malla de 10 mm
+  se pone rígida). Medido el 2026-10-16 en la GPU a 5 mm y en el Cusick a 5, 10 y 20 mm: con el tope en 0,1, 0,28 % de
+  aplastados, y el Cusick cumple (rango 2,6); con 0,05 y 0,03, 0,19 y 0,15 %, pero el Cusick pierde el rango (4,4 y
+  4,1). Lo que queda aplastado está en la tira del cuello. *Costo:* la tela que encoge más de 10 % ya no se dobla
+  dentro del triángulo y empuja como al estirar. Plan `2026-10-16-la-camiseta-a-s2.md`.
+- **E10 (§4.2.1, §4.3.1 y §4.3.2; reemplaza a E4 y a la anticipación). El cuerpo es un piso duro.** El vértice libre y
+  sin coser que al empezar el paso está a menos de la separación del cuerpo (más 0,1 mm de holgura), sin irse hacia
+  afuera a más de 1 mm/s (el que ya estaba apoyado, por la normal con que se lo sostuvo) y sin que el cuadro anterior lo
+  jalara hacia el cuerpo, queda restringido en la normal del
+  cuerpo, como las restricciones de Baraff y Witkin (*Large Steps*, §5.3): el gradiente conjugado filtra esa componente
+  y el vértice solo se mueve por el plano tangente, con su fricción. La fuerza de la restricción es −n·r, con r el
+  residuo sin filtrar al terminar el gradiente conjugado; si jala hacia el cuerpo, el vértice se suelta el cuadro
+  siguiente. La fricción usa esa fuerza, nunca menos que el peso que el vértice carga sobre el cuerpo. El vértice que el
+  paso mete en el cuerpo sin estar apoyado se proyecta a la separación al terminar el paso, sin velocidad hacia adentro,
+  y su fuerza de apoyo es la que lo frenó. Sin segunda ronda: el par de dos capas de tela entra activo también cuando el
+  cuadro sin fuerzas (y = x_t + h·v + h²·g) lo metería en la separación. Con dos cuadros de margen, el resorte de dos
+  lados de la solución jalaba una contra otra a dos capas que todavía no se iban a tocar: medido en dos láminas a 8 mm
+  que se acercan a 5 mm por cuadro, la de arriba llegaba a la separación en un cuadro y salía acelerada de 0,3 a
+  0,39 m/s, y en la camiseta la tela se arrugaba sobre sí misma. El par de una punta del cuerpo sigue con su resorte
+  (`kContacto`). Con el resorte de 2000 N/m del cuerpo, una tela de 27 N/m quedaba con un sistema mal
+  condicionado o, con un resorte blando, atravesaba el cuerpo donde la costura jalaba; la restricción no tiene rigidez.
+  La velocidad de despegue del que ya estaba apoyado se mide por su normal anterior porque en un canto redondeado (el
+  del pedestal del disco Cusick tiene el radio de la separación) resbalar por el plano tangente aleja al vértice de la
+  normal nueva, h·v²/R (2,3 mm/s a 13 mm/s), sin despegarlo: medida con la normal nueva, el vértice se soltaba, caía, se
+  proyectaba y volvía a apoyarse, en ciclos de dos cuadros que movían a mil vértices. Medido el 2026-10-17 en el disco de
+  5 mm con el jersey medido (E12): la quietud baja de 0,19 a 0,03 % de la caída libre, debajo de su umbral de 0,1 %.
+  *Costo:* la tela queda pegada un cuadro antes de soltarse, y la proyección no conserva la energía. Plan
+  `2026-10-16-el-motor-a-s2.md`.
+- **E11 (§4.4.2, se aparta de E5 en la tira del cuello). La tira del cuello arranca en anillo.** La colocación de la
+  referencia deja la tira plana detrás de la cabeza, y sus costuras la jalaban en línea recta a través del cuello hasta
+  el escote del delantero: el cuerpo quedaba entre los dos bordes, la puntada no cosía (E8) y la tira se estiraba de 38 a
+  240 %. En el banco la tira arranca en un círculo horizontal alrededor del cuello, a la altura del punto más alto del
+  escote, con el largo de reposo de su borde cosido (o rodeando el cuello a la separación si es más ancho), girada para
+  que cada vértice quede frente a su punto del escote; el borde libre sube lo que mide la tira de ancho (`banco/cuello.ts`).
+  Cambia el punto de partida, no la física. Plan `2026-10-16-el-motor-a-s2.md`.
+- **E12 (§4.1.1 y §4.4.2). La tela medida, con la flexión ajustada en su mismo ensayo.** Las telas que midió la
+  referencia (tracción de una tira colgada de su peso a lo largo, a lo ancho y en los dos bies; voladizo de Peirce en
+  las tres direcciones; gramaje y grosor) entran al motor así (`banco/telasMedidas.ts`): kTrama y kUrdimbre, la rigidez
+  de la tira a lo ancho y a lo largo; kCizalla, la que da a 45° la rigidez medida en bies con nuestra membrana sin
+  Poisson, 1/E45 = ¼·(1/kT + 1/kU + 1/kS); y la flexión de cada dirección, G = ρ·g·c³ con la c de la fórmula de Peirce,
+  multiplicada por el factor que da en el motor el mismo ángulo que la referencia con la misma tira apoyada en la mesa
+  (`bench/flexionDeLaReferencia.ts`, `escenaPeirceApoyada`). La referencia apoya la tira sin sujetarla: en el borde la
+  tira gira y la cola se levanta, y la fórmula de Peirce, que la supone empotrada, lee una flexión más blanda que la de
+  la tela. Medido el 2026-10-16 en la CPU con tres telas (un jersey, un rib y un denim), cuatro largos por dirección y
+  malla de 5 mm: el factor va de 1,9 a 2,5 por dirección (de 1,6 a 3,1 por corrida), y en el jersey a 2,5 mm queda
+  entre 1,8 y 2,2, así que casi no depende de la malla. Con la flexión de la fórmula, el disco Cusick de las tres telas
+  caía entre 6 y 9 puntos por debajo de la referencia; con la ajustada queda dentro de los 5 puntos de §2 en las tres:
+  el jersey a una décima, el rib y el denim unos 3,5 puntos por encima. *Costo:* el ajuste corre el voladizo de cada
+  tela en el motor (minutos por tela) y vale para la malla en que se ajustó (en una malla gruesa no caben las tiras
+  cortas: ahí se usa el de 5 mm). El rib y el denim quedan algo rígidos en el disco: la tracción del denim no es lineal
+  y el pandeo se calibró con la tela anterior del banco. Plan `2026-10-16-el-motor-a-s2.md`.
+- **E13 (§4.1.3 y §4.1.5). La tela no se aplasta, y una bisagra doblada no salta.** La membrana mide largos y un
+  triángulo invertido tiene los mismos que el original: nada le impedía aplastarse ni darse vuelta. En la camiseta
+  quedaban triángulos al 0,1 % de su área; a lo largo del paso pasaban por cero, sus bisagras saltaban π y la búsqueda en
+  línea rechazaba el paso entero y sus siete mitades, cuadro tras cuadro: la tela quedaba trabada. Bajo un quinto de su
+  área (J = A/A0 < J₀ = 1/5), cada triángulo suma A0·κ·b(J), con b(J) = −(J − J₀)²·ln(J/J₀), la barrera C² de IPC: nula
+  hasta J₀ y con una fuerza que crece como 1/J. κ es diez veces la tracción más rígida de la tela, la de los hilos
+  trabados, y la hessiana de Gauss-Newton suma κ·b''(J)·∇J·∇Jᵀ. Desde la mitad del área la barrera tocaba el impacto del
+  disco Cusick contra el pedestal (un triángulo baja a 0,19 en el tercer cuadro) y el disco dejaba de quedar quieto en
+  10 s; desde un quinto queda quieto a los 2,6 s con el mismo coeficiente. Además, dentro del paso el ángulo de prueba de
+  cada bisagra sigue desde el de x_t (se le suma la vuelta entera que lo deja más cerca): en un pliegue de la tela sobre
+  sí misma, una bisagra cerca de 180° saltaba de +π a −π y los términos cruzados de la placa cambiaban de signo (0,2 J de
+  escalón en G). Medido el 2026-10-17 con la camiseta de 10 mm en la CPU y fricción 0,8: sin los dos arreglos la búsqueda
+  rechazaba todos los pasos desde el cuadro 200; con ellos acepta el paso entero casi siempre. *Costo:* un triángulo no
+  puede perder más de cuatro quintos de su área sin pagar una energía que crece sin tope; donde actúa, la barrera es tan
+  rígida que la precisión simple se aleja de la CPU (2,2 mm en tres cuadros con un triángulo a 0,1 de su área). Plan
+  `2026-10-16-el-motor-a-s2.md`.

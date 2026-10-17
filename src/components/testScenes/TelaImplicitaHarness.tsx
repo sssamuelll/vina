@@ -3,21 +3,24 @@
  * con la CPU, velocidad y segundos hasta quedar quieta.
  *
  * DEV-only: App.tsx la monta con `?testScene=tela-implicita` y reemplaza la app entera. La consume
- * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | quietud | camiseta;
+ * tests/e2e/tela-implicita.spec.ts (@gpu-local). Parámetros: `modo` = paridad | velocidad | perfil | quietud | camiseta;
  * `escena` = una de ESCENAS (chica: disco Cusick de 10 mm; grande: disco de 48 cm con malla de 5 mm, del tamaño de
  * la camiseta; las escenas de paridad del banco; y camiseta, con `malla` en mm, armada con los archivos de la
- * referencia privada que sirve la prueba); `cg` = iteraciones por ronda; `cuadros`; `anticipar=0`, `busqueda=0` y
- * `propio=0` apagan esos pasos para aislar una diferencia; `kc` cambia la rigidez de contacto; `maxPares`, la
- * capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el resultado en
- * `window.__TELA_IMPLICITA__`.
+ * referencia privada que sirve la prueba); `cg` = iteraciones del gradiente conjugado; `cuadros`; `busqueda=0` y
+ * `propio=0` apagan esos pasos para aislar una diferencia; `anillo=0` deja la tira del cuello donde la pone la
+ * referencia (E11); `kc` cambia la rigidez de las puntas del cuerpo; `kp`, la de los pares entre capas de tela;
+ * `maxPares`, la capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el
+ * resultado en `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
 import {
-  escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaHundida, escenaInclinada, escenaPunta, TELA_DE_LABORATORIO, type Escena,
+  escenaAplastada, escenaApoyada, escenaCapas, escenaCostura, escenaCusick, escenaEsfera, escenaHundida, escenaInclinada, escenaPunta, TELA_DE_LABORATORIO, type Escena,
 } from '../../utils/cloth/implicito/banco/escenas';
 import {
   camisetaContraLaReferencia, medirCamiseta, type CamisetaContraLaReferencia, type ConfigCamiseta, type MedidasDeCamiseta,
 } from '../../utils/cloth/implicito/banco/camiseta';
+import { toparPlaca } from '../../utils/cloth/implicito/banco/experimentos';
+import { paresEnCosturas, peoresPuntos, type ParesEnCostura, type PeorPunto } from '../../utils/cloth/implicito/banco/paresEnCosturas';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
 import type { TelaFisica } from '../../utils/cloth/implicito/tela';
 import { pasoImplicito } from '../../utils/cloth/implicito/paso';
@@ -35,7 +38,12 @@ interface Resultado {
   msPorCuadro?: number;
   segundosHastaQuieta?: number | null;
   medidas?: MedidasDeCamiseta;
+  /** con diag=1: los pares del contacto propio junto a las costuras abiertas (banco/paresEnCosturas.ts) */
+  diagnostico?: ParesEnCostura[];
+  peores?: PeorPunto[];
   estado?: EstadoGpu;
+  /** modo perfil: ms de GPU por cuadro y despachos por cuadro de cada entrada, de la más cara a la más barata */
+  perfil?: Array<{ entrada: string; veces: number; ms: number }>;
   error?: string;
 }
 
@@ -61,6 +69,8 @@ async function escenaCamiseta(malla: number): Promise<Escena> {
     { dxf: dxf!, config: JSON.parse(config!) as ConfigCamiseta, colocacion: colocacion!, cuerpo: cuerpo!, asentada },
     malla,
     telaEnCurso,
+    // E11: la tira del cuello en anillo, salvo anillo=0
+    { anillo: new URLSearchParams(window.location.search).get('anillo') !== '0' },
   );
   return camisetaEnCurso.escena;
 }
@@ -77,6 +87,7 @@ const ESCENAS: Record<string, () => Escena | Promise<Escena>> = {
   capas: () => escenaCapas(),
   punta: () => escenaPunta(),
   hundida: () => escenaHundida(),
+  aplastada: () => escenaAplastada(),
   camiseta: () => escenaCamiseta(Number(new URLSearchParams(window.location.search).get('malla') ?? 5)),
 };
 
@@ -90,22 +101,33 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     maxCG: Number(q.get('cg') ?? 50),
     // en la paridad, todas las iteraciones en las dos: la tolerancia no decide nada
     tolCG: modo === 'paridad' ? 0 : 1e-4,
-    anticipar: q.get('anticipar') !== '0',
     busqueda: q.get('busqueda') !== '0',
     // la tela contra sí misma, salvo que se pida apagarla
     contactoPropio: q.get('propio') !== '0',
     // la rigidez de contacto, si se pide otra
     ...(q.get('kc') ? { kContacto: Number(q.get('kc')) } : {}),
+    // la de los pares del contacto propio, si se pide otra que la del cuerpo
+    ...(q.get('kp') ? { kPropio: Number(q.get('kp')) } : {}),
+    // el tope del cierre de las costuras (mm por cuadro), si se pide otro
+    ...(q.get('cierre') ? { cierreMaximo: Number(q.get('cierre')) / 1000 } : {}),
+    // la rigidez de los puntos de costura (N/m), si se pide otra
+    ...(q.get('kcost') ? { kCostura: Number(q.get('kcost')) } : {}),
   };
+  // la tela, con el gramaje, el pandeo, su tope y las rigideces de tracción y de flexión que pida el banco (p. ej. topePandeo=0.2&bUrdimbre=7.6)
+  const tela: TelaFisica = { ...telaEnCurso };
+  for (const k of ['gramaje', 'pandeo', 'topePandeo', 'kTrama', 'kUrdimbre', 'kCizalla', 'bTrama', 'bUrdimbre', 'bBies', 'friccionCuerpo', 'friccionTela'] as const) if (q.get(k)) tela[k] = Number(q.get(k));
   const nuevo = () => {
-    const s = new SistemaTela(e.malla, telaEnCurso, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
+    const s = new SistemaTela(e.malla, tela, { obstaculos: e.obstaculos, hilo: e.hilo, costuras: e.costuras, franja: e.franja, ajustes });
+    // el experimento de banco/experimentos.ts, solo si se pide
+    if (q.get('topePlaca')) toparPlaca(s.placa, Number(q.get('topePlaca')));
     if (e.v) s.v.set(e.v);
     return s;
   };
   const s = nuevo();
   const adaptador = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
   if (!adaptador) throw new Error('este navegador no tiene WebGPU');
-  const device = await adaptador.requestDevice();
+  // las marcas de tiempo, para el modo perfil, si el adaptador las tiene
+  const device = await adaptador.requestDevice({ requiredFeatures: adaptador.features.has('timestamp-query') ? ['timestamp-query'] : [] });
   const { vendor, architecture, description } = adaptador.info;
   const base = { modo, escena, vertices: s.n, gpu: `${vendor} ${architecture} ${description}`.trim() };
   const motor = await MotorGpu.crear(device, s, 3600, Number(q.get('maxPares')) || undefined);
@@ -132,6 +154,11 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
       await motor.avanzar(cuadros);
       return { ...base, msPorCuadro: (performance.now() - t0) / cuadros, estado: await motor.leerEstado() };
     }
+    if (modo === 'perfil') {
+      // desde la colocación, como la velocidad: `desde` cuadros sin medir y luego `cuadros` repartidos por entrada
+      await motor.avanzar(Number(q.get('desde') ?? 2));
+      return { ...base, perfil: await motor.perfilar(Number(q.get('cuadros') ?? 10)), estado: await motor.leerEstado() };
+    }
     if (modo === 'camiseta') {
       if (!camisetaEnCurso) throw new Error('el modo camiseta va con escena=camiseta');
       // hasta quieta o 10 s de tela, de a un segundo; el primer cuadro cuenta para la quietud y no para el tiempo,
@@ -150,7 +177,23 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
       }
       const cuadros = hechos - 1;
       const x = await motor.leerPosiciones();
-      return { ...base, segundosHastaQuieta: quieta, msPorCuadro: ms / cuadros, medidas: medirCamiseta(x, camisetaEnCurso), estado: await motor.leerEstado() };
+      let diagnostico: ParesEnCostura[] | undefined, peores: PeorPunto[] | undefined;
+      if (q.get('diag')) {
+        // los pares que arma la CPU sobre las posiciones de la GPU
+        const cpu = nuevo();
+        cpu.x.set(x);
+        cpu.v.fill(0);
+        cpu.costuras.cosido.set(await motor.leerCosidos());
+        cpu.armarParesPropios();
+        const { piezas, prenda } = camisetaEnCurso.camiseta;
+        const piezaDe = (v: number) => {
+          const k = prenda.piezas.findIndex((p) => v >= p.v0 && v < p.v0 + p.nv);
+          return `${piezas[k].name} (${piezas[k].category ?? 'sin clase'})`;
+        };
+        diagnostico = paresEnCosturas(cpu, piezaDe);
+        peores = peoresPuntos(cpu, piezaDe);
+      }
+      return { ...base, segundosHastaQuieta: quieta, msPorCuadro: ms / cuadros, medidas: medirCamiseta(x, camisetaEnCurso), diagnostico, peores, estado: await motor.leerEstado() };
     }
     // quietud: hasta 10 s de tela, leyendo la historia de a un segundo
     const vigia = new VigiaDeQuietud();

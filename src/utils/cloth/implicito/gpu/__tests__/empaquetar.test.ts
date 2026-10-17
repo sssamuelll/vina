@@ -13,10 +13,16 @@ function ranuras(s: SistemaTela): Float64Array {
     const e = ESTADO_MEMBRANA * t, o = 7 * t, A0 = c[o + 6];
     const gu = em[e + 8], gv = em[e + 9];
     const ks = kC * (em[e] * em[e + 3] + em[e + 1] * em[e + 4] + em[e + 2] * em[e + 5]);
+    // E13: κ·b'(J)·(a_j·∂J/∂f_u + b_j·∂J/∂f_v), con ∂J/∂f_u = f_v × n̂ y ∂J/∂f_v = n̂ × f_u
+    const [ux, uy, uz, vx, vy, vz] = [0, 1, 2, 3, 4, 5].map((d) => em[e + d]);
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx, J = Math.hypot(cx, cy, cz);
+    const n = J > 1e-12 ? [cx / J, cy / J, cz / J] : [0, 0, 0];
+    const dJu = [vy * n[2] - vz * n[1], vz * n[0] - vx * n[2], vx * n[1] - vy * n[0]];
+    const dJv = [n[1] * uz - n[2] * uy, n[2] * ux - n[0] * uz, n[0] * uy - n[1] * ux];
     for (let j = 0; j < 3; j++) {
       for (let d = 0; d < 3; d++) {
         const fu = em[e + d], fv = em[e + 3 + d];
-        out[3 * (3 * t + j) + d] = A0 * (gu * c[o + j] * fu + gv * c[o + 3 + j] * fv + ks * (c[o + j] * fv + c[o + 3 + j] * fu));
+        out[3 * (3 * t + j) + d] = A0 * (gu * c[o + j] * fu + gv * c[o + 3 + j] * fv + ks * (c[o + j] * fv + c[o + 3 + j] * fu) + em[e + 15] * (c[o + j] * dJu[d] + c[o + 3 + j] * dJv[d]));
       }
     }
     const th = [0, 1, 2].map((k) => (bisDeTri[3 * t + k] < 0 ? 0 : ep[13 * bisDeTri[3 * t + k]]));
@@ -60,6 +66,30 @@ describe('el paquete de la tela para la GPU', () => {
   for (let q = 0; q < s.x.length; q++) s.x[q] += 0.003 * r();
   s.linealizar();
   const p = empaquetar(s);
+
+  it('cada aporte de la placa sabe dónde están sus dos vértices en las bisagras de su triángulo', () => {
+    const { bisagras, bisDeTri } = s.placa;
+    let placas = 0;
+    for (let b = 0; b < p.nb; b++) {
+      const i = p.u32.blqFila[b], j = p.u32.blqCol[b];
+      for (let k = p.u32.blqOff[b]; k < p.u32.blqOff[b + 1]; k++) {
+        const cod = p.u32.blqCod[k], ran = p.u32.blqRanura[k];
+        if (cod < 0x80000000) {
+          expect(ran).toBe(0);
+          continue;
+        }
+        placas++;
+        const t = cod - 0x80000000;
+        for (let q = 0; q < 3; q++) {
+          const h = bisDeTri[3 * t + q], ri = (ran >>> (6 * q)) & 7, rj = (ran >>> (6 * q + 3)) & 7;
+          const lugar = (v: number) => (h < 0 ? -1 : [0, 1, 2, 3].findIndex((r) => bisagras[4 * h + r] === v));
+          expect(ri === 7 ? -1 : ri).toBe(lugar(i));
+          expect(rj === 7 ? -1 : rj).toBe(lugar(j));
+        }
+      }
+    }
+    expect(placas).toBeGreaterThan(0);
+  });
 
   it('los aportes de cada vértice suman el gradiente elástico', () => {
     const slot = ranuras(s), g = new Float64Array(3 * s.n), esperado = new Float64Array(3 * s.n);
@@ -133,6 +163,19 @@ describe('el paquete de una prenda cosida', () => {
     expect(p.nc).toBe(s.costuras.n);
     expect(Array.from(p.f32.cl)).toEqual(Array.from(Float32Array.from(s.costuras.L)));
     expect(Array.from(p.u32.costuraK)).toEqual(s.placa.costura.map((c) => c.o));
+  });
+
+  it('lleva las puntadas como la CPU: qué punto se cose, de cuál depende cada vértice y cuáles sostiene (E8)', () => {
+    const c = s.costuras;
+    expect(Array.from(p.u32.cSoldable)).toEqual(Array.from(c.soldable));
+    expect(Array.from(p.u32.dependeDe)).toEqual(Array.from(c.dependeDe, (e) => (e < 0 ? NINGUNA : e)));
+    expect(Array.from(p.u32.cInversa)).toEqual(Array.from(c.inversa));
+    for (let i = 0; i < s.n; i++) {
+      const esperado = [...Array(c.n).keys()].filter((e) => c.soldable[e] && (c.b0[e] === i || c.b1[e] === i));
+      expect(Array.from(p.u32.depIdx.subarray(p.u32.depOff[i], p.u32.depOff[i + 1]))).toEqual(esperado);
+    }
+    expect(Array.from(p.f32.ccos)).toEqual(Array.from(c.cosido));
+    expect(Array.from(p.f32.cdes)).toEqual(Array.from(Float32Array.from(c.desfase)));
   });
 });
 

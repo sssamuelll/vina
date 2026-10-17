@@ -18,15 +18,15 @@ describe('el sistema de un cuadro', () => {
     expect(errorDelGradiente((x) => s.energiaIncremental(x), res.map((q) => -q), s.x)).toBeLessThan(1e-4);
   });
 
-  it('al empezar el paso, el contacto entra con su plano', () => {
+  it('al empezar el paso, el vértice apoyado en el suelo entra con su restricción', () => {
     const s = new SistemaTela(laminaPlana(20), TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'plano', altura: 0 }] });
     const r = azar(23);
     // ±0,25 mm: todos los vértices quedan a menos de la separación del suelo (1,25 mm)
     for (let q = 0; q < s.x.length; q++) s.x[q] += 0.0005 * r();
     s.xt.set(s.x);
     s.linealizar();
-    s.armarContactos();
-    expect(s.contactos.length).toBe(s.n);
+    s.armarApoyos();
+    expect(s.apoyos.length).toBe(s.n);
     const res = new Float64Array(s.x.length);
     s.residuo(res);
     expect(errorDelGradiente((x) => s.energiaIncremental(x), res.map((q) => -q), s.x)).toBeLessThan(1e-4);
@@ -38,10 +38,10 @@ describe('el sistema de un cuadro', () => {
     m.fijos[0] = 1;
     const s = new SistemaTela(m, TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'plano', altura: 0 }] });
     s.linealizar();
-    s.armarContactos();
+    s.armarApoyos();
     const res = new Float64Array(s.x.length);
     s.residuo(res);
     expect([res[0], res[1], res[2]]).toEqual([0, 0, 0]);
-    expect(s.contactos.some((c) => c.i === 0)).toBe(false);
+    expect(s.apoyos.some((c) => c.i === 0)).toBe(false);
   });
 });

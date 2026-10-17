@@ -12,11 +12,11 @@ type Bufer = 'pos' | 'vf' | 'tf' | 'iu' | 'red' | 'vals' | 'pv' | 'at';
 /** En el orden de las ligaduras del WGSL. */
 const BUFERES: Bufer[] = ['pos', 'vf', 'tf', 'iu', 'red', 'vals', 'pv', 'at'];
 
-/** Lo que dejó el último cuadro: iteraciones, contactos anticipados, paso aceptado, quietud y pares de contacto propio (§4.2.4). */
+/** Lo que dejó el último cuadro: iteraciones, vértices proyectados (E10), paso aceptado, quietud y pares de contacto propio (§4.2.4). */
 export interface EstadoGpu {
   cuadro: number;
   cg: number;
-  anticipados: number;
+  proyectados: number;
   alfa: number;
   quietud: number;
   quietudMaxima: number;
@@ -56,6 +56,8 @@ export class MotorGpu {
     tf.set(p.f32.cs, d.tf.CS);
     tf.set(p.f32.cl, d.tf.CL);
     tf.set(p.f32.ckh, d.tf.CKH);
+    tf.set(p.f32.ccos, d.tf.CCOS);
+    tf.set(p.f32.cdes, d.tf.CDES);
     tf.set(p.f32.cuNodos, d.tf.CUN);
     tf.set(p.f32.cuTri, d.tf.CUT);
     tf.set(p.f32.cuNt, d.tf.CUNT);
@@ -71,7 +73,7 @@ export class MotorGpu {
       tf,
       iu,
       red: new Float32Array(d.red.total),
-      vals: new Float32Array(12 * Math.max(p.nq, 1)),
+      vals: new Float32Array(9 * Math.max(p.nq, 1)),
       pv: new Float32Array(4 * p.n),
       at: new Uint32Array(d.at.total),
     };
@@ -99,24 +101,43 @@ export class MotorGpu {
 
   /** Graba un cuadro completo en el pase, en el orden de paso.ts. */
   grabarCuadro(pase: GPUComputePassEncoder): void {
-    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gcel, gpnt, gvb } = this.d, propio = this.p.propio;
-    const d = (e: Entrada, grupos: number) => {
-      if (grupos === 0) return;
+    pase.setBindGroup(0, this.grupo);
+    this.grabar((e, grupos) => {
       pase.setPipeline(this.k[e]);
       pase.dispatchWorkgroups(grupos);
+    });
+  }
+
+  /** Los despachos de un cuadro, en el orden de paso.ts; `despachar` recibe solo los que tienen grupos. */
+  private grabar(despachar: (e: Entrada, grupos: number) => void): void {
+    const { aj } = this.s, { gv, gt, gh, gb, gc, gch, gp, gpa, ge, gcel, gpnt, gvb } = this.d, propio = this.p.propio;
+    const d = (e: Entrada, grupos: number) => {
+      if (grupos > 0) despachar(e, grupos);
+    };
+    // la lista de entradas de cada vértice en los pares activos
+    const listas = () => {
+      d('limpiarVertices', gv);
+      d('contarEntradas', gp);
+      d('scanVBloques', gv);
+      d('scanVTotales', 1);
+      d('scanVSumar', gv);
+      d('llenarEntradas', gp);
     };
     const ronda = () => {
       d('residuo', gv);
       d('sumarInicio', 1);
+      // E8: el p de cada vértice cosido es el de sus dos vértices
+      d('expandirP', gc);
       for (let k = 0; k < aj.maxCG; k++) {
+        if (propio) d('aportePares', gpa);
         d('spmv', gv);
-        d('sumarAlfa', 1);
         d('actualizar', gv);
-        d('sumarBeta', 1);
         d('nuevaP', gv);
+        d('expandirP', gc);
       }
     };
-    pase.setBindGroup(0, this.grupo);
+    d('encoger', gc);
+    d('ubicar', gc);
     d('inicio', gv);
     d('prepTri', gt);
     d('prepHinge', gh);
@@ -125,9 +146,9 @@ export class MotorGpu {
     d('ensamblar', gb);
     if (propio) {
       // los pares del contacto propio en x_t (sistema.ts, armarParesPropios) y la lista de entradas de cada vértice
-      d('velMax', gv);
-      d('armarRadio', 1);
+      d('limpiarPares', 1);
       d('limpiarCeldas', gcel);
+      d('anotarRegiones', gv);
       d('hashContar', gpnt);
       d('scanCBloques', gcel);
       d('scanCTotales', 1);
@@ -135,30 +156,16 @@ export class MotorGpu {
       d('hashLlenar', gpnt);
       d('limpiarPuntas', gvb);
       d('paresDeTriangulo', gt);
-      d('limpiarVertices', gv);
-      d('contarEntradas', gp);
-      d('scanVBloques', gv);
-      d('scanVTotales', 1);
-      d('scanVSumar', gv);
-      d('llenarEntradas', gp);
+      listas();
     }
     ronda();
-    // ponytail: la segunda ronda y los intentos de la búsqueda se despachan siempre y salen enseguida si no
-    // hacen falta (cuestan los despachos vacíos); pasar a despacho indirecto cuando se optimice la velocidad
-    if (aj.anticipar && (this.s.obstaculos.length > 0 || propio)) {
-      d('anticipar', gv);
-      if (propio) d('anticiparPares', gp);
-      d('armarRonda2', 1);
-      ronda();
-    }
+    // los intentos se despachan siempre y salen enseguida si ya se aceptó uno: el despacho indirecto, que los saltaría,
+    // cuesta más en Chrome que uno vacío. Cada intento son tres despachos
     if (aj.busqueda) {
       d('prepBusqueda', 1);
       for (let intento = 0; intento < 8; intento++) {
         d('posPrueba', gv);
-        d('anguloPrueba', gh);
-        d('difTri', gt);
-        d('difCostura', gc);
-        if (propio) d('difPares', gp);
+        d('difElementos', ge);
         d('decidir', 1);
       }
     }
@@ -183,6 +190,49 @@ export class MotorGpu {
     await this.device.queue.onSubmittedWorkDone();
   }
 
+  /**
+   * El tiempo de GPU de cada entrada en `cuadros` cuadros: un pase por despacho, con una marca de tiempo al empezar y
+   * otra al terminar. Pide un device con 'timestamp-query' (y Chrome redondea las marcas a 0,1 ms salvo con
+   * --enable-webgpu-developer-features). Los pases sueltos cuestan algo más que el pase único del cuadro: sirve para
+   * repartir el cuadro, no para medir su total.
+   */
+  async perfilar(cuadros: number): Promise<Array<{ entrada: Entrada; veces: number; ms: number }>> {
+    if (!this.device.features.has('timestamp-query')) throw new Error('perfilar: el device no tiene timestamp-query');
+    const total = new Map<Entrada, { veces: number; ms: number }>();
+    for (let c = 0; c < cuadros; c++) {
+      const nombres: Entrada[] = [];
+      this.grabar((e) => nombres.push(e));
+      const marcas = this.device.createQuerySet({ type: 'timestamp', count: 2 * nombres.length });
+      const resueltas = this.device.createBuffer({ size: 16 * nombres.length, usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC });
+      const lectura = this.device.createBuffer({ size: 16 * nombres.length, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      const enc = this.device.createCommandEncoder();
+      let q = 0;
+      this.grabar((e, grupos) => {
+        const pase = enc.beginComputePass({ timestampWrites: { querySet: marcas, beginningOfPassWriteIndex: 2 * q, endOfPassWriteIndex: 2 * q + 1 } });
+        pase.setBindGroup(0, this.grupo);
+        pase.setPipeline(this.k[e]);
+        pase.dispatchWorkgroups(grupos);
+        pase.end();
+        q++;
+      });
+      enc.resolveQuerySet(marcas, 0, 2 * q, resueltas, 0);
+      enc.copyBufferToBuffer(resueltas, 0, lectura, 0, 16 * q);
+      this.device.queue.submit([enc.finish()]);
+      await lectura.mapAsync(GPUMapMode.READ);
+      const t = new BigUint64Array(lectura.getMappedRange());
+      nombres.forEach((e, k) => {
+        const fila = total.get(e) ?? { veces: 0, ms: 0 };
+        fila.veces++;
+        fila.ms += Number(t[2 * k + 1] - t[2 * k]) / 1e6;
+        total.set(e, fila);
+      });
+      lectura.unmap();
+      for (const b of [lectura, resueltas]) b.destroy();
+      marcas.destroy();
+    }
+    return [...total].map(([entrada, f]) => ({ entrada, veces: f.veces / cuadros, ms: f.ms / cuadros })).sort((a, b) => b.ms - a.ms);
+  }
+
   private async leer(nombre: Bufer, desde: number, bytes: number): Promise<ArrayBuffer> {
     const lectura = this.device.createBuffer({ size: bytes, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
     const enc = this.device.createCommandEncoder();
@@ -203,9 +253,14 @@ export class MotorGpu {
     const e = new Float32Array(await this.leer('red', 4 * this.d.red.SC, 4 * 16));
     const a = new Uint32Array(await this.leer('at', 4 * this.d.at.NPAR, 8));
     return {
-      cuadro: e[ESC.CUADRO], cg: e[ESC.ITER], anticipados: e[ESC.NUEVOS], alfa: e[ESC.ALFA_FINAL], quietud: e[ESC.QUIETUD], quietudMaxima: e[ESC.QMAX],
+      cuadro: e[ESC.CUADRO], cg: e[ESC.ITER], proyectados: e[ESC.PROYECTADOS], alfa: e[ESC.ALFA_FINAL], quietud: e[ESC.QUIETUD], quietudMaxima: e[ESC.QMAX],
       dg: e[ESC.DG], pares: Math.min(a[0], this.p.maxPares), desbordes: a[1],
     };
+  }
+
+  /** E8: 1 en cada punto de costura que quedó cosido. */
+  async leerCosidos(): Promise<Float32Array> {
+    return new Float32Array(await this.leer('tf', 4 * this.d.tf.CCOS, 4 * Math.max(this.p.nc, 1))).subarray(0, this.p.nc);
   }
 
   /** La quietud de los cuadros [desde, desde + cuantos). */

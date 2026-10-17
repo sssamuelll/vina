@@ -232,12 +232,17 @@ export class Placa {
     return E;
   }
 
-  /** Energía de flexión en las posiciones x. */
+  /**
+   * Energía de flexión en las posiciones x. Cada ángulo sigue desde el del último `linealizar` (el de x_t en el paso): una
+   * bisagra doblada que cruza los 180° no salta de +π a −π, porque los términos cruzados de K cambiarían de signo y G
+   * saltaría a lo largo del paso.
+   */
   energia(x: Float64Array): number {
-    const th = new Float64Array(this.nh);
+    const th = new Float64Array(this.nh), e = this.estado;
     for (let h = 0; h < this.nh; h++) {
       const q = 4 * h;
-      th[h] = anguloYGradiente(x, this.bisagras[q], this.bisagras[q + 1], this.bisagras[q + 2], this.bisagras[q + 3], this.g) ?? 0;
+      const d = (anguloYGradiente(x, this.bisagras[q], this.bisagras[q + 1], this.bisagras[q + 2], this.bisagras[q + 3], this.g) ?? 0) - e[13 * h];
+      th[h] = e[13 * h] + d - 2 * Math.PI * Math.round(d / (2 * Math.PI));
     }
     let E = 0;
     for (let t = 0; t < this.tris.length / 3; t++) E += this.energiaDe(t, th);

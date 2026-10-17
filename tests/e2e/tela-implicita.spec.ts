@@ -23,7 +23,8 @@ interface ResultadoTela {
   segundosHastaQuieta?: number | null;
   dgCpu?: number;
   medidas?: MedidasDeCamiseta;
-  estado?: { cuadro: number; cg: number; anticipados: number; alfa: number; quietud: number; quietudMaxima: number; dg: number; pares: number; desbordes: number };
+  estado?: { cuadro: number; cg: number; proyectados: number; alfa: number; quietud: number; quietudMaxima: number; dg: number; pares: number; desbordes: number };
+  perfil?: Array<{ entrada: string; veces: number; ms: number }>;
   error?: string;
 }
 
@@ -50,7 +51,7 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
   // un cuadro (0,55 mm en tres); con 20 N/m baja de 1 µm
   const PARIDAD: Array<[string, string]> = [
     ['chica', 'cg=50'], ['apoyada', 'cg=50'], ['costura', 'cg=400'], ['costura-cerrada', 'cg=400'], ['esfera', 'cg=50'],
-    ['inclinada', 'cg=50'], ['capas', 'cg=400&kc=20'], ['punta', 'cg=50'], ['hundida', 'cg=400&kc=20'],
+    ['inclinada', 'cg=50'], ['capas', 'cg=400&kc=20'], ['punta', 'cg=50'], ['hundida', 'cg=400&kc=20'], ['aplastada', 'cg=400'],
   ];
   for (const [escena, ajustes] of PARIDAD) {
     test(`da lo mismo que la CPU tras 3 cuadros (${escena})`, async ({ page }) => {
@@ -59,6 +60,26 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
       if (escena === 'capas' || escena === 'punta' || escena === 'hundida') expect(r.estado?.pares).toBeGreaterThan(0);
     });
   }
+
+  test('da lo mismo que la CPU tras 3 cuadros con el tope de la meseta (chica)', async ({ page }) => {
+    // con un tope de 0,1 %, casi todo lo que encoge pasa la meseta y vuelve a resistir con k
+    const r = await correr(page, 'modo=paridad&escena=chica&cg=50&pandeo=1&topePandeo=0.001&cuadros=3');
+    expect(r.dif?.maxima).toBeLessThan(1e-4);
+  });
+
+  test('da lo mismo que la CPU tras 3 cuadros con el contacto propio más blando que el del cuerpo (capas)', async ({ page }) => {
+    // los pares en 20 N/m con kContacto en 2000: si la GPU usara kContacto para los pares, la CPU y la GPU se separan
+    const r = await correr(page, 'modo=paridad&escena=capas&cg=400&kp=20&cuadros=3');
+    expect(r.dif?.maxima).toBeLessThan(1e-4);
+    expect(r.estado?.pares).toBeGreaterThan(0);
+  });
+
+  test('da lo mismo que la CPU tras 3 cuadros con el contacto propio blando y la punta del cuerpo dura (punta)', async ({ page }) => {
+    // la punta del cuerpo contra la tela lleva kContacto aunque los pares de tela vayan a 1 N/m
+    const r = await correr(page, 'modo=paridad&escena=punta&cg=50&kp=1&cuadros=3');
+    expect(r.dif?.maxima).toBeLessThan(1e-4);
+    expect(r.estado?.pares).toBeGreaterThan(0);
+  });
 
   test('con lugar para 8 pares, la GPU cuenta los que no caben y la tela no se llena de NaN', async ({ page }) => {
     const r = await correr(page, 'modo=paridad&escena=capas&cg=50&cuadros=3&maxPares=8');
@@ -112,11 +133,13 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
 
   test('a 5 mm queda quieta sola, con las costuras cerradas, nada aplastado y a 17 ms por cuadro (§2)', async ({ page }) => {
     const espera = 880_000;
-    const camiseta = await correr(page, 'modo=camiseta&escena=camiseta&malla=5&cg=50', espera);
-    const velocidad20 = await correr(page, 'modo=velocidad&escena=camiseta&malla=5&cg=20&cuadros=60', espera);
-    const velocidad50 = await correr(page, 'modo=velocidad&escena=camiseta&malla=5&cg=50&cuadros=60', espera);
-    const paridad = await correr(page, 'modo=paridad&escena=camiseta&malla=5&cg=50&cuadros=3', espera);
-    console.log(`[camiseta] informe: ${guardarInforme('camiseta-gpu', { camiseta, velocidad20, velocidad50, paridad })}`);
+    // ajustes de la URL para medir otras variantes con el banco (p. ej. VINA_TELA_AJUSTES='cierre=2&kcost=300')
+    const extra = process.env.VINA_TELA_AJUSTES ? `&${process.env.VINA_TELA_AJUSTES}` : '';
+    const camiseta = await correr(page, `modo=camiseta&escena=camiseta&malla=5${extra}&cg=50`, espera);
+    const velocidad20 = await correr(page, `modo=velocidad&escena=camiseta&malla=5${extra}&cg=20&cuadros=60`, espera);
+    const velocidad50 = await correr(page, `modo=velocidad&escena=camiseta&malla=5${extra}&cg=50&cuadros=60`, espera);
+    const paridad = await correr(page, `modo=paridad&escena=camiseta&malla=5${extra}&cg=50&cuadros=3`, espera);
+    console.log(`[camiseta] informe: ${guardarInforme('camiseta-gpu', { extra, camiseta, velocidad20, velocidad50, paridad })}`);
     const m = camiseta.medidas!;
     expect(camiseta.estado?.desbordes).toBe(0);
     expect(m.aplastados).toBeLessThan(0.1);
@@ -125,5 +148,25 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
     expect(camiseta.segundosHastaQuieta).not.toBeNull();
     expect(camiseta.segundosHastaQuieta!).toBeLessThanOrEqual(10);
     expect(velocidad50.msPorCuadro!).toBeLessThanOrEqual(17);
+  });
+
+  test('velocidad por partes a 5 mm: iteraciones × contacto propio (medida, sin meta)', async ({ page }) => {
+    const filas: Array<{ consulta: string; msPorCuadro: number }> = [];
+    for (const cg of [20, 50]) {
+      for (const propio of [1, 0]) {
+        const consulta = `modo=velocidad&escena=camiseta&malla=5&cg=${cg}&propio=${propio}&cuadros=60`;
+        filas.push({ consulta, msPorCuadro: (await correr(page, consulta, 880_000)).msPorCuadro! });
+      }
+    }
+    console.log(`[velocidad] informe: ${guardarInforme('camiseta-velocidad', { filas })}`);
+    for (const f of filas) expect(f.msPorCuadro).toBeGreaterThan(0);
+  });
+
+  test('perfil por entrada a 5 mm: ms de GPU de cada despacho (medido, sin meta)', async ({ page }) => {
+    // con VINA_WEBGPU_PERFIL=1 Chrome no redondea las marcas de tiempo (playwright.webgpu.config.ts)
+    const extra = process.env.VINA_TELA_AJUSTES ? `&${process.env.VINA_TELA_AJUSTES}` : '';
+    const r = await correr(page, `modo=perfil&escena=camiseta&malla=5${extra}&cg=50&desde=30&cuadros=10`, 880_000);
+    console.log(`[perfil] informe: ${guardarInforme('camiseta-perfil', { extra, perfil: r.perfil, estado: r.estado })}`);
+    expect(r.perfil!.length).toBeGreaterThan(0);
   });
 });

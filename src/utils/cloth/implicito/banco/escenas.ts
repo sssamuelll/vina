@@ -114,6 +114,26 @@ export function escenaVoladizo(voladoMm: number, hilo: 'urdimbre' | 'trama', ari
   return { malla, obstaculos: [], hilo: hilo === 'urdimbre' ? [1, 0] : [0, 1] };
 }
 
+/** La mesa del voladizo apoyado: un pedestal de 1 m de radio con la tapa en y = 0; en los 25 mm de la tira, su borde se curva 0,08 mm. */
+export const MESA_DE_PEIRCE = { radio: 1, tapa: 0 } as const;
+
+/**
+ * El voladizo de Peirce apoyado, como lo corre la referencia (spec §4.4.2, E12): una tira de 25 mm sobre una mesa, sin
+ * sujetar, con `apoyoMm` sobre la mesa y `voladoMm` en el aire, 3 mm por encima de la tapa. El borde de la mesa corre en
+ * x = 1 m. Con 'urdimbre' el hilo va a lo largo de la tira; con 'trama', a lo ancho; con 'bies', a 45°.
+ */
+export function escenaPeirceApoyada(voladoMm: number, apoyoMm: number, hilo: 'urdimbre' | 'trama' | 'bies', aristaMm: number): Escena {
+  const R = 1000 * MESA_DE_PEIRCE.radio;
+  const malla = mallaDeContorno(
+    [[R - apoyoMm, -12.5], [R, -12.5], [R + voladoMm, -12.5], [R + voladoMm, 12.5], [R, 12.5], [R - apoyoMm, 12.5]],
+    aristaMm,
+    MESA_DE_PEIRCE.tapa + 0.003,
+    [[[R, -12.5], [R, 12.5]]],
+  );
+  const hilos = { urdimbre: [1, 0], trama: [0, 1], bies: [Math.SQRT1_2, Math.SQRT1_2] } as const;
+  return { malla, obstaculos: [{ tipo: 'pedestal', ...MESA_DE_PEIRCE }], hilo: hilos[hilo] };
+}
+
 /** Lámina de 120 × 120 mm, para curvarla sobre un cilindro. */
 export function laminaPlana(aristaMm: number): MallaDeTela {
   return mallaDeContorno(rectangulo(-60, -60, 60, 60), aristaMm);
@@ -196,7 +216,7 @@ export function piramideDeColision(base: number, altura: number): CollisionMeshD
   return mallaDeCuerpo(v, [[0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4], [0, 1, 2], [0, 2, 3]], (c) => resta(c, centro));
 }
 
-/** Una lámina de 120 mm, 5 mm sobre una esfera de 5 cm (malla de cuerpo): el contacto llega por anticipación en el segundo cuadro. */
+/** Una lámina de 120 mm, 5 mm sobre una esfera de 5 cm (malla de cuerpo): el segundo cuadro la mete en la esfera y la proyecta (E10). */
 export function escenaEsfera(): Escena {
   const cuerpo = new CuerpoRigido(buildLinearBVH(esferaDeColision(0.05, 3)));
   return { malla: mallaDeContorno(rectangulo(-60, -60, 60, 60), 10, 0.055), obstaculos: [{ tipo: 'cuerpo', cuerpo }] };
@@ -219,7 +239,7 @@ export function escenaInclinada(): Escena {
 /**
  * Dos láminas en caída libre, sin piso: una de 90 mm inclinada sobre otra de 120 mm, de 1,2 mm (dentro de la
  * separación) a 6 mm, bajando 0,3 m/s más rápido y resbalando a 0,05 m/s. El primer cuadro tiene pares activos desde
- * la entrada, con su fricción, y pares anticipados. Con un piso, el piso frenaba las dos láminas a la misma altura y la
+ * la entrada, con su fricción, y pares que la velocidad mete en la separación (E10). Con un piso, el piso frenaba las dos láminas a la misma altura y la
  * de arriba terminaba sobre la de abajo a distancia cero, donde la CPU y la GPU no pueden armar los mismos pares.
  */
 export function escenaCapas(): Escena {
@@ -247,6 +267,20 @@ export function escenaHundida(): Escena {
   });
   const abajo = dePie(mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), 0), arriba = dePie(mallaDeContorno(rectangulo(-45, -45, 45, 45), 10), 0.00005);
   return { malla: armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }]).malla, obstaculos: [] };
+}
+
+/**
+ * Una lámina de 120 mm con el primer triángulo aplastado a 0,15 de su área (su tercer vértice, hacia el borde opuesto): la
+ * barrera de área (E13) lo abre.
+ */
+export function escenaAplastada(): Escena {
+  const malla = laminaPlana(20);
+  const [a, b, c] = [malla.tris[0], malla.tris[1], malla.tris[2]];
+  for (let d = 0; d < 3; d++) {
+    const medio = 0.5 * (malla.x[3 * a + d] + malla.x[3 * b + d]);
+    malla.x[3 * c + d] = medio + 0.15 * (malla.x[3 * c + d] - medio);
+  }
+  return { malla, obstaculos: [] };
 }
 
 /** Una lámina de malla gruesa (20 mm), 2 mm sobre la punta de una pirámide y corrida para que la punta caiga en medio de un triángulo. */

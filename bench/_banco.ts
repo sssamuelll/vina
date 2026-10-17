@@ -51,6 +51,11 @@ export interface Corrida {
   /** segundos de tela hasta quedar quieta (§4.2.4); null si el motor no lo mide o no llegó */
   quieta: number | null;
   msPorCuadro: number;
+  /** iteraciones de gradiente conjugado por cuadro, en promedio (solo el motor implícito) */
+  cgMedio?: number;
+  /** el cuadro en que cerró la primera costura y el cuadro en que cerraron todas; null si no llegó (solo el motor implícito) */
+  primeraCerrada?: number | null;
+  todasCerradas?: number | null;
 }
 
 export type Corredor = (e: Escena) => Corrida;
@@ -188,10 +193,13 @@ export interface FilaCamiseta extends MedidasDeCamiseta {
   quieta: number | null;
   msPorCuadro: number;
   errorDeColocacion: number[];
+  cgMedio?: number;
+  primeraCerrada?: number | null;
+  todasCerradas?: number | null;
 }
 
 /** La camiseta sobre el avatar de la referencia, desde su colocación (E5), en la CPU hasta quieta o 10 s de tela. */
-export function ensayoCamiseta(tela: TelaFisica, mallas: number[], ajustes: Partial<AjustesImplicito> = {}): FilaCamiseta[] {
+export function ensayoCamiseta(tela: TelaFisica, mallas: number[], ajustes: Partial<AjustesImplicito> = {}, topePlaca?: number): FilaCamiseta[] {
   const dir = carpetaPrivada();
   const config = JSON.parse(fs.readFileSync(path.join(dir, 'camiseta.json'), 'utf8')) as ConfigCamiseta;
   const leer = (r: string) => fs.readFileSync(path.join(dir, r), 'utf8');
@@ -199,8 +207,11 @@ export function ensayoCamiseta(tela: TelaFisica, mallas: number[], ajustes: Part
   return mallas.map((malla) => {
     const asentada = config.asentada[String(malla)];
     const c = camisetaContraLaReferencia({ ...base, asentada: asentada ? leer(asentada) : undefined }, malla, tela);
-    const r = correrImplicito(tela, ajustes)(c.escena);
-    return { malla, quieta: r.quieta, msPorCuadro: r.msPorCuadro, errorDeColocacion: c.errorDeColocacion, ...medirCamiseta(r.x, c) };
+    const r = correrImplicito(tela, ajustes, topePlaca)(c.escena);
+    return {
+      malla, quieta: r.quieta, msPorCuadro: r.msPorCuadro, errorDeColocacion: c.errorDeColocacion,
+      cgMedio: r.cgMedio, primeraCerrada: r.primeraCerrada, todasCerradas: r.todasCerradas, ...medirCamiseta(r.x, c),
+    };
   });
 }
 
@@ -210,8 +221,10 @@ const pct = (e: { p05: number; p50: number; p95: number }) => [e.p05, e.p50, e.p
 export function imprimirCamiseta(filas: FilaCamiseta[]): void {
   for (const f of filas) {
     const ref = f.referencia;
-    console.log(`camiseta ${f.malla} mm (${f.vertices} vértices; colocación a ${Math.max(...f.errorDeColocacion).toFixed(2)} mm): quieta ${uno(f.quieta)} s · ${f.msPorCuadro.toFixed(0)} ms por cuadro`);
+    console.log(`camiseta ${f.malla} mm (${f.vertices} vértices; colocación a ${Math.max(...f.errorDeColocacion).toFixed(2)} mm): quieta ${uno(f.quieta)} s · ${f.msPorCuadro.toFixed(0)} ms por cuadro · cg ${f.cgMedio?.toFixed(1) ?? '—'} por cuadro · costuras cerradas: la primera en el cuadro ${f.primeraCerrada ?? '—'}, todas en el ${f.todasCerradas ?? '—'}`);
     console.log(`  aplastados ${f.aplastados.toFixed(2)} %${ref ? ` (referencia ${ref.aplastados.toFixed(2)} %)` : ''} · costuras mediana ${mm(f.costuras.mediana)} mm, máxima ${mm(f.costuras.maxima)} mm`);
+    console.log(`  costuras más abiertas: ${f.porCostura.slice(0, 3).map((q) => `${q.piezas.join(' ↔ ')}: ${mm(q.maxima)} mm (lados de ${mm(q.largos[0])} y ${mm(q.largos[1])} mm)`).join(' · ')}`);
+    console.log(`  aplastados por pieza: ${f.porPieza.map((q) => `${q.pieza} ${q.aplastados.toFixed(2)} %`).join(' · ')}`);
     console.log(`  estiramiento p05/p50/p95 ${pct(f.estiramiento)} %${ref ? ` (referencia ${pct(ref.estiramiento)})` : ''} · encogidas >10 % ${f.estiramiento.encogidas.toFixed(2)} %`);
     console.log(`  pliegues p50/p95 ${f.pliegues.p50.toFixed(1)}°/${f.pliegues.p95.toFixed(1)}°, >90° ${f.pliegues.sobre90}, >150° ${f.pliegues.sobre150}${ref ? ` (referencia ${ref.pliegues.p50.toFixed(1)}°/${ref.pliegues.p95.toFixed(1)}°, ${ref.pliegues.sobre90}, ${ref.pliegues.sobre150})` : ''}`);
     console.log(`  al cuerpo p05/p50/p95 ${mm(f.alCuerpo.p05)}/${mm(f.alCuerpo.p50)}/${mm(f.alCuerpo.p95)} mm${ref ? ` (referencia ${mm(ref.alCuerpo.p05)}/${mm(ref.alCuerpo.p50)}/${mm(ref.alCuerpo.p95)})` : ''}`);

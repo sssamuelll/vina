@@ -53,6 +53,22 @@ describe('la flexión que cruza la costura', () => {
     });
   }
 
+  it('con los t del tramo, cada bisagra busca su ala en el segmento de B que le toca por t', () => {
+    const { prenda, ladoA, ladoB } = laminaCosida(5);
+    const { patron, tris } = prenda.malla;
+    const largos = (lado: number[]) => {
+      const t = [0];
+      for (let k = 1; k < lado.length; k++) t.push(t[k - 1] + Math.hypot(patron[2 * lado[k]] - patron[2 * lado[k - 1]], patron[2 * lado[k] + 1] - patron[2 * lado[k - 1] + 1]));
+      return t.map((v) => v / t[t.length - 1]);
+    };
+    // B abarca solo la primera mitad de su tramo: de la mitad de A en adelante, todas las alas caen en el último segmento de B
+    const conT = bisagrasDeCostura(patron, tris, ladoA, ladoB, tela, largos(ladoA), largos(ladoB).map((t) => 0.5 * t));
+    const sinT = bisagrasDeCostura(patron, tris, ladoA, ladoB, tela);
+    const medio = Math.floor(0.75 * (ladoA.length - 1));
+    expect(conT[medio].d).toBe(conT[conT.length - 1].d);
+    expect(sinT[medio].d).not.toBe(sinT[sinT.length - 1].d);
+  });
+
   it('en la prenda, las bisagras se encienden cuando la costura cierra', () => {
     const izq = mallaDeContorno(rectangulo(0, 0, 100, 60), 10), der = mallaDeContorno(rectangulo(0, 0, 100, 60), 10);
     const prenda = armarPrenda([

@@ -4,26 +4,64 @@
  * con tracción lineal por hilo y pandeo de Choi y Ko al encoger, y su hessiana de Gauss-Newton:
  * k·n·nᵀ + max(ψ'/s, 0)·(I − n·nᵀ) por hilo y kCizalla·∇γ·∇γᵀ para la cizalla. A lo largo del hilo va la
  * rigidez k también en la meseta de pandeo, donde ψ'' es 0: la energía y la fuerza siguen la ley, pero el
- * paso no mueve gratis el hilo comprimido (con 0, la malla gruesa se trababa).
+ * paso no mueve gratis el hilo comprimido (con 0, la malla gruesa se trababa). E13: bajo un quinto de su área, la
+ * barrera de área A0·κ·b(J) no deja que el triángulo se aplaste ni se dé vuelta.
  */
 import type { TelaSI } from './tela';
 
 /**
- * ψ(ε), ψ'(ε) y ψ''(ε) por unidad de área: rigidez k hasta la carga de pandeo `pcr` (N/m) al encoger;
- * desde ahí la fuerza queda en −pcr y la tela se dobla en vez de encoger.
+ * E13: la fracción de su área (J = A/A0) desde la que la tela resiste aplastarse, como cuando los hilos se traban. Desde la
+ * mitad, la barrera tocaba el impacto del disco Cusick contra el pedestal (un triángulo baja a 0,19 en el tercer cuadro) y
+ * el disco ya no quedaba quieto en 10 s; desde un quinto, queda quieto a los 2,6 s y la camiseta deja de trabarse.
  */
-export function ley(eps: number, k: number, pcr: number): [number, number, number] {
+export const AREA_MINIMA = 0.2;
+/** La rigidez de la barrera de área, en veces la tracción más rígida de la tela. */
+export const RIGIDEZ_DE_AREA = 10;
+
+/**
+ * b(J), b'(J) y b''(J) de la barrera de área (E13): −(J − J₀)²·ln(J/J₀) bajo J₀ = AREA_MINIMA y 0 encima; es la barrera de
+ * IPC, C² en J₀, y crece sin tope al aplastar el triángulo (su fuerza va como 1/J). J se acota en 10⁻¹² para que un
+ * triángulo hecho un punto no dé infinito.
+ */
+export function barreraDeArea(J: number): [number, number, number] {
+  if (J >= AREA_MINIMA) return [0, 0, 0];
+  const j = Math.max(J, 1e-12), d = j - AREA_MINIMA, l = Math.log(j / AREA_MINIMA);
+  return [-d * d * l, -2 * d * l - (d * d) / j, -2 * l - (4 * d) / j + (d * d) / (j * j)];
+}
+
+/** J = |f_u × f_v| y sus derivadas ∂J/∂f_u = f_v × n̂ y ∂J/∂f_v = n̂ × f_u (n̂ = f_u × f_v / J), en `g` (6 números). */
+function areaYGradiente(ux: number, uy: number, uz: number, vx: number, vy: number, vz: number, g: Float64Array): number {
+  const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx, J = Math.hypot(cx, cy, cz);
+  if (J < 1e-12) {
+    g.fill(0);
+    return J;
+  }
+  const nx = cx / J, ny = cy / J, nz = cz / J;
+  g[0] = vy * nz - vz * ny; g[1] = vz * nx - vx * nz; g[2] = vx * ny - vy * nx;
+  g[3] = ny * uz - nz * uy; g[4] = nz * ux - nx * uz; g[5] = nx * uy - ny * ux;
+  return J;
+}
+
+/**
+ * ψ(ε), ψ'(ε) y ψ''(ε) por unidad de área: rigidez k hasta la carga de pandeo `pcr` (N/m) al encoger;
+ * desde ahí la fuerza queda en −pcr y la tela se dobla en vez de encoger. Pasado el encogimiento `tope`, la
+ * tela vuelve a resistir con k: ψ suma ½·k·(ε + tope)².
+ */
+export function ley(eps: number, k: number, pcr: number, tope = Infinity): [number, number, number] {
   const ecr = pcr / k;
   if (eps >= -ecr) return [0.5 * k * eps * eps, k * eps, k];
-  return [0.5 * k * ecr * ecr + pcr * (-eps - ecr), -pcr, 0];
+  const meseta = 0.5 * k * ecr * ecr + pcr * (-eps - ecr);
+  const t = Math.max(tope, ecr);
+  if (eps >= -t) return [meseta, -pcr, 0];
+  return [meseta + 0.5 * k * (eps + t) * (eps + t), -pcr + k * (eps + t), k];
 }
 
 /**
  * Estado de cada triángulo tras `linealizar`: f_u(3) f_v(3) |f_u| |f_v| ψ'_u/|f_u| ψ'_v/|f_v| k_u k_v
- * max(ψ'_u/|f_u|, 0) max(ψ'_v/|f_v|, 0), con k_u y k_v la rigidez del hilo en la hessiana. La GPU usa la
- * misma disposición.
+ * max(ψ'_u/|f_u|, 0) max(ψ'_v/|f_v|, 0) J κ·b'(J) κ·b''(J), con k_u y k_v la rigidez del hilo en la hessiana y b la
+ * barrera de área (E13). La GPU usa la misma disposición.
  */
-export const ESTADO_MEMBRANA = 14;
+export const ESTADO_MEMBRANA = 17;
 
 export class Membrana {
   readonly nt: number;
@@ -31,7 +69,10 @@ export class Membrana {
   readonly pcrU: Float64Array;
   readonly pcrV: Float64Array;
   readonly estado: Float64Array;
+  /** la rigidez de la barrera de área (E13), N/m */
+  readonly kArea: number;
   private readonly f = new Float64Array(6);
+  private readonly gJ = new Float64Array(6);
 
   constructor(readonly tris: Uint32Array, readonly coef: Float64Array, readonly tela: TelaSI) {
     this.nt = tris.length / 3;
@@ -43,6 +84,7 @@ export class Membrana {
       this.pcrV[t] = (tela.pandeo * Math.PI * Math.PI * tela.bUrdimbre) / L2;
     }
     this.estado = new Float64Array(ESTADO_MEMBRANA * this.nt);
+    this.kArea = RIGIDEZ_DE_AREA * Math.max(tela.kTrama, tela.kUrdimbre);
   }
 
   /** f_u y f_v del triángulo t en las posiciones x, en `f`. */
@@ -62,8 +104,9 @@ export class Membrana {
     this.columnas(t, x, f);
     const su = Math.hypot(f[0], f[1], f[2]), sv = Math.hypot(f[3], f[4], f[5]);
     const g = f[0] * f[3] + f[1] * f[4] + f[2] * f[5];
-    const { kTrama, kUrdimbre, kCizalla } = this.tela;
-    return this.coef[7 * t + 6] * (ley(su - 1, kTrama, this.pcrU[t])[0] + ley(sv - 1, kUrdimbre, this.pcrV[t])[0] + 0.5 * kCizalla * g * g);
+    const { kTrama, kUrdimbre, kCizalla, topePandeo } = this.tela;
+    const J = areaYGradiente(f[0], f[1], f[2], f[3], f[4], f[5], this.gJ);
+    return this.coef[7 * t + 6] * (ley(su - 1, kTrama, this.pcrU[t], topePandeo)[0] + ley(sv - 1, kUrdimbre, this.pcrV[t], topePandeo)[0] + 0.5 * kCizalla * g * g + this.kArea * barreraDeArea(J)[0]);
   }
 
   energia(x: Float64Array): number {
@@ -74,19 +117,29 @@ export class Membrana {
 
   /** Guarda el estado de cada triángulo en las posiciones x, para el gradiente, H·p y los bloques. */
   linealizar(x: Float64Array): void {
-    const f = this.f, e = this.estado, { kTrama, kUrdimbre } = this.tela;
+    const f = this.f, e = this.estado, { kTrama, kUrdimbre, topePandeo } = this.tela;
     for (let t = 0; t < this.nt; t++) {
       this.columnas(t, x, f);
       const su = Math.hypot(f[0], f[1], f[2]), sv = Math.hypot(f[3], f[4], f[5]);
-      const du = ley(su - 1, kTrama, this.pcrU[t])[1];
-      const dv = ley(sv - 1, kUrdimbre, this.pcrV[t])[1];
+      const du = ley(su - 1, kTrama, this.pcrU[t], topePandeo)[1];
+      const dv = ley(sv - 1, kUrdimbre, this.pcrV[t], topePandeo)[1];
       // un triángulo aplastado en una dirección no tiene dirección: sin fuerza ni rigidez transversal
       const gu = su > 1e-12 ? du / su : 0, gv = sv > 1e-12 ? dv / sv : 0;
       const s = ESTADO_MEMBRANA * t;
       for (let k = 0; k < 6; k++) e[s + k] = f[k];
       e[s + 6] = su; e[s + 7] = sv; e[s + 8] = gu; e[s + 9] = gv; e[s + 10] = kTrama; e[s + 11] = kUrdimbre;
       e[s + 12] = Math.max(gu, 0); e[s + 13] = Math.max(gv, 0);
+      const J = areaYGradiente(f[0], f[1], f[2], f[3], f[4], f[5], this.gJ), [, db, hb] = barreraDeArea(J);
+      e[s + 14] = J; e[s + 15] = this.kArea * db; e[s + 16] = this.kArea * hb;
     }
+  }
+
+  /** ∂J/∂f_u y ∂J/∂f_v del triángulo t (del último `linealizar`) en `gJ`; false si no hay barrera. */
+  private gradienteDeArea(t: number): boolean {
+    const e = this.estado, s = ESTADO_MEMBRANA * t;
+    if (e[s + 15] === 0 && e[s + 16] === 0) return false;
+    areaYGradiente(e[s], e[s + 1], e[s + 2], e[s + 3], e[s + 4], e[s + 5], this.gJ);
+    return true;
   }
 
   /** out += ∇E, del último `linealizar`. */
@@ -101,6 +154,16 @@ export class Membrana {
         out[q] += A0 * (gu * a * ux + gv * b * vx + ks * (a * vx + b * ux));
         out[q + 1] += A0 * (gu * a * uy + gv * b * vy + ks * (a * vy + b * uy));
         out[q + 2] += A0 * (gu * a * uz + gv * b * vz + ks * (a * vz + b * uz));
+      }
+      // E13: κ·b'(J)·∇J
+      if (this.gradienteDeArea(t)) {
+        const w = A0 * e[s + 15], g = this.gJ;
+        for (let k = 0; k < 3; k++) {
+          const q = 3 * this.tris[3 * t + k], a = c[o + k], b = c[o + 3 + k];
+          out[q] += w * (a * g[0] + b * g[3]);
+          out[q + 1] += w * (a * g[1] + b * g[4]);
+          out[q + 2] += w * (a * g[2] + b * g[5]);
+        }
       }
     }
   }
@@ -140,6 +203,16 @@ export class Membrana {
         out[q + 1] += A0 * (a * hu1 + b * hv1 + dg * (a * vy + b * uy));
         out[q + 2] += A0 * (a * hu2 + b * hv2 + dg * (a * vz + b * uz));
       }
+      // E13: κ·b''(J)·∇J·(∇J·p), con ∇J·p = ∂J/∂f_u·d_u + ∂J/∂f_v·d_v
+      if (this.gradienteDeArea(t)) {
+        const g = this.gJ, w = A0 * e[s + 16] * (g[0] * du0 + g[1] * du1 + g[2] * du2 + g[3] * dv0 + g[4] * dv1 + g[5] * dv2);
+        for (let k = 0; k < 3; k++) {
+          const q = 3 * this.tris[3 * t + k], a = c[o + k], b = c[o + 3 + k];
+          out[q] += w * (a * g[0] + b * g[3]);
+          out[q + 1] += w * (a * g[1] + b * g[4]);
+          out[q + 2] += w * (a * g[2] + b * g[5]);
+        }
+      }
     }
   }
 
@@ -159,6 +232,11 @@ export class Membrana {
         const Hv = (e[s + 11] - e[s + 13]) * nv[r] * nv[q] + e[s + 13] * id;
         M[o + 3 * r + q] += A0 * (ai * aj * Hu + bi * bj * Hv + kC * di[r] * dj[q]);
       }
+    }
+    // E13: κ·b''(J)·(a_i·∂J/∂f_u + b_i·∂J/∂f_v)(a_j·∂J/∂f_u + b_j·∂J/∂f_v)ᵀ
+    if (this.gradienteDeArea(t)) {
+      const g = this.gJ, w = A0 * e[s + 16];
+      for (let r = 0; r < 3; r++) for (let q = 0; q < 3; q++) M[o + 3 * r + q] += w * (ai * g[r] + bi * g[3 + r]) * (aj * g[q] + bj * g[3 + q]);
     }
   }
 

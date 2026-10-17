@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildLinearBVH } from '../../gpu/bvh';
-import { energiaDePlano, EPS_FRICCION, rigidezDeFriccion } from '../contactos';
+import { energiaDeFriccion, EPS_FRICCION, rigidezDeFriccion } from '../contactos';
 import { CuerpoRigido } from '../cuerpo';
-import { SistemaTela } from '../sistema';
+import { SistemaTela, type AjustesImplicito } from '../sistema';
 import { pasoImplicito } from '../paso';
 import { medirQuietud, VigiaDeQuietud } from '../quietud';
 import { separacion, telaSI } from '../tela';
@@ -10,12 +10,100 @@ import { aplastados } from '../banco/medidas';
 import { esferaDeColision, laminaPlana, planoDeColision, TELA_DE_LABORATORIO } from '../banco/escenas';
 import { azar, errorDelGradiente } from './ayudas';
 
-describe('el contacto es un plano, con fricción', () => {
-  it('la energía del plano: nada afuera, cuadrática adentro, y la fricción en el plano', () => {
-    const c = { i: 0, nx: 0, ny: 1, nz: 0, p0: 0.001, kt: 50 };
-    expect(energiaDePlano(c, 2000, 0, 0.002, 0)).toBe(0);
-    expect(energiaDePlano(c, 2000, 0, 0.0005, 0)).toBeCloseTo(0.5 * 2000 * 0.0005 ** 2, 15);
-    expect(energiaDePlano(c, 2000, 0.003, 0.002, 0)).toBeCloseTo(0.5 * 50 * 0.003 ** 2, 15);
+describe('el cuerpo es un piso duro (E10)', () => {
+  const plano = () => [{ tipo: 'plano' as const, altura: 0 }];
+  /** una lámina a `altura` sobre el suelo, todos sus vértices con velocidad vertical `vy` */
+  const lamina = (ajustes: Partial<AjustesImplicito> = {}, altura?: number, vy = 0) => {
+    const s = new SistemaTela(laminaPlana(10), TELA_DE_LABORATORIO, { obstaculos: plano(), ajustes });
+    for (let i = 0; i < s.n; i++) {
+      s.x[3 * i + 1] = altura ?? s.sep;
+      s.v[3 * i + 1] = vy;
+    }
+    return s;
+  };
+
+  it('la tela apoyada no entra en la separación, ni un micrómetro', () => {
+    const s = lamina();
+    for (let c = 0; c < 30; c++) pasoImplicito(s);
+    for (let i = 0; i < s.n; i++) expect(s.x[3 * i + 1]).toBeGreaterThan(s.sep - 1e-9);
+  });
+
+  it('la tela que sale despedida del suelo no se queda pegada', () => {
+    // a 0,5 m/s sube 8,3 mm en un cuadro, menos 2,7 mm que le quita la gravedad
+    const s = lamina({}, undefined, 0.5);
+    pasoImplicito(s);
+    for (let i = 0; i < s.n; i++) expect(s.x[3 * i + 1]).toBeGreaterThan(s.sep + 0.004);
+  });
+
+  it('el suelo suelta la tela cuando la tela jala hacia afuera', () => {
+    // con la gravedad al revés, el suelo la sostiene a lo sumo un cuadro: en tres ya se despegó
+    const s = lamina({ gravedad: 9.81 });
+    for (let c = 0; c < 3; c++) pasoImplicito(s);
+    for (let i = 0; i < s.n; i++) expect(s.x[3 * i + 1]).toBeGreaterThan(s.sep + 0.002);
+  });
+
+  it('el vértice que el paso mete en el suelo queda a la separación y sin velocidad hacia adentro', () => {
+    // a 2 m/s el paso la llevaría 33 mm más abajo
+    const s = lamina({}, undefined, -2);
+    for (let i = 0; i < s.n; i++) s.x[3 * i + 1] = s.sep + 0.001;
+    const info = pasoImplicito(s);
+    expect(info.proyectados).toBe(s.n);
+    for (let i = 0; i < s.n; i++) {
+      expect(s.x[3 * i + 1]).toBeGreaterThan(s.sep - 1e-9);
+      expect(s.v[3 * i + 1]).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  describe('en un canto redondeado', () => {
+    // el canto del pedestal: el vértice 0 a la separación, con la normal a 30° de la vertical; el resto de la lámina, lejos
+    const R = 0.09, T = 0.5, a = Math.PI / 6;
+    const enElCanto = (v: [number, number]) => {
+      const s = new SistemaTela(laminaPlana(20), TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'pedestal', radio: R, tapa: T }] });
+      for (let i = 0; i < s.n; i++) s.x[3 * i + 1] = T + 0.1;
+      s.x.set([R + s.sep * Math.sin(a), T + s.sep * Math.cos(a), 0], 0);
+      s.v.set([v[0], v[1], 0], 0);
+      s.fuerzaDeApoyo[0] = 0.1 * s.masa[0] * 9.81;
+      return s;
+    };
+    // la normal con que lo sostuvo el cuadro anterior, a 20°: resbalando por su plano tangente a 13 mm/s, se aleja de la
+    // normal nueva 13·sen 10° = 2,3 mm/s, más que la velocidad de despegue
+    const b = Math.PI / 9, deslizando: [number, number] = [0.013 * Math.cos(b), -0.013 * Math.sin(b)];
+    const sostenidoA20 = (s: SistemaTela) => (s.apoyos = [{ i: 0, nx: Math.sin(b), ny: Math.cos(b), nz: 0, kt: 0 }]);
+
+    it('el vértice apoyado que resbala por el canto sigue apoyado: no se aleja de la normal con que se lo sostuvo', () => {
+      const s = enElCanto(deslizando);
+      sostenidoA20(s);
+      s.armarApoyos();
+      expect(s.apoyos.map((c) => c.i)).toEqual([0]);
+      expect(s.apoyos[0].ny).toBeCloseTo(Math.cos(a), 9);
+    });
+
+    it('el que llega alejándose del canto no se apoya', () => {
+      const s = enElCanto(deslizando);
+      s.armarApoyos();
+      expect(s.apoyos).toEqual([]);
+    });
+
+    it('el apoyado al que algo lanza hacia afuera de su normal se suelta', () => {
+      const s = enElCanto([0.5 * Math.sin(b), 0.5 * Math.cos(b)]);
+      sostenidoA20(s);
+      s.armarApoyos();
+      expect(s.apoyos).toEqual([]);
+    });
+  });
+
+  it('el cuadro se resuelve en una sola ronda de gradiente conjugado', () => {
+    const s = lamina({ tolCG: 0, maxCG: 20 }, undefined, -2);
+    for (let i = 0; i < s.n; i++) s.x[3 * i + 1] = s.sep + 0.001;
+    expect(pasoImplicito(s).cg).toBeLessThanOrEqual(20);
+  });
+});
+
+describe('el apoyo tiene fricción', () => {
+  it('la energía de la fricción del apoyo: nada en la normal, cuadrática en el plano', () => {
+    const c = { i: 0, nx: 0, ny: 1, nz: 0, kt: 50 };
+    expect(energiaDeFriccion(c, 0, 0.002, 0)).toBe(0);
+    expect(energiaDeFriccion(c, 0.003, 0.002, 0)).toBeCloseTo(0.5 * 50 * 0.003 ** 2, 15);
   });
 
   it('el resorte de la fricción: μ·λ sobre la velocidad del cuadro anterior, con piso ε_v', () => {
@@ -25,18 +113,21 @@ describe('el contacto es un plano, con fricción', () => {
     expect(rigidezDeFriccion(0.4, 0, 0.5, 1 / 60)).toBe(0);
   });
 
-  it('residuo = −∂G/∂x con planos y fricción, cerca de x_t (diferencias finitas)', () => {
+  it('residuo = −∂G/∂x con la fricción de los apoyos, cerca de x_t (diferencias finitas)', () => {
     const s = new SistemaTela(laminaPlana(20), TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'plano', altura: 0 }] });
     const r = azar(61);
-    // todos los vértices entre 0,5 y 1 mm del suelo: dentro de la separación (1,25 mm), con velocidad
+    // todos los vértices entre 0,5 y 1 mm del suelo, dentro de la separación (1,25 mm), resbalando por el suelo y
+    // sostenidos el cuadro anterior
     for (let i = 0; i < s.n; i++) {
       s.x[3 * i + 1] = 0.00075 + 0.0005 * r();
-      for (let d = 0; d < 3; d++) s.v[3 * i + d] = 0.05 * r();
+      s.v[3 * i] = 0.05 * r();
+      s.v[3 * i + 2] = 0.05 * r();
     }
+    s.fuerzaDeApoyo.fill(1);
     s.xt.set(s.x);
-    s.armarContactos();
-    expect(s.contactos.length).toBe(s.n);
-    expect(s.contactos.every((c) => c.kt > 0)).toBe(true);
+    s.armarApoyos();
+    expect(s.apoyos.length).toBe(s.n);
+    expect(s.apoyos.every((c) => c.kt > 0)).toBe(true);
     // un poco fuera de x_t, sin salir de ningún plano
     for (let q = 0; q < s.x.length; q++) s.x[q] += 1e-5 * r();
     s.linealizar();

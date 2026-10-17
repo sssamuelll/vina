@@ -18,10 +18,10 @@ describe('el WGSL del motor', () => {
     expect(fuente).not.toMatch(/Infinity|NaN/);
   });
 
-  it('la búsqueda en línea usa los planos fijos: posPrueba no consulta el obstáculo (E4)', () => {
-    const cuerpo = fuente.slice(fuente.indexOf('fn posPrueba('), fuente.indexOf('fn anguloPrueba('));
+  it('la búsqueda en línea no consulta el obstáculo: del apoyo solo cuenta su fricción (E10)', () => {
+    const cuerpo = fuente.slice(fuente.indexOf('fn posPrueba('), fuente.indexOf('fn difTriangulo('));
     expect(cuerpo).not.toMatch(/masCercano/);
-    expect(cuerpo).toMatch(/energiaPlano/);
+    expect(cuerpo).toMatch(/energiaFriccion/);
   });
 
   it('con un cuerpo, el obstáculo es el BVH recorrido hasta el radio de búsqueda', () => {

@@ -82,9 +82,39 @@ export interface SeamPair {
   /**
    * Los dos lados de la costura en orden de cosido (el B ya invertido si va al revés) y con el filtro de
    * rango aplicado. El motor implícito cose cada vértice de un lado a un punto del otro
-   * (implicito/costuras.ts); el XPBD usa `vertexPairs`.
+   * (implicito/costuras.ts); el XPBD usa `vertexPairs`. `ta` y `tb` son el t de cada vértice renormalizado al
+   * tramo cosido: en una costura parcial, los vértices que quedan no llegan a las puntas del tramo.
    */
-  lados?: { a: LocalVertexIndex[]; b: LocalVertexIndex[] };
+  lados?: LadosDeSeamPair;
+}
+
+/**
+ * El vértice del borde justo antes del tramo cosido y el justo después, con su t renormalizado (< 0 y > 1): en una
+ * costura parcial, un punto que cae entre una punta del tramo y el primer vértice de adentro se cose sobre ese segmento.
+ */
+export interface VecinosDeLado {
+  antes?: { v: LocalVertexIndex; t: number };
+  despues?: { v: LocalVertexIndex; t: number };
+}
+
+export interface LadosDeSeamPair {
+  a: LocalVertexIndex[];
+  b: LocalVertexIndex[];
+  ta?: number[];
+  tb?: number[];
+  vecinosA?: VecinosDeLado;
+  vecinosB?: VecinosDeLado;
+}
+
+/** Los vecinos de afuera del tramo [t0, t1] en un borde ordenado por t, con su t renormalizado al tramo. */
+function vecinosAfuera(edge: ReadonlyArray<{ index: number; t: number }>, t0: number, t1: number): VecinosDeLado {
+  const span = t1 - t0, vecinos: VecinosDeLado = {};
+  if (span <= 1e-9) return vecinos;
+  for (const v of edge) {
+    if (v.t < t0) vecinos.antes = { v: v.index as LocalVertexIndex, t: (v.t - t0) / span };
+    else if (v.t > t1 && !vecinos.despues) vecinos.despues = { v: v.index as LocalVertexIndex, t: (v.t - t0) / span };
+  }
+  return vecinos;
 }
 
 /**
@@ -218,7 +248,7 @@ interface ResolvedSeamVertexPairs {
   vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]>;
   /** `null` when the seam resolved to ≥1 vertex pair. */
   failure: SeamResolutionFailure | null;
-  lados?: { a: LocalVertexIndex[]; b: LocalVertexIndex[] };
+  lados?: LadosDeSeamPair;
 }
 
 function buildPieceIndex(
@@ -314,12 +344,15 @@ function resolveSeamVertexPairs(
 
   // Filtro + RENORMALIZACIÓN de t al sub-rango (espejo exacto de
   // seamAssembly.ts — renormalizeFilteredT; los tiers no pueden divergir).
+  let vecinosA: VecinosDeLado | undefined, vecinosB: VecinosDeLado | undefined;
   if (seam.pieceARange) {
     const [t0, t1] = seam.pieceARange;
+    vecinosA = vecinosAfuera(edgeA, t0, t1);
     edgeA = renormalizeFilteredT(edgeA.filter(v => v.t >= t0 && v.t <= t1), t0, t1);
   }
   if (seam.pieceBRange) {
     const [t0, t1] = seam.pieceBRange;
+    vecinosB = vecinosAfuera(edgeB, t0, t1);
     edgeB = renormalizeFilteredT(edgeB.filter(v => v.t >= t0 && v.t <= t1), t0, t1);
   }
 
@@ -331,7 +364,14 @@ function resolveSeamVertexPairs(
   return {
     vertexPairs,
     failure: null,
-    lados: { a: edgeA.map((v) => v.index as LocalVertexIndex), b: edgeB.map((v) => v.index as LocalVertexIndex) },
+    lados: {
+      a: edgeA.map((v) => v.index as LocalVertexIndex),
+      b: edgeB.map((v) => v.index as LocalVertexIndex),
+      ta: edgeA.map((v) => v.t),
+      tb: edgeB.map((v) => v.t),
+      ...(vecinosA ? { vecinosA } : {}),
+      ...(vecinosB ? { vecinosB } : {}),
+    },
   };
 }
 
