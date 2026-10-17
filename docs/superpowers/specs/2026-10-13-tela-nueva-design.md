@@ -494,3 +494,19 @@ la referencia y dar un motor eficiente para la web y natural: de ahí E10 en ade
   tela en el motor (minutos por tela) y vale para la malla en que se ajustó (en una malla gruesa no caben las tiras
   cortas: ahí se usa el de 5 mm). El rib y el denim quedan algo rígidos en el disco: la tracción del denim no es lineal
   y el pandeo se calibró con la tela anterior del banco. Plan `2026-10-16-el-motor-a-s2.md`.
+- **E13 (§4.1.3 y §4.1.5). La tela no se aplasta, y una bisagra doblada no salta.** La membrana mide largos y un
+  triángulo invertido tiene los mismos que el original: nada le impedía aplastarse ni darse vuelta. En la camiseta
+  quedaban triángulos al 0,1 % de su área; a lo largo del paso pasaban por cero, sus bisagras saltaban π y la búsqueda en
+  línea rechazaba el paso entero y sus siete mitades, cuadro tras cuadro: la tela quedaba trabada. Bajo un quinto de su
+  área (J = A/A0 < J₀ = 1/5), cada triángulo suma A0·κ·b(J), con b(J) = −(J − J₀)²·ln(J/J₀), la barrera C² de IPC: nula
+  hasta J₀ y con una fuerza que crece como 1/J. κ es diez veces la tracción más rígida de la tela, la de los hilos
+  trabados, y la hessiana de Gauss-Newton suma κ·b''(J)·∇J·∇Jᵀ. Desde la mitad del área la barrera tocaba el impacto del
+  disco Cusick contra el pedestal (un triángulo baja a 0,19 en el tercer cuadro) y el disco dejaba de quedar quieto en
+  10 s; desde un quinto queda quieto a los 2,6 s con el mismo coeficiente. Además, dentro del paso el ángulo de prueba de
+  cada bisagra sigue desde el de x_t (se le suma la vuelta entera que lo deja más cerca): en un pliegue de la tela sobre
+  sí misma, una bisagra cerca de 180° saltaba de +π a −π y los términos cruzados de la placa cambiaban de signo (0,2 J de
+  escalón en G). Medido el 2026-10-17 con la camiseta de 10 mm en la CPU y fricción 0,8: sin los dos arreglos la búsqueda
+  rechazaba todos los pasos desde el cuadro 200; con ellos acepta el paso entero casi siempre. *Costo:* un triángulo no
+  puede perder más de cuatro quintos de su área sin pagar una energía que crece sin tope; donde actúa, la barrera es tan
+  rígida que la precisión simple se aleja de la CPU (2,2 mm en tres cuadros con un triángulo a 0,1 de su área). Plan
+  `2026-10-16-el-motor-a-s2.md`.
