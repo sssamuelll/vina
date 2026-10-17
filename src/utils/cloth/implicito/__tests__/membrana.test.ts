@@ -131,10 +131,11 @@ describe('la membrana', () => {
       return { m, mem, x };
     };
 
-    it('nada hasta la mitad del área; desde ahí crece sin tope al aplastar, suave en el borde', () => {
+    it('nada hasta un quinto del área; desde ahí crece sin tope al aplastar, suave en el borde', () => {
       expect(barreraDeArea(1)).toEqual([0, 0, 0]);
+      expect(barreraDeArea(0.3)).toEqual([0, 0, 0]);
       expect(barreraDeArea(AREA_MINIMA)).toEqual([0, 0, 0]);
-      const [b1, d1, h1] = barreraDeArea(0.3), [b2, d2] = barreraDeArea(0.1);
+      const [b1, d1, h1] = barreraDeArea(0.1), [b2, d2] = barreraDeArea(0.05);
       expect(b1).toBeGreaterThan(0);
       expect(b2).toBeGreaterThan(b1);
       expect(d1).toBeLessThan(0);
@@ -147,8 +148,8 @@ describe('la membrana', () => {
       expect(Number.isFinite(barreraDeArea(0)[0])).toBe(true);
     });
 
-    it('fuerza = −∂E/∂x con un triángulo aplastado a 0,3 de su área (diferencias finitas)', () => {
-      const { mem, x } = conAplastado(0.3);
+    it('fuerza = −∂E/∂x con un triángulo aplastado a 0,1 de su área (diferencias finitas)', () => {
+      const { mem, x } = conAplastado(0.1);
       mem.linealizar(x);
       const g = new Float64Array(x.length);
       mem.gradiente(g);
@@ -167,7 +168,7 @@ describe('la membrana', () => {
       expect(fuerza(0.01)).toBeGreaterThan(5 * fuerza(0.1));
     });
 
-    it('la tela abre el triángulo aplastado: en 20 cuadros sin gravedad pasa de la mitad de su área', () => {
+    it('la tela abre el triángulo aplastado: en 20 cuadros sin gravedad pasa de un quinto de su área', () => {
       const e = escenaAplastada();
       const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0 } });
       for (let c = 0; c < 20; c++) pasoImplicito(s);
@@ -176,7 +177,7 @@ describe('la membrana', () => {
     });
 
     it('con un triángulo aplastado, la hessiana no es negativa y sus bloques diagonales son los de H·p', () => {
-      const { mem, x } = conAplastado(0.3);
+      const { mem, x } = conAplastado(0.1);
       mem.linealizar(x);
       const r = azar(9), n = x.length / 3, Hp = new Float64Array(x.length);
       for (let caso = 0; caso < 10; caso++) {

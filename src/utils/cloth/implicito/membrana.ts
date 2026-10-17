@@ -4,13 +4,17 @@
  * con tracción lineal por hilo y pandeo de Choi y Ko al encoger, y su hessiana de Gauss-Newton:
  * k·n·nᵀ + max(ψ'/s, 0)·(I − n·nᵀ) por hilo y kCizalla·∇γ·∇γᵀ para la cizalla. A lo largo del hilo va la
  * rigidez k también en la meseta de pandeo, donde ψ'' es 0: la energía y la fuerza siguen la ley, pero el
- * paso no mueve gratis el hilo comprimido (con 0, la malla gruesa se trababa). E13: bajo la mitad de su área, la barrera
- * de área A0·κ·b(J) no deja que el triángulo se aplaste ni se dé vuelta.
+ * paso no mueve gratis el hilo comprimido (con 0, la malla gruesa se trababa). E13: bajo un quinto de su área, la
+ * barrera de área A0·κ·b(J) no deja que el triángulo se aplaste ni se dé vuelta.
  */
 import type { TelaSI } from './tela';
 
-/** E13: la fracción de su área (J = A/A0) desde la que la tela resiste aplastarse, como cuando los hilos se traban. */
-export const AREA_MINIMA = 0.5;
+/**
+ * E13: la fracción de su área (J = A/A0) desde la que la tela resiste aplastarse, como cuando los hilos se traban. Desde la
+ * mitad, la barrera tocaba el impacto del disco Cusick contra el pedestal (un triángulo baja a 0,19 en el tercer cuadro) y
+ * el disco ya no quedaba quieto en 10 s; desde un quinto, queda quieto a los 2,6 s y la camiseta deja de trabarse.
+ */
+export const AREA_MINIMA = 0.2;
 /** La rigidez de la barrera de área, en veces la tracción más rígida de la tela. */
 export const RIGIDEZ_DE_AREA = 10;
 
