@@ -1019,8 +1019,11 @@ fn difTriangulo(t: u32) -> f32 {
   for (var k = 0u; k < 3u; k++) {
     let h = iu[I_HOT + 3u * t + k];
     if (h != NINGUNA) {
+      // desde el ángulo en x_t (placa.ts, energia): la bisagra doblada que cruza los 180° no salta de +π a −π
       let b = I_BIS + 4u * h;
-      th[k] = soloAngulo(ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u]), ld(O_XP, iu[b + 3u]));
+      let th0 = tf[O_HD + 16u * h];
+      let d = soloAngulo(ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u]), ld(O_XP, iu[b + 3u])) - th0;
+      th[k] = th0 + d - 6.2831853 * round(d / 6.2831853);
     }
   }
   for (var k = 0u; k < 3u; k++) {

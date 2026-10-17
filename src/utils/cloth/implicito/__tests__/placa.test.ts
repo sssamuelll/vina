@@ -28,6 +28,26 @@ describe('la placa', () => {
     expect(peor).toBeLessThan(1e-5);
   });
 
+  it('la energía no salta cuando una bisagra doblada cruza los 180°: el ángulo sigue desde el del último linealizar', () => {
+    // tres triángulos: el del medio (0, 1, 2) con dos bisagras; la de abajo se dobla φ, la de la izquierda 30°
+    const l = 0.01, a = l * Math.sqrt(3) / 2;
+    const uv = Float64Array.from([0, 0, l, 0, l / 2, a, l / 2, -a, -l / 2, a]);
+    const tris = Uint32Array.from([0, 1, 2, 1, 0, 3, 0, 4, 2]);
+    const placa = new Placa(uv, tris, telaSI(TELA_DE_LABORATORIO));
+    const x = (phi: number) => {
+      // el ala 3 gira φ alrededor del borde 0-1 (el eje x); el ala 4 gira 30° alrededor del borde 0-2, que pasa por el origen
+      const e = [0.5, Math.sqrt(3) / 2], v4 = [-l / 2, a], psi = Math.PI / 6;
+      const sobre = v4[0] * e[0] + v4[1] * e[1], perp = [v4[0] - sobre * e[0], v4[1] - sobre * e[1]], giro = e[0] * v4[1] - e[1] * v4[0];
+      const ala4 = [sobre * e[0] + perp[0] * Math.cos(psi), sobre * e[1] + perp[1] * Math.cos(psi), giro * Math.sin(psi)];
+      return Float64Array.from([0, 0, 0, l, 0, 0, l / 2, a, 0, l / 2, -a * Math.cos(phi), -a * Math.sin(phi), ...ala4]);
+    };
+    const grados = (g: number) => (g * Math.PI) / 180;
+    placa.linealizar(x(grados(179)));
+    const [e1, e2, e3] = [178.5, 179.5, 180.5].map((g) => placa.energia(x(grados(g))));
+    // de 178,5 a 179,5° y de 179,5 a 180,5° la energía cambia casi lo mismo
+    expect(Math.abs(e3 - e2 - (e2 - e1))).toBeLessThan(0.2 * Math.abs(e2 - e1));
+  });
+
   it('el ángulo es el de dihedral.ts, con la misma convención de signo', () => {
     const r = azar(9), g = new Float64Array(12);
     let comparados = 0;
