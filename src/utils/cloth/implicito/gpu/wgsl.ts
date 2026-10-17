@@ -11,6 +11,7 @@ import type { SistemaTela } from '../sistema';
 import type { PaqueteGpu } from './empaquetar';
 import { wgslCuerpoCercano, wgslPuntoMasCercano } from './wgslCuerpo';
 import { wgslPropio } from './wgslPropio';
+import { AREA_MINIMA, ESTADO_MEMBRANA, RIGIDEZ_DE_AREA } from '../membrana';
 
 /** Hilos por grupo de trabajo. */
 export const WG = 128;
@@ -87,7 +88,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const { n, nt, nh } = p;
   const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n, RN: n, DC: n });
   const tf = zonas<ZonaTf>({
-    COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: 14 * nt, E0: nt, HD: 16 * nh, CONTRIB: 45 * nt + 9 * p.nc,
+    COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: ESTADO_MEMBRANA * nt, E0: nt, HD: 16 * nh, CONTRIB: 45 * nt + 9 * p.nc,
     CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
     CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD4: 4 * p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
@@ -223,6 +224,10 @@ const MGH = ${f(Math.max(p.pesoTotal * aj.h, 1e-30))};
 const KU = ${f(tela.kTrama)};
 const KV = ${f(tela.kUrdimbre)};
 const KS = ${f(tela.kCizalla)};
+// E13: la barrera de área (membrana.ts, barreraDeArea) y el estado de cada triángulo (ESTADO_MEMBRANA números)
+const AREA_MIN = ${f(AREA_MINIMA)};
+const KAREA = ${f(RIGIDEZ_DE_AREA * Math.max(tela.kTrama, tela.kUrdimbre))};
+const EST_M = ${u(ESTADO_MEMBRANA)};
 // sin tope, uno que nunca se llega a tocar
 const TOPE_P = ${f(Math.min(tela.topePandeo, 3e38))};
 const BUSQUEDA = ${aj.busqueda};
@@ -363,11 +368,30 @@ fn soloAngulo(a: vec3<f32>, b: vec3<f32>, c: vec3<f32>, d: vec3<f32>) -> f32 {
   return atan2(dot(cross(u1, u2), ed) / sqrt(e2), clamp(dot(u1, u2), -1.0, 1.0));
 }
 
+// E13: b(J), b'(J) y b''(J) de la barrera de área (membrana.ts, barreraDeArea)
+fn barrera(J: f32) -> vec3<f32> {
+  if (J >= AREA_MIN) { return vec3<f32>(0.0); }
+  let j = max(J, 1e-12);
+  let d = j - AREA_MIN;
+  let l = log(j / AREA_MIN);
+  return vec3<f32>(-d * d * l, -2.0 * d * l - d * d / j, -2.0 * l - 4.0 * d / j + d * d / (j * j));
+}
+
+// J = |f_u × f_v| y sus derivadas ∂J/∂f_u = f_v × n̂ y ∂J/∂f_v = n̂ × f_u (membrana.ts, areaYGradiente)
+struct Area { J: f32, gu: vec3<f32>, gv: vec3<f32> }
+fn areaDe(fu: vec3<f32>, fv: vec3<f32>) -> Area {
+  let c = cross(fu, fv);
+  let J = length(c);
+  if (J < 1e-12) { return Area(J, vec3<f32>(0.0), vec3<f32>(0.0)); }
+  let n = c / J;
+  return Area(J, cross(fv, n), cross(n, fu));
+}
+
 // el bloque (li, lj) de la membrana del triángulo t (membrana.ts, sumarBloque)
 fn bloqueMembrana(t: u32, li: u32, lj: u32) -> mat3x3<f32> {
   let o = O_COEF + 7u * t;
   let ai = tf[o + li]; let bi = tf[o + 3u + li]; let aj = tf[o + lj]; let bj = tf[o + 3u + lj];
-  let b = O_TRI + 14u * t;
+  let b = O_TRI + EST_M * t;
   let fu = vec3<f32>(tf[b], tf[b + 1u], tf[b + 2u]);
   let fv = vec3<f32>(tf[b + 3u], tf[b + 4u], tf[b + 5u]);
   var nu = vec3<f32>(0.0);
@@ -376,7 +400,13 @@ fn bloqueMembrana(t: u32, li: u32, lj: u32) -> mat3x3<f32> {
   if (tf[b + 7u] > 1e-12) { nv = fv / tf[b + 7u]; }
   let Hu = (tf[b + 10u] - tf[b + 12u]) * outer(nu, nu) + tf[b + 12u] * I3;
   let Hv = (tf[b + 11u] - tf[b + 13u]) * outer(nv, nv) + tf[b + 13u] * I3;
-  return tf[o + 6u] * (ai * aj * Hu + bi * bj * Hv + KS * outer(ai * fv + bi * fu, aj * fv + bj * fu));
+  var M = ai * aj * Hu + bi * bj * Hv + KS * outer(ai * fv + bi * fu, aj * fv + bj * fu);
+  // E13: κ·b''(J)·(a_i·∂J/∂f_u + b_i·∂J/∂f_v)(a_j·∂J/∂f_u + b_j·∂J/∂f_v)ᵀ
+  if (tf[b + 16u] != 0.0) {
+    let ar = areaDe(fu, fv);
+    M += tf[b + 16u] * outer(ai * ar.gu + bi * ar.gv, aj * ar.gu + bj * ar.gv);
+  }
+  return tf[o + 6u] * M;
 }
 
 // el bloque (i, j) de la placa del triángulo t (placa.ts, sumarBloque); ranuras dice dónde están i y j en cada
@@ -625,14 +655,18 @@ const MARGEN_DC = 1e-5;
   if (su > 1e-12) { gu = lu.y / su; }
   var gv = 0.0;
   if (sv > 1e-12) { gv = lv.y / sv; }
-  let b = O_TRI + 14u * t;
+  let b = O_TRI + EST_M * t;
   tf[b] = fu.x; tf[b + 1u] = fu.y; tf[b + 2u] = fu.z;
   tf[b + 3u] = fv.x; tf[b + 4u] = fv.y; tf[b + 5u] = fv.z;
   tf[b + 6u] = su; tf[b + 7u] = sv; tf[b + 8u] = gu; tf[b + 9u] = gv;
   // la rigidez del hilo en la hessiana es k también en la meseta de pandeo (membrana.ts)
   tf[b + 10u] = KU; tf[b + 11u] = KV; tf[b + 12u] = max(gu, 0.0); tf[b + 13u] = max(gv, 0.0);
+  // E13: la barrera de área
+  let J = length(cross(fu, fv));
+  let bj = barrera(J);
+  tf[b + 14u] = J; tf[b + 15u] = KAREA * bj.y; tf[b + 16u] = KAREA * bj.z;
   let gam = dot(fu, fv);
-  tf[O_E0 + t] = tf[o + 6u] * (lu.x + lv.x + 0.5 * KS * gam * gam);
+  tf[O_E0 + t] = tf[o + 6u] * (lu.x + lv.x + 0.5 * KS * gam * gam + KAREA * bj.x);
 }
 
 // 3. el ángulo y su gradiente en cada bisagra
@@ -655,16 +689,19 @@ const MARGEN_DC = 1e-5;
   if (t >= NT) { return; }
   let o = O_COEF + 7u * t;
   let A0 = tf[o + 6u];
-  let b = O_TRI + 14u * t;
+  let b = O_TRI + EST_M * t;
   let fu = vec3<f32>(tf[b], tf[b + 1u], tf[b + 2u]);
   let fv = vec3<f32>(tf[b + 3u], tf[b + 4u], tf[b + 5u]);
   let gu = tf[b + 8u];
   let gv = tf[b + 9u];
   let ks = KS * dot(fu, fv);
+  // E13: κ·b'(J)·∇J
+  let ar = areaDe(fu, fv);
+  let kb = tf[b + 15u];
   for (var j = 0u; j < 3u; j++) {
     let aj = tf[o + j];
     let bj = tf[o + 3u + j];
-    stc(3u * t + j, A0 * (gu * aj * fu + gv * bj * fv + ks * (aj * fv + bj * fu)));
+    stc(3u * t + j, A0 * (gu * aj * fu + gv * bj * fv + ks * (aj * fv + bj * fu) + kb * (aj * ar.gu + bj * ar.gv)));
   }
   var th = vec3<f32>(0.0);
   for (var k = 0u; k < 3u; k++) {
@@ -1014,7 +1051,7 @@ fn difTriangulo(t: u32) -> f32 {
   let fu = tf[o + 1u] * d1 + tf[o + 2u] * d2;
   let fv = tf[o + 4u] * d1 + tf[o + 5u] * d2;
   let gam = dot(fu, fv);
-  var e = tf[o + 6u] * (ley(length(fu) - 1.0, KU, tf[O_PCR + 2u * t]).x + ley(length(fv) - 1.0, KV, tf[O_PCR + 2u * t + 1u]).x + 0.5 * KS * gam * gam);
+  var e = tf[o + 6u] * (ley(length(fu) - 1.0, KU, tf[O_PCR + 2u * t]).x + ley(length(fv) - 1.0, KV, tf[O_PCR + 2u * t + 1u]).x + 0.5 * KS * gam * gam + KAREA * barrera(length(cross(fu, fv))).x);
   var th = vec3<f32>(0.0);
   for (var k = 0u; k < 3u; k++) {
     let h = iu[I_HOT + 3u * t + k];

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { aMarcoDelHilo } from '../malla';
 import { prepararReposo } from '../reposo';
-import { ley, Membrana } from '../membrana';
+import { AREA_MINIMA, barreraDeArea, ley, Membrana } from '../membrana';
 import { telaSI, TOPE_DE_PANDEO } from '../tela';
-import { laminaPlana, TELA_DE_LABORATORIO } from '../banco/escenas';
+import { escenaAplastada, laminaPlana, TELA_DE_LABORATORIO } from '../banco/escenas';
+import { SistemaTela } from '../sistema';
+import { pasoImplicito } from '../paso';
 import { azar, errorDeHessiana, errorDelGradiente } from './ayudas';
 
 function membranaDeLamina(pandeo: number, topePandeo?: number) {
@@ -114,6 +116,85 @@ describe('la membrana', () => {
         for (let a = 0; a < 3; a++) expect(B[9 * i + 3 * a + d]).toBeCloseTo(col[3 * i + a], 6);
       }
     }
+  });
+
+  describe('la barrera de área (E13)', () => {
+    /** la lámina con el triángulo 0 aplastado a `J` de su área: su vértice c baja hacia el borde a-b */
+    const conAplastado = (J: number) => {
+      const { m, mem } = membranaDeLamina(1);
+      const x = Float64Array.from(m.x);
+      const [a, b, c] = [m.tris[0], m.tris[1], m.tris[2]];
+      for (let d = 0; d < 3; d++) {
+        const medio = 0.5 * (x[3 * a + d] + x[3 * b + d]);
+        x[3 * c + d] = medio + J * (x[3 * c + d] - medio);
+      }
+      return { m, mem, x };
+    };
+
+    it('nada hasta la mitad del área; desde ahí crece sin tope al aplastar, suave en el borde', () => {
+      expect(barreraDeArea(1)).toEqual([0, 0, 0]);
+      expect(barreraDeArea(AREA_MINIMA)).toEqual([0, 0, 0]);
+      const [b1, d1, h1] = barreraDeArea(0.3), [b2, d2] = barreraDeArea(0.1);
+      expect(b1).toBeGreaterThan(0);
+      expect(b2).toBeGreaterThan(b1);
+      expect(d1).toBeLessThan(0);
+      expect(d2).toBeLessThan(d1);
+      expect(h1).toBeGreaterThan(0);
+      // C²: la derivada y la segunda se apagan al llegar a la mitad
+      const [, dBorde, hBorde] = barreraDeArea(AREA_MINIMA - 1e-6);
+      expect(Math.abs(dBorde)).toBeLessThan(1e-9);
+      expect(Math.abs(hBorde)).toBeLessThan(1e-4);
+      expect(Number.isFinite(barreraDeArea(0)[0])).toBe(true);
+    });
+
+    it('fuerza = −∂E/∂x con un triángulo aplastado a 0,3 de su área (diferencias finitas)', () => {
+      const { mem, x } = conAplastado(0.3);
+      mem.linealizar(x);
+      const g = new Float64Array(x.length);
+      mem.gradiente(g);
+      expect(errorDelGradiente((y) => mem.energia(y), g, x)).toBeLessThan(1e-4);
+    });
+
+    it('la fuerza que abre el triángulo aplastado crece sin tope: a 0,01 de su área, más de cinco veces la de 0,1', () => {
+      const fuerza = (J: number) => {
+        const { m, mem, x } = conAplastado(J);
+        mem.linealizar(x);
+        const g = new Float64Array(x.length);
+        mem.gradiente(g);
+        const c = m.tris[2];
+        return Math.hypot(g[3 * c], g[3 * c + 1], g[3 * c + 2]);
+      };
+      expect(fuerza(0.01)).toBeGreaterThan(5 * fuerza(0.1));
+    });
+
+    it('la tela abre el triángulo aplastado: en 20 cuadros sin gravedad pasa de la mitad de su área', () => {
+      const e = escenaAplastada();
+      const s = new SistemaTela(e.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0 } });
+      for (let c = 0; c < 20; c++) pasoImplicito(s);
+      s.membrana.linealizar(s.x);
+      expect(s.membrana.estado[14]).toBeGreaterThan(AREA_MINIMA);
+    });
+
+    it('con un triángulo aplastado, la hessiana no es negativa y sus bloques diagonales son los de H·p', () => {
+      const { mem, x } = conAplastado(0.3);
+      mem.linealizar(x);
+      const r = azar(9), n = x.length / 3, Hp = new Float64Array(x.length);
+      for (let caso = 0; caso < 10; caso++) {
+        const p = Float64Array.from(x, () => r());
+        Hp.fill(0);
+        mem.hessianaPor(p, Hp);
+        expect(p.reduce((s, q, k) => s + q * Hp[k], 0)).toBeGreaterThanOrEqual(0);
+      }
+      const B = new Float64Array(9 * n), e = new Float64Array(3 * n), col = new Float64Array(3 * n);
+      mem.sumarBloquesDiagonales(B);
+      for (let d = 0; d < 3; d++) {
+        e.fill(0);
+        e[3 * mem.tris[2] + d] = 1;
+        col.fill(0);
+        mem.hessianaPor(e, col);
+        for (let a = 0; a < 3; a++) expect(B[9 * mem.tris[2] + 3 * a + d]).toBeCloseTo(col[3 * mem.tris[2] + a], 6);
+      }
+    });
   });
 
   it('un triángulo aplastado hasta un punto no da NaN', () => {

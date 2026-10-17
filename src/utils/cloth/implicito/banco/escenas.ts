@@ -269,6 +269,20 @@ export function escenaHundida(): Escena {
   return { malla: armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }]).malla, obstaculos: [] };
 }
 
+/**
+ * Una lámina de 120 mm con el primer triángulo aplastado a 0,3 de su área (su tercer vértice, hacia el borde opuesto): la
+ * barrera de área (E13) lo abre.
+ */
+export function escenaAplastada(): Escena {
+  const malla = laminaPlana(20);
+  const [a, b, c] = [malla.tris[0], malla.tris[1], malla.tris[2]];
+  for (let d = 0; d < 3; d++) {
+    const medio = 0.5 * (malla.x[3 * a + d] + malla.x[3 * b + d]);
+    malla.x[3 * c + d] = medio + 0.3 * (malla.x[3 * c + d] - medio);
+  }
+  return { malla, obstaculos: [] };
+}
+
 /** Una lámina de malla gruesa (20 mm), 2 mm sobre la punta de una pirámide y corrida para que la punta caiga en medio de un triángulo. */
 export function escenaPunta(): Escena {
   const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
