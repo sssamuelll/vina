@@ -54,6 +54,9 @@ export interface PaqueteGpu {
     cl: Float32Array;
     /** la rigidez de cada bisagra de costura al encenderse */
     ckh: Float32Array;
+    /** E8: las puntadas al empaquetar, cosido (0 o 1) y desfase (3 por punto) */
+    ccos: Float32Array;
+    cdes: Float32Array;
     /** el BVH del cuerpo (gpu/bvh.ts, LinearBVH): nodos, triángulos, normales de cara y pseudonormales */
     cuNodos: Float32Array;
     cuTri: Float32Array;
@@ -79,6 +82,11 @@ export interface PaqueteGpu {
      */
     blqOff: Uint32Array;
     blqCod: Uint32Array;
+    /**
+     * por cada aporte de la placa, dónde están sus dos vértices en las bisagras del triángulo: 6 bits por bisagra k,
+     * el lugar r (0-3) de la fila y el de la columna, 7 si no está; 0 en los demás aportes
+     */
+    blqRanura: Uint32Array;
     blqFila: Uint32Array;
     blqCol: Uint32Array;
     /** franjas de 32 filas: el bloque k de la fila 32·f + c va en franjaBase[f] + 32·k + c */
@@ -99,6 +107,15 @@ export interface PaqueteGpu {
     /** por vértice, él y sus compañeros de costura (sistema.ts, excluidos), en CSR */
     exOff: Uint32Array;
     exIdx: Uint32Array;
+    /** E8, por punto: 1 si se puede coser (costuras.ts, soldable) */
+    cSoldable: Uint32Array;
+    /** E8, por punto: 1 si es de vuelta (costuras.ts, inversa) */
+    cInversa: Uint32Array;
+    /** E8, por vértice: el punto soldable del que depende (NINGUNA si ninguno) */
+    dependeDe: Uint32Array;
+    /** E8, por vértice, en CSR: los puntos soldables que sostiene, sin repetir */
+    depOff: Uint32Array;
+    depIdx: Uint32Array;
   };
 }
 
@@ -117,6 +134,15 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
   if (4 * maxPares >= 1 << 24 || np >= 1 << 24 || nceldas >= 1 << 24) throw new Error('empaquetar: más pares o puntos de los que la GPU guarda como enteros exactos');
   const exOff = new Uint32Array(n + 1);
   for (let i = 0; i < n; i++) exOff[i + 1] = exOff[i] + s.excluidos[i].length;
+  // E8: los puntos soldables que sostiene cada vértice, para que reciba lo de sus vértices cosidos
+  const sostenidos: number[][] = Array.from({ length: n }, () => []);
+  for (let e = 0; e < nc; e++) {
+    if (!c.soldable[e]) continue;
+    sostenidos[c.b0[e]].push(e);
+    if (c.b1[e] !== c.b0[e]) sostenidos[c.b1[e]].push(e);
+  }
+  const depOff = new Uint32Array(n + 1);
+  for (let i = 0; i < n; i++) depOff[i + 1] = depOff[i] + sostenidos[i].length;
 
   // las ranuras de aporte al gradiente que suma cada vértice
   const aportes: number[][] = Array.from({ length: n }, () => []);
@@ -154,12 +180,31 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
     for (let li = 0; li < 3; li++) for (let lj = 0; lj < 3; lj++) aporte(v[li], v[lj], (0x40000000 | (e << 4) | (li << 2) | lj) >>> 0);
   }
   const filaOff = new Uint32Array(n + 1);
-  const blqFila: number[] = [], blqCol: number[] = [], blqOff: number[] = [0], blqCod: number[] = [];
+  const blqFila: number[] = [], blqCol: number[] = [], blqOff: number[] = [0], blqCod: number[] = [], blqRanura: number[] = [];
+  // el lugar de i y de j en cada bisagra del triángulo t, para que el bloque de la placa no los busque en cada cuadro
+  const ranuras = (t: number, i: number, j: number) => {
+    let r = 0;
+    for (let k = 0; k < 3; k++) {
+      const h = bisDeTri[3 * t + k];
+      let ri = 7, rj = 7;
+      if (h >= 0) {
+        for (let q = 0; q < 4; q++) {
+          if (bisagras[4 * h + q] === i) ri = q;
+          if (bisagras[4 * h + q] === j) rj = q;
+        }
+      }
+      r |= (ri | (rj << 3)) << (6 * k);
+    }
+    return r >>> 0;
+  };
   for (let i = 0; i < n; i++) {
     for (const j of [...filas[i].keys()].sort((a, b) => a - b)) {
       blqFila.push(i);
       blqCol.push(j);
-      for (const cod of filas[i].get(j) ?? []) blqCod.push(cod);
+      for (const cod of filas[i].get(j) ?? []) {
+        blqCod.push(cod);
+        blqRanura.push(cod >= 0x80000000 ? ranuras(cod - 0x80000000, i, j) : 0);
+      }
       blqOff.push(blqCod.length);
     }
     filaOff[i + 1] = blqCol.length;
@@ -223,6 +268,8 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       cs: Float32Array.from(c.s),
       cl: Float32Array.from(c.L),
       ckh: Float32Array.from(s.placa.costura, (k) => k.kh),
+      ccos: Float32Array.from(c.cosido),
+      cdes: Float32Array.from(c.desfase),
       cuNodos: bvh?.nodes ?? new Float32Array(0),
       cuTri: bvh?.triVerts ?? new Float32Array(0),
       cuNt: bvh?.triNormals ?? new Float32Array(0),
@@ -240,6 +287,7 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       aporIdx,
       blqOff: Uint32Array.from(blqOff),
       blqCod: Uint32Array.from(blqCod),
+      blqRanura: Uint32Array.from(blqRanura),
       blqFila: Uint32Array.from(blqFila),
       blqCol: Uint32Array.from(blqCol),
       franjaBase,
@@ -252,6 +300,11 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       cuSalto: bvh?.skip ?? new Uint32Array(0),
       exOff,
       exIdx: Uint32Array.from(s.excluidos.flat()),
+      cSoldable: Uint32Array.from(c.soldable),
+      dependeDe: Uint32Array.from(c.dependeDe, (e) => (e < 0 ? NINGUNA : e)),
+      cInversa: Uint32Array.from(c.inversa),
+      depOff,
+      depIdx: Uint32Array.from(sostenidos.flat()),
     },
   };
 }

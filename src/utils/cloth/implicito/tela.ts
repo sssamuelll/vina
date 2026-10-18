@@ -18,6 +18,8 @@ export interface TelaFisica {
   kCizalla: number;
   /** factor de la carga de pandeo P = pandeo·π²·B/L² (§4.1.4); Infinity = resiste igual que al estirar */
   pandeo: number;
+  /** encogimiento (fracción) desde el que la tela vuelve a resistir como al estirar (E9); sin él, TOPE_DE_PANDEO */
+  topePandeo?: number;
   /** µN·m */
   bTrama: number;
   /** µN·m */
@@ -38,6 +40,8 @@ export interface TelaSI {
   kUrdimbre: number;
   kCizalla: number;
   pandeo: number;
+  /** Infinity sin tope */
+  topePandeo: number;
   bTrama: number;
   bUrdimbre: number;
   bBies: number;
@@ -53,6 +57,7 @@ export function telaSI(t: TelaFisica): TelaSI {
     kUrdimbre: t.kUrdimbre,
     kCizalla: t.kCizalla,
     pandeo: t.pandeo,
+    topePandeo: t.topePandeo ?? TOPE_DE_PANDEO,
     bTrama: t.bTrama * 1e-6,
     bUrdimbre: t.bUrdimbre * 1e-6,
     bBies: t.bBies * 1e-6,
@@ -72,3 +77,11 @@ export function separacion(t: TelaSI): number {
  * 2026-10-13 con la referencia privada del banco.
  */
 export const PANDEO_CALIBRADO = 0.4;
+
+/**
+ * E9: el encogimiento (fracción) en que termina la meseta de pandeo de las telas que no traen uno medido; desde ahí
+ * la tela vuelve a resistir como al estirar. Medido el 2026-10-16 con la camiseta a 5 mm en la GPU y el disco Cusick
+ * en 5, 10 y 20 mm: con 0,1 los triángulos aplastados bajan de 1,53 a 0,28 % y el Cusick sigue cumpliendo (rango
+ * 2,6); con 0,05 y 0,03 el Cusick pierde el rango.
+ */
+export const TOPE_DE_PANDEO = 0.1;

@@ -17,11 +17,12 @@ import { seamInitDataToPairs, type PieceWithOutline } from '../../seamPairs';
 import { seamsToInitData } from '../../../../components/Viewport3D/costurasDeLaSimulacion';
 import type { BodyMeasurements, InternalLineType, PatternPiece, Seam } from '../../../../types/types';
 import { buildLinearBVH } from '../../gpu/bvh';
-import type { BisagraDeCostura, PuntoDeCostura } from '../costuras';
+import { puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura } from '../costuras';
 import { CuerpoRigido } from '../cuerpo';
 import type { MallaDeTela } from '../malla';
 import { armarPrenda, bisagrasDePrenda, costurasDePrenda, franjaDePrenda, type LadosDeCostura, type Prenda } from '../prenda';
-import type { TelaFisica } from '../tela';
+import { separacion, telaSI, type TelaFisica } from '../tela';
+import { anillarTira, type TiraEnAnillo } from './cuello';
 import { colocarDesdeObj } from './colocacion';
 import type { Escena } from './escenas';
 import { aplastados, distanciaAlCuerpo, distanciaASuperficie, estiramiento, pliegues, separacionDeCosturas } from './medidas';
@@ -30,9 +31,13 @@ import { cuerpoDeObj, leerObj, mallaDeObj } from './obj';
 /** Las medidas con que la app refina las costuras de María en el mundo (las de seamCoverage.maria.test.ts). */
 export const MEDIDAS_DE_MARIA = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } as BodyMeasurements;
 
-/** Las piezas del DXF, clasificadas y con sus bordes semánticos, como al importarlas en la app. */
+/**
+ * Las piezas del DXF, clasificadas y con sus bordes semánticos, como al importarlas en la app. Con ids fijos: autoSew
+ * orienta algunas costuras según los ids, y con los de la importación (al azar) la camiseta del banco no se repetía.
+ */
 export function piezasDeMaria(dxf: string): PatternPiece[] {
-  const piezas = importDXFContent(dxf, { unit: 'auto', autoDetect: true }).pieces;
+  // state-encoded ID: el orden de la pieza en el DXF
+  const piezas = importDXFContent(dxf, { unit: 'auto', autoDetect: true }).pieces.map((p, k) => ({ ...p, id: `maria-${k}` }));
   const clases = classifyPiecesGeometric(piezas);
   for (const p of piezas) {
     const c = clases.get(p.id);
@@ -155,10 +160,15 @@ export interface CamisetaContraLaReferencia {
   referencia: { malla: MallaDeTela; superficie: CuerpoRigido } | null;
   /** por pieza, la mayor distancia (mm de patrón) de un vértice de Vina a la malla de la colocación */
   errorDeColocacion: number[];
+  /** la tira del cuello en anillo (E11), si la camiseta la tiene y se pidió */
+  anillo: TiraEnAnillo | null;
 }
 
-/** La camiseta sobre el avatar de la referencia y desde su colocación inicial (E5). Las posiciones de los OBJ van en mm. */
-export function camisetaContraLaReferencia(a: ArchivosDeLaCamiseta, aristaMm: number, tela: TelaFisica): CamisetaContraLaReferencia {
+/**
+ * La camiseta sobre el avatar de la referencia y desde su colocación inicial (E5), con la tira del cuello en anillo
+ * alrededor del cuello (E11, salvo `anillo: false`). Las posiciones de los OBJ van en mm.
+ */
+export function camisetaContraLaReferencia(a: ArchivosDeLaCamiseta, aristaMm: number, tela: TelaFisica, op: { anillo?: boolean } = {}): CamisetaContraLaReferencia {
   const colocacion = leerObj(a.colocacion);
   let mmPorVt = 1, errorDeColocacion: number[] = [];
   const camiseta = camisetaDeMaria(a.dxf, aristaMm, tela, (piezas, mallas) => {
@@ -173,13 +183,18 @@ export function camisetaContraLaReferencia(a: ArchivosDeLaCamiseta, aristaMm: nu
     return r.x;
   });
   const cuerpo = new CuerpoRigido(buildLinearBVH(cuerpoDeObj(leerObj(a.cuerpo), a.config.gruposDelCuerpo, 0.001)));
+  const tira = camiseta.piezas.findIndex((p) => p.category === 'collar');
+  const { malla } = camiseta.prenda;
+  const anillo = op.anillo !== false && tira >= 0
+    ? anillarTira(malla.x, malla.patron, camiseta.prenda.piezas[tira], camiseta.costuras.puntos, cuerpo, separacion(telaSI(tela)))
+    : null;
   let referencia: CamisetaContraLaReferencia['referencia'] = null;
   if (a.asentada) {
     const obj = leerObj(a.asentada);
     referencia = { malla: mallaDeObj(obj, 0.001, mmPorVt), superficie: new CuerpoRigido(buildLinearBVH(cuerpoDeObj(obj, null, 0.001))) };
   }
   const escena: Escena = { malla: camiseta.prenda.malla, obstaculos: [{ tipo: 'cuerpo', cuerpo }], costuras: camiseta.costuras, franja: camiseta.franja };
-  return { escena, camiseta, cuerpo, referencia, errorDeColocacion };
+  return { escena, camiseta, cuerpo, referencia, errorDeColocacion, anillo };
 }
 
 export interface MedidasDeCamiseta {
@@ -187,21 +202,51 @@ export interface MedidasDeCamiseta {
   aplastados: number;
   estiramiento: ReturnType<typeof estiramiento>;
   costuras: ReturnType<typeof separacionDeCosturas>;
+  /** por costura, de la más abierta a la más cerrada: sus dos piezas, cuántos puntos, el largo de cada lado en el patrón (m) y la separación (m) */
+  porCostura: Array<{ piezas: [string, string]; puntos: number; largos: [number, number]; mediana: number; maxima: number }>;
+  /** por pieza, el porcentaje de sus triángulos con menos de la mitad del área de su patrón */
+  porPieza: Array<{ pieza: string; aplastados: number; estiramiento95: number }>;
   pliegues: ReturnType<typeof pliegues>;
   alCuerpo: ReturnType<typeof distanciaAlCuerpo>;
   /** la distancia de cada vértice de Vina a la asentada de la referencia */
   contraLaReferencia: ReturnType<typeof distanciaASuperficie> | null;
   /** lo mismo medido sobre la asentada de la referencia (sin costuras: el OBJ no las trae) */
-  referencia: Omit<MedidasDeCamiseta, 'costuras' | 'contraLaReferencia' | 'referencia'> | null;
+  referencia: Omit<MedidasDeCamiseta, 'costuras' | 'porCostura' | 'porPieza' | 'contraLaReferencia' | 'referencia'> | null;
 }
 
 export function medirCamiseta(x: ArrayLike<number>, c: CamisetaContraLaReferencia): MedidasDeCamiseta {
-  const { malla } = c.escena, ref = c.referencia;
+  const { malla } = c.escena, ref = c.referencia, { piezas, prenda, lados } = c.camiseta;
+  const nombre = (k: number) => `${piezas[k].name} (${piezas[k].category ?? 'sin clase'})`;
+  const piezaDe = (v: number) => prenda.piezas.findIndex((p) => v >= p.v0 && v < p.v0 + p.nv);
+  const largo = (lado: readonly number[]) => {
+    let L = 0;
+    for (let k = 1; k < lado.length; k++) {
+      L += Math.hypot(malla.patron[2 * lado[k]] - malla.patron[2 * lado[k - 1]], malla.patron[2 * lado[k] + 1] - malla.patron[2 * lado[k - 1] + 1]);
+    }
+    return L;
+  };
   return {
     vertices: x.length / 3,
     aplastados: aplastados(x, malla),
     estiramiento: estiramiento(x, malla),
     costuras: separacionDeCosturas(x, c.camiseta.costuras.puntos),
+    porCostura: lados
+      .filter((l) => l.a.length > 0 && l.b.length > 0)
+      .map((l) => {
+        const puntos = puntosDeCostura(malla.patron, l.a, l.b, l.ta, l.tb, l.vecinosA, l.vecinosB);
+        return {
+          piezas: [nombre(piezaDe(l.a[0])), nombre(piezaDe(l.b[0]))] as [string, string],
+          puntos: puntos.length,
+          largos: [largo(l.a), largo(l.b)] as [number, number],
+          ...separacionDeCosturas(x, puntos),
+        };
+      })
+      .sort((p, q) => q.maxima - p.maxima),
+    porPieza: prenda.piezas.map((p, k) => ({
+      pieza: nombre(k),
+      aplastados: aplastados(x, malla, p.t0, p.nt),
+      estiramiento95: estiramiento(x, malla, p.t0, p.nt).p95,
+    })),
     pliegues: pliegues(x, malla),
     alCuerpo: distanciaAlCuerpo(x, c.cuerpo),
     contraLaReferencia: ref ? distanciaASuperficie(x, ref.superficie) : null,

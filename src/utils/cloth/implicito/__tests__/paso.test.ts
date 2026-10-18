@@ -11,13 +11,13 @@ describe('el paso implícito', () => {
     const s = new SistemaTela(laminaPlana(10), TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'plano', altura: -0.004 }] });
     const r = azar(31);
     for (let q = 0; q < s.x.length; q++) s.x[q] += 0.002 * r();
-    let anticipados = 0;
+    let proyectados = 0;
     for (let k = 0; k < 20; k++) {
       const info = pasoImplicito(s);
       expect(info.G1).toBeLessThanOrEqual(info.G0);
-      anticipados += info.anticipados;
+      proyectados += info.proyectados;
     }
-    expect(anticipados).toBeGreaterThan(0);
+    expect(proyectados).toBeGreaterThan(0);
   });
 
   it('el disco cae sobre el pedestal sin atravesarlo y sin aplastarse', () => {
