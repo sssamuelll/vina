@@ -360,8 +360,15 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 ## 5. Riesgos
 
 - **Velocidad**: para asentar tan rápido como la referencia hacen falta ~50
-  iteraciones por cuadro (17 ms). Con 20, la prenda tarda más en quedar quieta. La
-  multimalla del subproyecto 1 es el remedio previsto.
+  iteraciones por cuadro. Con 20, el gradiente conjugado sin converger frena la tela
+  como un amortiguador. Medido el 2026-10-18: la tela sobre un plano a 35° con μ = 0,4
+  avanza 2 mm en vez de más de 20 (falla §4.4.1), el disco de 20 mm con poca
+  resistencia a encoger sigue en 55 tras 60 cuadros, y en el disco Cusick a 5 mm el
+  jersey y el rib no quedan quietos y el denim tarda 8,9 s contra 4,4. En la camiseta
+  a 5 mm con el jersey medido (E12), en la GTX 980, ese freno se ve como mejora: 31 ms
+  por cuadro contra 53, de 1285 a 5505 desbordes contra 11186 a 12627 y la costura más
+  abierta a 2,2-6,0 mm contra 6,2-10,6 mm; ninguna de las dos queda quieta en 10 s. El
+  motor sigue con 50. La multimalla del subproyecto 1 es el remedio previsto.
 - **Contacto propio en GPU**: las listas por vértice que cambian cada cuadro son la
   parte más nueva y la de mayor costo incierto.
 - **Calibración**: el factor de pandeo y la rigidez del margen definen cuánto cambia la
@@ -388,6 +395,7 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
 el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
 la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
+Aprobó E12 y E13 el 2026-10-18.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
