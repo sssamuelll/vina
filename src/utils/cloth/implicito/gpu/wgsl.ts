@@ -19,7 +19,7 @@ export const WG = 128;
 /** Los escalares del cuadro, en la zona SC de `red`. */
 export const ESC = {
   RZ: 0, RZ0: 1, HECHO: 4, ACTIVO: 5, PROYECTADOS: 6, ALFA_LS: 7, PROBANDO: 8,
-  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15, RZ_IMPAR: 16,
+  CUADRO: 9, QUIETUD: 10, QMAX: 11, ITER: 12, DG: 13, ALFA_FINAL: 14, COSIDA: 15, RZ_IMPAR: 16, RZ_FIN: 17,
 } as const;
 const N_ESC = 32;
 
@@ -51,7 +51,7 @@ type ZonaTf =
   | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD4' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
   | 'APORTE';
 /** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
-type ZonaAt = 'CNTC' | 'CURC' | 'VREG' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB';
+type ZonaAt = 'CNTC' | 'CURC' | 'VREG' | 'CNTV' | 'CURV' | 'NPAR' | 'DESB' | 'SALTO';
 /** las sumas parciales de cada reducción, los escalares y la historia de la quietud */
 type ZonaRed = 'PA' | 'PB' | 'PC' | 'PD' | 'PE' | 'SC' | 'HISTO';
 
@@ -108,7 +108,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const ge = Math.max(gt, gc, p.propio ? gp : 0, 1);
   const zona = Math.max(gv, gt, gh, gc, gp, 1);
   const red = { ...zonas<ZonaRed>({ PA: zona, PB: zona, PC: zona, PD: zona, PE: zona, SC: N_ESC, HISTO: cuadrosDeHistoria }), HIST: cuadrosDeHistoria };
-  const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, VREG: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1 });
+  const at = zonas<ZonaAt>({ CNTC: p.nceldas, CURC: p.nceldas, VREG: p.nceldas, CNTV: n, CURV: n, NPAR: 1, DESB: 1, SALTO: 1 });
   return { vf, tf, iu, red, at, gv, gt, gh, gb, gc, gch, gp, gpa, ge, gcel, gpnt, gvb };
 }
 
@@ -884,6 +884,7 @@ fn arbolR0(v: u32) -> ResiduoB {
   for (var k = 0u; k < GV; k++) { s += red[R_PA + k]; }
   red[R_SC + E_RZ] = s;
   red[R_SC + E_RZ0] = s;
+  red[R_SC + E_RZ_FIN] = s;
   red[R_SC + E_HECHO] = 0.0;
 }
 
@@ -994,6 +995,8 @@ fn lugarRz(siguiente: bool) -> u32 {
     var b = -1.0;
     if (!fin) { b = rzn / red[lugarRz(false)]; }
     if (w.x == 0u) {
+      // el rᵀz de la última iteración, para medir cuánto convergió el cuadro
+      red[R_SC + E_RZ_FIN] = rzn;
       if (fin) {
         red[R_SC + E_HECHO] = 1.0;
         red[R_SC + E_ACTIVO] = 0.0;

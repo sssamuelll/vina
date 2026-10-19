@@ -203,9 +203,9 @@ fn parDePunta(b: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, bb: vec3<f32>, c:
   let hi = max(max(a, b), c) + vec3<f32>(r);
   let k0 = celdaDe(lo, CELDA);
   let k1 = celdaDe(hi, CELDA);
-  // ponytail: un triángulo estirado más allá de ocho celdas por eje no busca pares y se cuenta como desborde
+  // ponytail: un triángulo estirado más allá de ocho celdas por eje no busca pares y se cuenta aparte de la lista llena
   if (any(k1 - k0 >= vec3<i32>(8))) {
-    atomicAdd(&at[A_DESB], 1u);
+    atomicAdd(&at[A_SALTO], 1u);
     return;
   }
   for (var kx = k0.x; kx <= k1.x; kx++) {

@@ -9,7 +9,8 @@
  * referencia privada que sirve la prueba); `cg` = iteraciones del gradiente conjugado; `cuadros`; `busqueda=0` y
  * `propio=0` apagan esos pasos para aislar una diferencia; `anillo=0` deja la tira del cuello donde la pone la
  * referencia (E11); `kc` cambia la rigidez de las puntas del cuerpo; `kp`, la de los pares entre capas de tela;
- * `maxPares`, la capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide. Publica el
+ * `maxPares`, la capacidad de pares. El modo camiseta la corre hasta quieta o 10 s de tela y la mide; con `instr=1`, cuadro
+ * a cuadro y con los instrumentos de banco/instrumentos.ts, sin medir el tiempo. Publica el
  * resultado en `window.__TELA_IMPLICITA__`.
  */
 import { useEffect, useState } from 'react';
@@ -20,6 +21,8 @@ import {
   camisetaContraLaReferencia, medirCamiseta, type CamisetaContraLaReferencia, type ConfigCamiseta, type MedidasDeCamiseta,
 } from '../../utils/cloth/implicito/banco/camiseta';
 import { toparPlaca } from '../../utils/cloth/implicito/banco/experimentos';
+import { costurasPorClase, LadosDeLosPares } from '../../utils/cloth/implicito/banco/instrumentos';
+import { percentil } from '../../utils/cloth/implicito/banco/medidas';
 import { paresEnCosturas, peoresPuntos, type ParesEnCostura, type PeorPunto } from '../../utils/cloth/implicito/banco/paresEnCosturas';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
 import type { TelaFisica } from '../../utils/cloth/implicito/tela';
@@ -44,7 +47,80 @@ interface Resultado {
   estado?: EstadoGpu;
   /** modo perfil: ms de GPU por cuadro y despachos por cuadro de cada entrada, de la más cara a la más barata */
   perfil?: Array<{ entrada: string; veces: number; ms: number }>;
+  /** modo camiseta con instr=1: cada cuadro y su resumen (banco/instrumentos.ts); esa corrida no mide el tiempo */
+  instrumentos?: Instrumentos;
   error?: string;
+}
+
+const SERIES = ['alfa', 'quietud', 'aceptado', 'cg', 'residuo', 'pares', 'desbordesLista', 'desbordesCeldas', 'ladoMaloPares', 'ladoMaloVertices'] as const;
+
+interface Instrumentos {
+  /** por cuadro: el α aceptado, la quietud del paso pedido y la del aceptado (α·quietud), las iteraciones, el residuo, los pares, los desbordes del cuadro por causa y los pares (y sus vértices) del lado malo */
+  serie: Record<(typeof SERIES)[number], number[]>;
+  resumen: {
+    cuadros: number;
+    desbordesLista: number;
+    desbordesCeldas: number;
+    cuadrosConDesborde: number;
+    alfaMenorQueUno: number;
+    alfaCero: number;
+    cgAlTope: number;
+    residuoMediano: number;
+    residuoMaximo: number;
+    ladoMaloMaximo: number;
+    ladoMaloAlFinal: number;
+    paresAnotados: number;
+    cruces: ReturnType<LadosDeLosPares['cruces']>;
+    costuras: ReturnType<typeof costurasPorClase>;
+  };
+}
+
+/**
+ * La camiseta cuadro a cuadro, leyendo después de cada uno el estado, los pares y las posiciones: los desbordes del
+ * cuadro por causa, la historia de α, el residuo y los pares que cruzaron su cara. Al final, la costura por clase de punto.
+ */
+async function instrumentar(motor: MotorGpu, nuevo: () => SistemaTela): Promise<{ quieta: number | null; x: Float32Array; instrumentos: Instrumentos }> {
+  const vigia = new VigiaDeQuietud(), lados = new LadosDeLosPares();
+  const serie = Object.fromEntries(SERIES.map((k) => [k, [] as number[]])) as Instrumentos['serie'];
+  let x = await motor.leerPosiciones(), quieta: number | null = null, lista = 0, celdas = 0;
+  for (let c = 0; c < 600 && quieta === null; c++) {
+    await motor.avanzar(1);
+    const e = await motor.leerEstado();
+    // los pares se armaron con las posiciones de antes del cuadro
+    lados.anotar(await motor.leerPares(e.pares), e.pares, x);
+    x = await motor.leerPosiciones();
+    const malo = lados.revisar(x);
+    const fila = { alfa: e.alfa, quietud: e.quietud, aceptado: e.alfa * e.quietud, cg: e.cg, residuo: e.residuo, pares: e.pares, desbordesLista: e.desbordesLista - lista, desbordesCeldas: e.desbordesCeldas - celdas, ladoMaloPares: malo.pares, ladoMaloVertices: malo.vertices };
+    for (const k of SERIES) serie[k].push(fila[k]);
+    lista = e.desbordesLista;
+    celdas = e.desbordesCeldas;
+    if (vigia.registrar(e.quietud)) quieta = (c + 1) / 60;
+  }
+  const cpu = nuevo();
+  cpu.x.set(x);
+  const { n, a, b0, b1 } = cpu.costuras;
+  const costura = new Set([...a.subarray(0, n), ...b0.subarray(0, n), ...b1.subarray(0, n)]);
+  const cuenta =(v: number[], si: (q: number, k: number) => boolean) => v.filter(si).length;
+  const instrumentos: Instrumentos = {
+    serie,
+    resumen: {
+      cuadros: serie.alfa.length,
+      desbordesLista: lista,
+      desbordesCeldas: celdas,
+      cuadrosConDesborde: cuenta(serie.desbordesLista, (q, k) => q + serie.desbordesCeldas[k] > 0),
+      alfaMenorQueUno: cuenta(serie.alfa, (q) => q < 1),
+      alfaCero: cuenta(serie.alfa, (q) => q === 0),
+      cgAlTope: cuenta(serie.cg, (q) => q >= motor.s.aj.maxCG),
+      residuoMediano: percentil(serie.residuo, 0.5),
+      residuoMaximo: Math.max(...serie.residuo),
+      ladoMaloMaximo: Math.max(...serie.ladoMaloVertices),
+      ladoMaloAlFinal: serie.ladoMaloVertices.at(-1) ?? 0,
+      paresAnotados: lados.anotados,
+      cruces: lados.cruces(x, costura),
+      costuras: costurasPorClase(x, cpu.costuras, await motor.leerCosidos(), (e, d) => cpu.cruzaUnObstaculo(cpu.costuras.a[e], d)),
+    },
+  };
+  return { quieta, x, instrumentos };
 }
 
 /** Lo que sirve tela-implicita.spec.ts desde la carpeta privada; sin ella, la escena no se arma. */
@@ -161,6 +237,10 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     }
     if (modo === 'camiseta') {
       if (!camisetaEnCurso) throw new Error('el modo camiseta va con escena=camiseta');
+      if (q.get('instr')) {
+        const { quieta, x, instrumentos } = await instrumentar(motor, nuevo);
+        return { ...base, segundosHastaQuieta: quieta, medidas: medirCamiseta(x, camisetaEnCurso), instrumentos, estado: await motor.leerEstado() };
+      }
       // hasta quieta o 10 s de tela, de a un segundo; el primer cuadro cuenta para la quietud y no para el tiempo,
       // porque su envío espera a que se compilen las tuberías
       const vigia = new VigiaDeQuietud();

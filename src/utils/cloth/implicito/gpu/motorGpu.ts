@@ -25,6 +25,12 @@ export interface EstadoGpu {
   pares: number;
   /** los pares que no cupieron y los triángulos que no buscaron, desde el primer cuadro */
   desbordes: number;
+  /** de esos, los pares que no cupieron en la lista */
+  desbordesLista: number;
+  /** y los triángulos de ocho celdas o más por eje, que no buscaron */
+  desbordesCeldas: number;
+  /** √(rᵀz final / rᵀz inicial) del gradiente conjugado del último cuadro */
+  residuo: number;
 }
 
 export class MotorGpu {
@@ -250,12 +256,18 @@ export class MotorGpu {
   }
 
   async leerEstado(): Promise<EstadoGpu> {
-    const e = new Float32Array(await this.leer('red', 4 * this.d.red.SC, 4 * 16));
-    const a = new Uint32Array(await this.leer('at', 4 * this.d.at.NPAR, 8));
+    const e = new Float32Array(await this.leer('red', 4 * this.d.red.SC, 4 * (ESC.RZ_FIN + 1)));
+    const a = new Uint32Array(await this.leer('at', 4 * this.d.at.NPAR, 12));
     return {
       cuadro: e[ESC.CUADRO], cg: e[ESC.ITER], proyectados: e[ESC.PROYECTADOS], alfa: e[ESC.ALFA_FINAL], quietud: e[ESC.QUIETUD], quietudMaxima: e[ESC.QMAX],
-      dg: e[ESC.DG], pares: Math.min(a[0], this.p.maxPares), desbordes: a[1],
+      dg: e[ESC.DG], pares: Math.min(a[0], this.p.maxPares), desbordes: a[1] + a[2], desbordesLista: a[1], desbordesCeldas: a[2],
+      residuo: e[ESC.RZ0] > 0 ? Math.sqrt(e[ESC.RZ_FIN] / e[ESC.RZ0]) : 0,
     };
+  }
+
+  /** Los `cuantos` primeros pares del contacto propio del último cuadro: 14 números por par (wgslPropio.ts, guardarPar). */
+  async leerPares(cuantos: number): Promise<Float32Array> {
+    return new Float32Array(await this.leer('tf', 4 * this.d.tf.PAR, 4 * 14 * Math.max(cuantos, 1))).subarray(0, 14 * cuantos);
   }
 
   /** E8: 1 en cada punto de costura que quedó cosido. */
