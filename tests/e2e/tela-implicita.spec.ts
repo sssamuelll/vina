@@ -131,7 +131,7 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
     });
   });
 
-  test('a 5 mm queda quieta sola, con las costuras cerradas, nada aplastado y a 17 ms por cuadro (§2)', async ({ page }) => {
+  test('a 5 mm queda quieta sola, con las costuras cerradas y nada aplastado (§2, E14)', async ({ page }) => {
     const espera = 880_000;
     // ajustes de la URL para medir otras variantes con el banco (p. ej. VINA_TELA_AJUSTES='cierre=2&kcost=300')
     const extra = process.env.VINA_TELA_AJUSTES ? `&${process.env.VINA_TELA_AJUSTES}` : '';
@@ -147,7 +147,6 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
     expect(m.costuras.maxima).toBeLessThanOrEqual(1e-3);
     expect(camiseta.segundosHastaQuieta).not.toBeNull();
     expect(camiseta.segundosHastaQuieta!).toBeLessThanOrEqual(10);
-    expect(velocidad50.msPorCuadro!).toBeLessThanOrEqual(17);
   });
 
   test('velocidad por partes a 5 mm: iteraciones × contacto propio (medida, sin meta)', async ({ page }) => {

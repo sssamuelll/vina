@@ -395,7 +395,7 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
 el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
 la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
-Aprobó E12 y E13 el 2026-10-18.
+Aprobó E12 y E13 el 2026-10-18, y E14 el 2026-10-19.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -518,3 +518,9 @@ Aprobó E12 y E13 el 2026-10-18.
   puede perder más de cuatro quintos de su área sin pagar una energía que crece sin tope; donde actúa, la barrera es tan
   rígida que la precisión simple se aleja de la CPU (2,2 mm en tres cuadros con un triángulo a 0,1 de su área). Plan
   `2026-10-16-el-motor-a-s2.md`.
+- **E14 (§2 y §4.4.3). La velocidad sale del criterio de éxito.** Los 17 ms de §2 eran el costo del spike sin contacto
+  ni costuras (§1.2). Con todo puesto y 50 iteraciones, el perfil limpio de la camiseta suma al menos 20,5 ms de GPU;
+  entrar en 17 ms deja unas 30 iteraciones, el régimen que frena la tela (§5). Manda la física: la camiseta tiene que
+  quedar quieta en 10 s con 50 iteraciones, y la velocidad (17 ms y luego 8 ms) es la meta del subproyecto de
+  velocidad. El banco la sigue midiendo y reportando. *Costo:* este subproyecto puede cerrar con la camiseta a más de
+  17 ms por cuadro.
