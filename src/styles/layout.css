@@ -202,7 +202,7 @@
   height: var(--top-bar-h);
   flex-shrink: 0;
   display: flex;
-  background: var(--papel);
+  background: var(--canvas-2d);
   border-top: var(--hairline);
   color: var(--text-primary);
 }

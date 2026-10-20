@@ -1,9 +1,8 @@
 /* Los márgenes de herramientas (spec 2026-10-02 «la interfaz en papel» § 4.3).
-   Son papel, no marco: --papel, y una línea de pelo los separa de la hoja
-   (gris desde el 20-10). Son columnas en el flujo, no flotan: no tapan la
-   hoja ni se mueven con lo que pase encima. El del patrón vive dentro de
-   `.canvas-area__2d`; el del 3D (`.margen--derecho`), en `.canvas-area`,
-   DETRÁS de los paneles. Llevan
+   Son papel, no marco: el color de la hoja, y una línea de pelo los separa de
+   ella. Son columnas en el flujo, no flotan: no tapan la hoja ni se mueven con
+   lo que pase encima. El del patrón vive dentro de `.canvas-area__2d`; el del
+   3D (`.margen--derecho`), en `.canvas-area`, DETRÁS de los paneles. Llevan
    data-material="papel", así que `--text-*`, `--bg-elevated` y `--border` de
    `.dock__tool` y `.dock__add` son los del papel. */
 .margen {
@@ -20,7 +19,7 @@
   align-items: center;
   gap: 2px;
   padding: 6px 0;
-  background: var(--papel);
+  background: var(--canvas-2d);
   border-right: var(--hairline);
   /* Si no caben (hasta 22, `MAX_DOCK_2D_TOOLS`), se desplaza con la barra a la
      vista: salirse en silencio es el defecto de #1095. Fina, para que no se

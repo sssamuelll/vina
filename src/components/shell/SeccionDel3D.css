@@ -1,7 +1,7 @@
 /* La sección del 3D de la línea al pie (SeccionDel3D.tsx, spec 2026-10-02 § 5.3,
    P5): la voz de la vista. Su caja (`.linea-al-pie__3d`) y cómo se reparte el
    ancho con la sección del patrón están en layout.css. Vive en la línea al pie,
-   que es papel desde el 2026-10-11 (tinta del ámbito sobre --papel). El
+   que es papel desde el 2026-10-11 (tinta del ámbito sobre --canvas-2d). El
    estado de la simulación se mudó ese día al pie del margen del 3D
    (EstadoDeLaSimulacion.css). */
 

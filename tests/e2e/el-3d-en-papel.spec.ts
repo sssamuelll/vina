@@ -18,10 +18,8 @@ import { abrirSubmenuDeVina } from './helpers/diagnostico';
 test.describe.configure({ timeout: process.env.CI ? 240_000 : 120_000 });
 
 const MARIA = { width: 1366, height: 643 };
-/** La hoja (`--canvas-2d`, el gris de CLO desde el 20-10), tal como la calcula el navegador. */
-const HOJA = 'rgb(199, 199, 199)';
-/** El papel de los márgenes y la línea al pie (`--papel`): desde el 20-10 ya no es el de la hoja. */
-const PAPEL = 'rgb(244, 244, 244)';
+/** El papel de la hoja (`--canvas-2d`), tal como lo calcula el navegador. */
+const PAPEL = 'rgb(245, 245, 245)';
 
 interface VentanaConStore {
   __VINA_STORE__: { getState: () => { renderSettings: { backgroundMode: string; avatarRenderStyle: string }; simulation: { simulationState: string; viewMode3D: string } } };
@@ -64,11 +62,11 @@ test('el escenario es el papel de la hoja, y entre las dos vistas hay una línea
       ancho: divisor.getBoundingClientRect().width,
     };
   });
-  expect(f.escenario, 'el escenario no es el papel').toBe(HOJA);
-  expect(f.hoja, 'la hoja no es el papel').toBe(HOJA);
+  expect(f.escenario, 'el escenario no es el papel').toBe(PAPEL);
+  expect(f.hoja, 'la hoja no es el papel').toBe(PAPEL);
   // La franja de 4 px pinta el papel, no lo negro de detrás; lo que se ve es la
   // línea de 1 px del centro. Y sigue siendo arrastrable.
-  expect(f.divisor, 'el divisor es una franja oscura').toBe(HOJA);
+  expect(f.divisor, 'el divisor es una franja oscura').toBe(PAPEL);
   expect(f.linea, 'lo que se ve no es una línea de 1 px').toBe('1px');
   expect(f.ancho, 'el área de agarre ya no son 4 px').toBe(4);
   expect(f.cursor).toBe('col-resize');
@@ -85,7 +83,7 @@ test('el escenario es el papel de la hoja, y entre las dos vistas hay una línea
   // En 3D solo no hay divisor, y el escenario sigue siendo el papel.
   await cambiarVista(page, '3D');
   expect(await page.locator('.canvas-area__divider').count()).toBe(0);
-  expect(await page.evaluate(() => getComputedStyle(document.querySelector('.canvas-area__3d')!).backgroundColor)).toBe(HOJA);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('.canvas-area__3d')!).backgroundColor)).toBe(PAPEL);
 });
 
 test('el margen del 3D: pegado al borde, con sus cuatro herramientas, y no se mueve cuando se abre un panel', async ({ page }) => {
@@ -243,7 +241,7 @@ test('«Capturar visor 3D» saca el visor sobre el papel: la captura sale con el
   });
   expect(imagen.ancho, 'la captura salió vacía').toBeGreaterThan(100);
   expect(imagen.alto).toBeGreaterThan(100);
-  expect(imagen.esquina, 'la esquina de la captura no es el papel de la hoja (199, 199, 199)').toEqual([199, 199, 199, 255]);
+  expect(imagen.esquina, 'la esquina de la captura no es el papel de la hoja (245, 245, 245)').toEqual([245, 245, 245, 255]);
 });
 
 test('el pie lleva la sección del 3D con la voz de la vista: en Split y en 3D, no en 2D', async ({ page }) => {

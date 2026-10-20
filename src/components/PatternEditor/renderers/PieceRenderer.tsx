@@ -421,7 +421,7 @@ const SinglePiece = memo(function SinglePiece({
                   // pierde en cuanto se escribe. Mismo par que su hermano
                   // `.layer-inline-rename` (LayerPanel.css:38). El censo de R6
                   // no lo veia: solo miraba CSS, y este estilo va en linea.
-                  border: '1px solid var(--accent-2d)',
+                  border: '1px solid var(--accent)',
                   outline: 'none',
                   fontSize: `${11 / zoom2D}px`,
                   fontFamily: 'var(--font-mono-2d)',
