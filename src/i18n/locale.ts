@@ -149,3 +149,7 @@ export function detectLocale(over: Partial<DetectEnv> = {}): Locale {
 export function __resetLocaleForTests(locale: Locale = 'en'): void {
   commit(locale, false);
 }
+
+export function __listenerCountForTests(): number {
+  return listeners.size;
+}
