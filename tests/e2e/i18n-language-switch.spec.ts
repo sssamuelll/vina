@@ -16,7 +16,8 @@ async function openLanguageItems(page: Page) {
 
 test.describe('language switch', () => {
   test('Preferences menu sets German, keeps it across a reload, and goes back to Spanish', async ({ page }, testInfo) => {
-    await openApp(page, new URL(testInfo.project.use.baseURL ?? 'http://localhost:5174').origin, '/app/');
+    // Spanish named in the address: the launch gate runs this spec with the browser pinned to English.
+    await openApp(page, new URL(testInfo.project.use.baseURL ?? 'http://localhost:5174').origin, '/app/?lang=es');
     expect(await lang(page)).toBe('es');
 
     await openLanguageItems(page);
