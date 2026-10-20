@@ -30,8 +30,8 @@ describe('pseudo-locale', () => {
     const out = entry('Manga');
     expect(out).toContain('Manga');
     expect(out).toContain('Délété');
-    expect(out).not.toContain('');
-    expect(out).not.toContain('');
+    expect(out).not.toContain('\uE000');
+    expect(out).not.toContain('\uE001');
     expect(outsideBrackets(out)).not.toMatch(/\p{L}/u);
   });
 

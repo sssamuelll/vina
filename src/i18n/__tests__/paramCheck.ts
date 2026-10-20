@@ -6,7 +6,8 @@ export type ParamKind = 'string' | 'number' | 'count';
 
 const NUMBER_SENTINEL = 12.3456;
 const COUNT_SENTINEL = 5;
-const marker = (i: number) => `⟦p${i}⟧`;
+// Letters only: a digit in a marker would read as a number or count token.
+const marker = (i: number) => `⟦p${String.fromCharCode(97 + i)}⟧`;
 
 function callWith(fn: (...args: never[]) => unknown, args: unknown[]): unknown {
   return (fn as (...a: unknown[]) => unknown)(...args);
