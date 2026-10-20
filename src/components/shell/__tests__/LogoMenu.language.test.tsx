@@ -5,7 +5,7 @@
  * each named in itself and marked with its own `lang`, a check on the active one.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import editorReducer from '../../../store/editorSlice';
@@ -15,7 +15,7 @@ import projectReducer from '../../../store/projectSlice';
 import toolsReducer from '../../../store/toolSlice';
 import constructionReducer from '../../../store/constructionSlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
-import { getLocale } from '../../../i18n/locale';
+import { getLocale, setLocale } from '../../../i18n/locale';
 import LogoMenu, { PREFERENCES_MENU } from '../LogoMenu';
 
 vi.mock('../../Viewport3D/visorBridge', () => ({ capturarVisor3D: vi.fn(() => true) }));
@@ -76,6 +76,14 @@ describe('LogoMenu ▸ Preferences ▸ Language', () => {
     expect(getLocale()).toBe('de');
     openPreferences();
     expect(isChecked('Deutsch')).toBe(true);
+    expect(isChecked('Español')).toBe(false);
+  });
+
+  it('the check follows a change made elsewhere while the menu is open', () => {
+    renderMenu();
+    openPreferences();
+    act(() => setLocale('en'));
+    expect(isChecked('English')).toBe(true);
     expect(isChecked('Español')).toBe(false);
   });
 
