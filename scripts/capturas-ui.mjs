@@ -28,6 +28,7 @@ if (!FECHA || !/^\d{4}-\d{2}-\d{2}$/.test(FECHA)) {
   console.error('Falta --fecha=YYYY-MM-DD (sin valor por defecto: dos corridas del mismo día se pisarían).');
   process.exit(1);
 }
+const TEXTO = process.argv.includes('--texto');
 const SUFIJO = arg('sufijo') ?? '';
 const BASE_URL = (arg('url') ?? 'http://localhost:4174').replace(/\/$/, '');
 const FIXTURE = path.join(REPO, 'tests/fixtures/garments/maria_patrones_samuel_2M.dxf');
@@ -56,9 +57,32 @@ const superficies = () => page.evaluate(() => {
   }
   return [...visibles].sort();
 });
+// --texto: also record the visible text of every shot (i18n es baseline).
+// Self-contained on purpose: no closures over module scope, so it can move unchanged into a Playwright helper.
+const collectTexto = () => {
+  const visible = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+  const inDev = (el) => Boolean(el.closest('[data-superficie="dev"]'));
+  const text = new Set(), attrs = new Set();
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const value = n.nodeValue.trim();
+    const parent = n.parentElement;
+    if (value && parent && !inDev(parent) && visible(parent)) text.add(value);
+  }
+  for (const el of document.body.querySelectorAll('[aria-label],[title],[placeholder],[alt]')) {
+    if (inDev(el) || !visible(el)) continue;
+    for (const name of ['aria-label', 'title', 'placeholder', 'alt']) {
+      const value = el.getAttribute(name)?.trim();
+      if (value) attrs.add(value);
+    }
+  }
+  return { text: [...text].sort(), attrs: [...attrs].sort() };
+};
+const textos = {};
 const shot = async (nombre) => {
   await settle();
   await page.screenshot({ path: path.join(OUT, `${nombre}.png`) });
+  if (TEXTO) textos[nombre] = await page.evaluate(collectTexto);
   registro[nombre] = await superficies();
   console.log('captura', nombre, registro[nombre].join(' '));
 };
@@ -187,5 +211,11 @@ for (const vp of VIEWPORTS) {
 }
 
 await writeFile(path.join(OUT, 'superficies.json'), JSON.stringify(registro, null, 2) + '\n');
+if (TEXTO) {
+  const dir = path.join(REPO, 'tests/i18n/baseline');
+  await mkdir(dir, { recursive: true });
+  const salida = { _base: '473c1772', _fixture: 'tests/fixtures/garments/maria_patrones_samuel_2M.dxf', shots: textos };
+  await writeFile(path.join(dir, 'texto-es.json'), JSON.stringify(salida, null, 2) + '\n');
+}
 await browser.close();
 console.log('OK', OUT);
