@@ -1,5 +1,7 @@
 # Glosario de copy UI en español — Vina
 
+> **Sustituido** por el glosario trilingüe (inglés, español, alemán), `docs/specs/2026-09-29-ui-glossary.md`, que copia sus filas. Este archivo queda como registro.
+
 **Decisión (Fase 3, 2026-07-16):** el idioma del producto es **español**. Sin framework
 de i18n: strings directos (YAGNI hasta que exista una segunda lengua; cuando llegue,
 este glosario es la fuente para extraer claves). Usuaria de referencia: María,

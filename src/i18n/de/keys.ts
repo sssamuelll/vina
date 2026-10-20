@@ -4,7 +4,7 @@ import type { Catalog } from '../types';
 export const keys = {
   space: 'Leertaste',
   backspace: 'Rücktaste',
-  delete: 'Entf',
+  delete: 'Entf', // glossary-exempt: Delete — key name printed on the keycap, not the verb
   escape: 'Esc', // same-as-en: key name printed on the keycap
   ctrl: 'Strg',
   shift: 'Umschalt',
