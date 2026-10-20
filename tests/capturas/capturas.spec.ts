@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { en } from '../../src/i18n/en';
+import { es } from '../../src/i18n/es';
 import { I18N_SURFACES, collectText, openApp, visibleSurfaces } from '../e2e/i18n-surfaces';
 
 const LOCALE = process.env.CAPTURAS_LOCALE ?? 'es';
@@ -46,6 +48,23 @@ const COMPARE_EXCEPTIONS: Record<string, Exception | 'skip'> = {
   'desk-1600x1000--14-3d': SNAPSHOT_CARRIED,
 };
 
+// Catalog keys whose Spanish was written fresh (spec § 1.1 O9): for each, the compare tolerates the
+// `en` text missing from a shot and the `es` text added to it, and nothing else.
+const leaves = (node: unknown, other: unknown): [string, string][] =>
+  typeof node === 'string' && typeof other === 'string'
+    ? [[node, other]]
+    : node && other && typeof node === 'object' && typeof other === 'object'
+      ? Object.entries(node).flatMap(([k, v]) => leaves(v, (other as Record<string, unknown>)[k]))
+      : [];
+const lookup = (root: unknown, key: string) => key.split('.').reduce<unknown>((n, k) => (n as Record<string, unknown> | undefined)?.[k], root);
+const ALLOWED: [string, string][] = process.env.CAPTURAS_ALLOWED
+  ? (JSON.parse(readFileSync(process.env.CAPTURAS_ALLOWED, 'utf8')) as string[]).flatMap((key) => {
+      const pairs = leaves(lookup(en, key), lookup(es, key));
+      if (!pairs.length) throw new Error(`CAPTURAS_ALLOWED: "${key}" has no string entries in both catalogs`);
+      return pairs;
+    })
+  : [];
+
 const registro: Record<string, string[]> = {};
 const textos: Record<string, Shot> = {};
 
@@ -62,7 +81,14 @@ function compare(name: string, got: Shot) {
       expected.splice(at, 1);
     }
     expected.push(...(exception?.added[key] ?? []));
-    expect([...got[key]].sort(), `${name} ${key}`).toEqual(expected.sort());
+    const shot = [...got[key]];
+    for (const [enText, esText] of ALLOWED) {
+      const missing = expected.indexOf(enText);
+      if (missing >= 0 && !shot.includes(enText)) expected.splice(missing, 1);
+      const added = shot.indexOf(esText);
+      if (added >= 0 && !expected.includes(esText)) shot.splice(added, 1);
+    }
+    expect(shot.sort(), `${name} ${key}`).toEqual(expected.sort());
   }
 }
 

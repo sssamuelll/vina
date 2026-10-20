@@ -21,6 +21,8 @@
     "lint": "eslint .",
     "lint:ui": "node scripts/ui-contract-lint.mjs",
     "i18n:lock": "node scripts/i18n/lock.mjs",
+    "i18n:sweep-report": "node scripts/i18n-sweep-report.mjs",
+    "i18n:launch-gate": "node scripts/i18n-launch-gate.mjs",
     "lint:contraste": "tsx scripts/contraste-tokens.ts",
     "audit:ui": "node scripts/ui-surface-audit.mjs",
     "audit:capturas": "node scripts/pesado.mjs --nombre=capturas -- playwright test --config playwright.capturas.config.ts",
