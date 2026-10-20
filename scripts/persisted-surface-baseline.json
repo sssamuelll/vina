@@ -372,7 +372,70 @@
     "updatedAt"
   ],
   "storedShapes": {
-    "AvatarProfile[]": [
+    "connections": [
+      "activeConnectionId",
+      "connections",
+      "connections[]",
+      "connections[].apiKey",
+      "connections[].baseUrl",
+      "connections[].createdAt",
+      "connections[].enabled",
+      "connections[].id",
+      "connections[].label",
+      "connections[].lastUsedAt",
+      "connections[].model",
+      "connections[].provider",
+      "version"
+    ],
+    "copilot-memory-${…}": [
+      "decisions",
+      "decisions[]",
+      "decisions[].context",
+      "decisions[].decision",
+      "decisions[].timestamp",
+      "lastAccessed",
+      "notes",
+      "notes[]",
+      "preferences",
+      "projectId"
+    ],
+    "fallback-provider": [
+      "baseUrl",
+      "model",
+      "provider"
+    ],
+    "input-scheme": [
+      "data",
+      "data.scheme",
+      "data.source",
+      "version"
+    ],
+    "installed": [
+      "[]",
+      "[].enabled",
+      "[].installedAt",
+      "[].manifest",
+      "[].manifest.apiVersion",
+      "[].manifest.author",
+      "[].manifest.compatibleWith",
+      "[].manifest.description",
+      "[].manifest.entryPoint",
+      "[].manifest.id",
+      "[].manifest.license",
+      "[].manifest.name",
+      "[].manifest.networkAllowlist",
+      "[].manifest.networkAllowlist[]",
+      "[].manifest.permissions",
+      "[].manifest.permissions[]",
+      "[].manifest.version",
+      "[].sourceUrl"
+    ],
+    "ollama-config": [
+      "autoDetect",
+      "model",
+      "url"
+    ],
+    "profiles": [
       "[]",
       "[].createdAt",
       "[].id",
@@ -427,34 +490,22 @@
       "[].name",
       "[].updatedAt"
     ],
-    "ConnectionsState": [
-      "activeConnectionId",
-      "connections",
-      "connections[]",
-      "connections[].apiKey",
-      "connections[].baseUrl",
-      "connections[].createdAt",
-      "connections[].enabled",
-      "connections[].id",
-      "connections[].label",
-      "connections[].lastUsedAt",
-      "connections[].model",
-      "connections[].provider",
-      "version"
+    "provider-config": [
+      "baseUrl",
+      "model",
+      "provider"
     ],
-    "CopilotLongTermMemory": [
-      "decisions",
-      "decisions[]",
-      "decisions[].context",
-      "decisions[].decision",
-      "decisions[].timestamp",
-      "lastAccessed",
-      "notes",
-      "notes[]",
-      "preferences",
-      "projectId"
+    "saved-poses": [
+      "[]",
+      "[].createdAt",
+      "[].id",
+      "[].joints",
+      "[].joints[*].x",
+      "[].joints[*].y",
+      "[].joints[*].z",
+      "[].name"
     ],
-    "HistoryTimelineEvent[]": [
+    "undo-history-events": [
       "[]",
       "[].actionTimestamp",
       "[].actionType",
@@ -466,57 +517,6 @@
       "[].latencyMs",
       "[].timestamp",
       "[].toolName"
-    ],
-    "InstalledPlugin[]": [
-      "[]",
-      "[].enabled",
-      "[].installedAt",
-      "[].manifest",
-      "[].manifest.apiVersion",
-      "[].manifest.author",
-      "[].manifest.compatibleWith",
-      "[].manifest.description",
-      "[].manifest.entryPoint",
-      "[].manifest.id",
-      "[].manifest.license",
-      "[].manifest.name",
-      "[].manifest.networkAllowlist",
-      "[].manifest.networkAllowlist[]",
-      "[].manifest.permissions",
-      "[].manifest.permissions[]",
-      "[].manifest.version",
-      "[].sourceUrl"
-    ],
-    "OllamaConfig": [
-      "autoDetect",
-      "model",
-      "url"
-    ],
-    "SavedPose[]": [
-      "[]",
-      "[].createdAt",
-      "[].id",
-      "[].joints",
-      "[].joints[*].x",
-      "[].joints[*].y",
-      "[].joints[*].z",
-      "[].name"
-    ],
-    "StoredProviderConfig": [
-      "baseUrl",
-      "model",
-      "provider"
-    ],
-    "storedConfig": [
-      "baseUrl",
-      "model",
-      "provider"
-    ],
-    "{ version: number; data: { scheme: InputSchemeId; source: SchemeSource; }; }": [
-      "data",
-      "data.scheme",
-      "data.source",
-      "version"
     ]
   },
   "zodKeys": [
@@ -710,6 +710,7 @@
     "__vina_storage_test__",
     "autosave",
     "connections",
+    "copilot-memory-${…}",
     "fallback-provider",
     "input-scheme",
     "installed",
@@ -717,11 +718,15 @@
     "ollama-config",
     "openclo-autosave",
     "openclo-saved-poses",
+    "plugin:${…}",
+    "plugin:${…}:${…}",
     "precision-hint-used",
     "profiles",
     "provider-config",
     "saved-poses",
     "undo-history-events",
+    "vina${…}",
+    "vina-autosave-quarantine-${…}",
     "vina-avatar-profiles",
     "vina-bar-position",
     "vina-crossbend",
@@ -746,11 +751,19 @@
     "vina-tether-disabled",
     "vina-use-webgpu",
     "vina-workflow",
+    "vina:avatars:${…}",
+    "vina:designLog:${…}",
+    "vina:plugins:${…}",
+    "vina:projects:${…}",
+    "vina:settings:${…}",
     "vina_budget",
     "vina_copilot_preferences",
     "vina_installed_community_skills",
     "vina_installed_plugins",
+    "vina_memory_${…}",
+    "vina_plugins_${…}",
     "vina_skill_registry_url",
+    "vina_usage_${…}",
     "webclo-use-webgpu"
   ],
   "actionTypes": [

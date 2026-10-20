@@ -48,6 +48,25 @@ const FIXTURE: Record<string, string> = {
     interface Saved { a: number; b: { c: string } }
     declare const saved: Saved;
     void storageSet('kv', 'vina-saved', saved);
+    declare const projectId: string;
+    localStorage.setItem(\`vina_memory_\${projectId}\`, '1');
+    const inline = { version: 1, data: { n: 2 } };
+    void storageSet('kv', \`vina-inline-\${projectId}\`, inline);
+    const USAGE_PREFIX = 'vina_usage_';
+    localStorage.removeItem(USAGE_PREFIX + projectId);
+    const usageKey = USAGE_PREFIX + projectId;
+    localStorage.setItem(usageKey, '1');
+    const LOG_KEY = 'vina-log';
+    localStorage.getItem(\`\${LOG_KEY}:\${projectId}\`);
+    function memKey(id: string): string {
+      return \`vina-mem:\${id}\`;
+    }
+    interface Mem { note: { text: string } }
+    declare const mem: Mem;
+    void storageSet('settings', memKey(projectId), mem);
+    function readAny(key: string): string | null {
+      return localStorage.getItem(key);
+    }
   `,
 };
 
@@ -89,15 +108,29 @@ describe('collectSurface', () => {
     expect(surface.storageKeys).toEqual(expect.arrayContaining(['vina-demo', 'vina-literal', 'vina-saved']));
   });
 
-  it('lists the property paths of the stored value by its type name', () => {
-    expect(surface.storedShapes.Saved).toEqual(expect.arrayContaining(['a', 'b.c']));
+  it('lists a template-literal key family by its pattern', () => {
+    expect(surface.storageKeys).toEqual(expect.arrayContaining(['vina_memory_${…}', 'vina-inline-${…}']));
+  });
+
+  it('follows concatenation, a const holding a key pattern, a const inside a template, and a key function', () => {
+    expect(surface.storageKeys).toEqual(
+      expect.arrayContaining(['vina_usage_${…}', 'vina-log:${…}', 'vina-mem:${…}']),
+    );
+    expect(surface.storageKeys.filter((k) => k.startsWith('${…}'))).toEqual([]);
+  });
+
+  it('lists the property paths of each stored value, keyed by its storage key', () => {
+    expect(surface.storedShapes['vina-saved']).toEqual(expect.arrayContaining(['a', 'b.c']));
+    expect(surface.storedShapes['vina-inline-${…}']).toEqual(expect.arrayContaining(['data.n', 'version']));
+    expect(surface.storedShapes['vina-mem:${…}']).toEqual(expect.arrayContaining(['note.text']));
+    expect(Object.keys(surface.storedShapes).sort()).toEqual(['vina-inline-${…}', 'vina-mem:${…}', 'vina-saved']);
   });
 
   it('lists the project property paths, arrays as [], cycles cut', () => {
     expect(surface.projectPaths).toEqual(
       expect.arrayContaining(['id', 'pieces[].id', 'pieces[].name', 'trazos[]', 'trazos[].points[].x', 'parent']),
     );
-    expect(surface.projectPaths.length).toBeLessThan(100);
+    expect(surface.projectPaths.some((p) => p.startsWith('parent.'))).toBe(false);
   });
 
   it('sorts every list', () => {

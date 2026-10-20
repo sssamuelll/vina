@@ -2,7 +2,7 @@
 // Lists everything a project or the browser persists, so later i18n phases can prove that
 // translating the UI renamed nothing persisted:
 //   projectPaths  property paths of VinaProject (arrays as `[]`, unions merged, cycles cut, depth <= 8)
-//   storedShapes  property paths of each storageSet(store, key, value) value, keyed by its type name
+//   storedShapes  property paths of each storageSet(store, key, value) value, keyed by its storage key (template keys as `prefix${…}`)
 //   zodKeys       `<schemaVariable>.<key>` of every z.object({...}) in src/utils/projectSchema.ts
 //   storageKeys   string keys of safe*Item / localStorage.* / storageGet|Set|Del calls
 //   actionTypes   `<slice name>/<reducer key>` of every createSlice
@@ -85,11 +85,44 @@ export function collectSurface(program, skipped = []) {
   const storageKeys = new Set();
   const actionTypes = new Set();
 
+  // Storage keys of an expression, or undefined when it cannot be resolved. Template literals and `+`
+  // concatenations are key families: string constants are inlined, anything else becomes `${…}`.
+  // Const identifiers and single-`return` functions resolve through their initializer/returned
+  // expression (parameters stay unresolved, so they become `${…}`). `seen` cuts recursion.
+  const keyValues = (expr, seen = new Set()) => {
+    while (ts.isParenthesizedExpression(expr) || ts.isAsExpression(expr) || ts.isNonNullExpression(expr)) expr = expr.expression;
+    const part = (e) => keyValues(e, seen) ?? ['${…}'];
+    const join = (lists) => lists.reduce((acc, l) => acc.flatMap((x) => l.map((y) => x + y)), ['']);
+    if (ts.isTemplateExpression(expr)) {
+      return join([[expr.head.text], ...expr.templateSpans.flatMap((sp) => [part(sp.expression), [sp.literal.text]])]);
+    }
+    if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      return join([part(expr.left), part(expr.right)]);
+    }
+    const literal = stringValues(expr);
+    if (literal) return literal;
+    let target;
+    if (ts.isIdentifier(expr)) {
+      const decl = checker.getSymbolAtLocation(expr)?.valueDeclaration;
+      if (decl && ts.isVariableDeclaration(decl) && decl.initializer && ts.getCombinedNodeFlags(decl) & ts.NodeFlags.Const) target = [decl, decl.initializer];
+    } else if (ts.isCallExpression(expr)) {
+      const fn = checker.getResolvedSignature(expr)?.declaration;
+      if (fn && (ts.isFunctionDeclaration(fn) || ts.isArrowFunction(fn) || ts.isFunctionExpression(fn)) && fn.body) {
+        const body = fn.body;
+        const ret = !ts.isBlock(body) ? body : body.statements.length === 1 && ts.isReturnStatement(body.statements[0]) ? body.statements[0].expression : undefined;
+        if (ret) target = [fn, ret];
+      }
+    }
+    if (!target || seen.has(target[0])) return undefined;
+    return keyValues(target[1], new Set(seen).add(target[0]));
+  };
   const addKeys = (expr, call) => {
-    if (!expr) return;
-    const values = stringValues(expr);
+    if (!expr) return undefined;
+    let values = keyValues(expr);
+    if (values?.some((v) => v.startsWith('${…}'))) values = undefined; // a bare parameter says nothing about the key
     if (values) values.forEach((v) => storageKeys.add(v));
     else skipped.push(`storage key not a literal: ${where(call)}`);
+    return values;
   };
 
   const visit = (node) => {
@@ -99,20 +132,15 @@ export function collectSurface(program, skipped = []) {
     if (ts.isCallExpression(node)) {
       const name = calleeName(node);
       const [a0, a1, a2] = node.arguments;
+      let keys;
       if (SAFE_KEY_FNS.has(name)) addKeys(a0, node);
-      else if (STORE_KEY_FNS.has(name)) addKeys(a1, node);
+      else if (STORE_KEY_FNS.has(name)) keys = addKeys(a1, node);
       else if (ts.isPropertyAccessExpression(node.expression) && LS_METHODS.has(name) && node.expression.expression.getText().endsWith('localStorage')) addKeys(a0, node);
 
-      if (name === 'storageSet' && a2) {
-        const t = checker.getTypeAtLocation(a2);
-        const sym = t.aliasSymbol ?? t.getSymbol();
-        let key = sym?.name;
-        // Anonymous types (`__type`, `__object`) have no useful name: use the argument's variable name.
-        if (checker.isArrayType(t)) key = checker.typeToString(t);
-        else if (!key || key.startsWith('__')) key = ts.isIdentifier(a2) ? a2.text : checker.typeToString(t);
-        const paths = typePaths(t);
+      if (name === 'storageSet' && a2 && keys) {
         // A primitive or opaque value has no paths worth tracking.
-        if (paths.size) for (const p of paths) (storedShapes[key] ??= new Set()).add(p);
+        const paths = typePaths(checker.getTypeAtLocation(a2));
+        if (paths.size) for (const k of keys) for (const p of paths) (storedShapes[k] ??= new Set()).add(p);
       }
 
       if (name === 'createSlice' && a0 && ts.isObjectLiteralExpression(a0)) {
