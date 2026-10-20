@@ -4,5 +4,4 @@
  * @module copilot/hooks
  */
 
-export { useAgenticLoop } from './useAgenticLoop';
-export type { UseAgenticLoopReturn, ToolCallProgress } from './useAgenticLoop';
+export type { ToolCallProgress } from './useAgenticLoop';

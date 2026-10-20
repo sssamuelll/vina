@@ -21,24 +21,28 @@
  * 2. DIRECTION — set `pieceB.reversed` so endpoints pair nearest-to-nearest
  *    (straight, not crossed). Ctrl+B in the seam tool remains the human
  *    override; this only seeds the AI proposal correctly.
+ * 3. CAP CUT — step 1 may hand a sleeve-cap half to the other armhole, so
+ *    each split cap is re-cut for its FINAL partners (`repartirCopas`).
  *
  * Seams whose edges can't be resolved by semantic name (manual `edge-N`
- * seams, missing pieces) pass through untouched.
+ * seams, missing pieces) pass through steps 1-2 untouched; step 3 only
+ * touches a cap split in two complementary halves.
  */
 
-import type { PatternPiece, Seam } from '../../types/types';
+import type { PatternPiece, Point2D, Seam } from '../../types/types';
 import { outlineBBoxCenter } from '../cloth/garmentPlacement';
 import type { PlacementWithFrame } from '../cloth/arrangement/arrangementBinding';
 import { wrapPlacedMesh } from '../cloth/arrangement/wrapPlacedMesh';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
 import { mirrorPctRange } from '../seam/seamRange';
+import { repartirCopas } from './repartoDeCopa';
 
 type V3 = [number, number, number];
 
 /** One side of a seam, detached from A/B storage order. */
 type SeamHalf = { pieceId: string; edgeName: string; tStart?: number; tEnd?: number };
 
-interface EdgeWorld {
+export interface EdgeWorld {
   /** World position of the edge's first outline point (t=0 traversal). */
   first: V3;
   /** World position of the edge's last outline point (t=1 traversal). */
@@ -54,7 +58,27 @@ function edgeRoot(name: string): string {
   return name.toLowerCase().replace(/-\d+$/, '');
 }
 
-function edgeWorld(
+/** El punto del tramo aplanado [fs, fe] (fe < fs da la vuelta por el cierre) a la fracción t de su largo de arco. */
+function puntoPorLargo(flat: Point2D[], fs: number, fe: number, t: number): Point2D | null {
+  const N = flat.length;
+  const fin = fe < fs ? fe + N : fe;
+  const pts: Point2D[] = [];
+  for (let k = fs; k <= fin; k++) pts.push(flat[k % N]);
+  if (pts.length === 0 || pts.some((p) => !p)) return null;
+  if (pts.length === 1) return pts[0];
+  const largos = [0];
+  for (let k = 1; k < pts.length; k++) largos.push(largos[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y));
+  const total = largos[largos.length - 1];
+  if (!(total > 0)) return pts[0];
+  const objetivo = Math.max(0, Math.min(1, t)) * total;
+  let k = 1;
+  while (k < pts.length - 1 && largos[k] < objetivo) k++;
+  const tramo = largos[k] - largos[k - 1];
+  const u = tramo > 0 ? (objetivo - largos[k - 1]) / tramo : 0;
+  return { x: pts[k - 1].x + u * (pts[k].x - pts[k - 1].x), y: pts[k - 1].y + u * (pts[k].y - pts[k - 1].y) };
+}
+
+export function edgeWorld(
   piece: PatternPiece,
   pwf: PlacementWithFrame,
   edgeName: string,
@@ -66,19 +90,12 @@ function edgeWorld(
   if (flat.length === 0) return null;
   const center = outlineBBoxCenter(piece.outline);
   const [fs0, fe0] = commandRangeToFlattened(piece.outline, edge.segmentRange, 12);
-  // Sub-rango t (medias costuras de sisa): recorta el tramo de índices
-  // linealmente en t — la misma aproximación index-lineal de
-  // parameterizeEdge. Sin esto, las dos mitades del cap medirían el MISMO
-  // midpoint y la permutación de grupo no podría discriminarlas.
-  let fs = fs0, fe = fe0;
-  if (tRange && (tRange[0] > 0 || tRange[1] < 1)) {
-    const span = fe0 - fs0;
-    fs = fs0 + Math.round(Math.max(0, Math.min(1, tRange[0])) * span);
-    fe = fs0 + Math.round(Math.max(0, Math.min(1, tRange[1])) * span);
-    if (fe <= fs) fe = Math.min(fs + 1, fe0);
-  }
-  const pFirst = flat[fs];
-  const pLast = flat[fe % flat.length];
+  // Las puntas de un sub-rango t (medias costuras de sisa y de cuello) van por largo de arco, interpolando
+  // dentro del segmento: la misma t con la que parameterizeEdgeFromBoundary reparte los vértices (#1250 C2).
+  // Por índice de punto, en la orilla recta de la tira (dos puntos) las dos puntas caían en el mismo lugar y
+  // la dirección de la media costura quedaba a la suerte del empate.
+  const pFirst = puntoPorLargo(flat, fs0, fe0, tRange ? tRange[0] : 0);
+  const pLast = puntoPorLargo(flat, fs0, fe0, tRange ? tRange[1] : 1);
   if (!pFirst || !pLast) return null;
   // Position the endpoints with the EXACT mapping the solver uses (envelope
   // wrap, not the old rigid Euler): build the two local mesher verts in the
@@ -126,9 +143,10 @@ interface ResolvedSeam {
 
 /**
  * Refine a set of proposed seams against the CURRENT placements: reassign
- * symmetric partners by world proximity and seed `pieceB.reversed` from
- * endpoint geometry. Returns refined copies in the same order; unresolvable
- * seams pass through untouched.
+ * symmetric partners by world proximity, seed `pieceB.reversed` from
+ * endpoint geometry, and re-cut split sleeve caps for their final partners.
+ * Returns refined copies in the same order; unresolvable seams pass through
+ * untouched unless they are halves of a split cap.
  *
  * Endpoints are positioned with the WRAP (envelope-wrap PR), via the same
  * `wrapPlacedMesh(frame, flip)` the solver starts pieces with — NOT the old
@@ -229,7 +247,7 @@ export function refineSeamsInWorld(
   }
 
   // ── 2. Direction (reversed) from endpoint geometry ───────────────────────
-  return seams.map((seam, i) => {
+  const refined = seams.map((seam, i) => {
     const r = resolved[i];
     if (!r) return seam;
 
@@ -255,4 +273,9 @@ export function refineSeamsInWorld(
       pieceB: { ...yStored, reversed },
     };
   });
+
+  // ── 3. Where each sleeve cap is cut ──────────────────────────────────────
+  // Step 1 may hand a cap half to the other armhole; the cut follows the
+  // FINAL partners, so each half measures what its armhole measures.
+  return repartirCopas(refined, pieces);
 }

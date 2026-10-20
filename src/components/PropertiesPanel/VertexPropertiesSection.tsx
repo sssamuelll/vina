@@ -2,21 +2,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
 import type { CornerType } from '../../types/types';
+// Un término por concepto: los mismos nombres que la etiqueta de la esquina (P3c).
+import { TIPOS_DE_ESQUINA } from '../../utils/seam/tiposDeEsquina';
 
 interface Props {
   pieceId: string;
   vertexIndex: number;
 }
 
-const CORNER_TYPES: { type: CornerType; label: string; disabled?: boolean }[] = [
-  { type: 'mitered', label: 'Inglete' },
-  { type: 'doubleMitered', label: 'Inglete doble' },
-  { type: 'envelope', label: 'Envolvente' },
-  { type: 'squared', label: 'Cuadrada' },
-  { type: 'slant', label: 'Sesgada' },
-  { type: 'match', label: 'Empatada' },
-  { type: 'trimMirrored', label: 'Recorte espejado' },
-];
 
 /**
  * Corner geometry for the selected vertex, edited in the docked panel (bound to
@@ -47,11 +40,10 @@ export default function VertexPropertiesSection({ pieceId, vertexIndex }: Props)
     <section className="panel-section">
       <div className="panel-subtitle panel-subtitle--spaced">Esquina</div>
       <div className="panel-preset-row">
-        {CORNER_TYPES.map(({ type, label, disabled }) => (
+        {TIPOS_DE_ESQUINA.map(({ value: type, label }) => (
           <button
             key={type}
             className={`panel-chip-btn ${isExplicit && type === current ? 'panel-chip-btn--active' : ''}`}
-            disabled={disabled}
             onClick={() => setForVertex(type)}
           >
             {label}
@@ -60,7 +52,7 @@ export default function VertexPropertiesSection({ pieceId, vertexIndex }: Props)
       </div>
       {!isExplicit && (
         <div className="panel-hint">
-          Por defecto: {CORNER_TYPES.find(c => c.type === current)?.label}
+          Por defecto: {TIPOS_DE_ESQUINA.find(c => c.value === current)?.label}
         </div>
       )}
       <div className="panel-field panel-field--row">

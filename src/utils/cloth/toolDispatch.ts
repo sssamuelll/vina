@@ -11,7 +11,7 @@
  *   (which writes the TSL `grabNodes.*` uniforms internally).
  * - WASM: mesh grab only (via `setPins` with positional pin shape).
  * - CPU + Neural: no tool dispatch (capability flag protects consumer
- *   intent; `SimulationStatusOverlay` warning communicates absence).
+ *   intent; `EstadoDeLaSimulacion` warning communicates absence).
  *
  * **Pin position semantics caveat (per A6 RFC Q2):** WASM `setPins` uses
  * positional pin (`position` field is the target coordinate the particle
@@ -179,7 +179,7 @@ function devWarn(message: string): void {
  * Tier coverage:
  * - `kind: 'gpu'`: writes brush uniforms via `setBrushParams`.
  * - `kind: 'wasm'` / `kind: 'none'`: silent no-op (steam brush is GPU-only
- *   per C4 RFC § 2.3; `SimulationStatusOverlay` communicates absence).
+ *   per C4 RFC § 2.3; `EstadoDeLaSimulacion` communicates absence).
  *
  * @returns `true` if a tier accepted the dispatch, `false` otherwise.
  */

@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { act } from '@testing-library/react';
 import type { PatternPiece } from '../../../types/types';
 import { setup } from './editPatternHarness';
+import { setLayerLocked } from '../../../store/projectSlice';
 
 function makePiece(locked: boolean): PatternPiece {
   return {
@@ -39,6 +40,17 @@ function makePiece(locked: boolean): PatternPiece {
 
 const outlineOf = (store: ReturnType<typeof setup>['store']) =>
   store.getState().project.pieces[0].outline;
+
+describe('useEditPattern — el candado de capa pesa igual (piezaBloqueada, #1136)', () => {
+  it('addPointOnSegment sobre una pieza de capa bloqueada no escribe y avisa', () => {
+    const { store, ref } = setup(makePiece(false));
+    act(() => { store.dispatch(setLayerLocked({ layer: 1, locked: true })); });
+    const before = outlineOf(store);
+    act(() => { ref.current!.addPointOnSegment(1, 0.5, 'p1'); });
+    expect(outlineOf(store)).toBe(before);
+    expect(JSON.stringify(store.getState())).toContain('bloqueada');
+  });
+});
 
 describe('useEditPattern — candado en los verbos (pieceId explícito)', () => {
   it('addPointOnSegment sobre pieza bloqueada no escribe y avisa', () => {

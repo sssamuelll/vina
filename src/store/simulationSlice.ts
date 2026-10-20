@@ -81,6 +81,14 @@ export interface SimSnapshotMeta {
 interface SimulationSliceState {
   /** Current simulation state */
   simulationState: SimulationState;
+  /**
+   * La tela ya dio su primer cuadro en esta corrida; hasta entonces el estado
+   * dice «Preparando la tela». Vuelve a `false` al arrancar desde reposo, al
+   * restablecer y al empezar cada corrida de la cascada; pasa a `true` con el
+   * primer cuadro (GarmentSimulation): en WebGPU, cuando la GPU termina los
+   * kernels de ese cuadro.
+   */
+  telaEnMovimiento: boolean;
   /** Fabric ID assigned to each pattern piece, keyed by piece ID */
   pieceFabrics: Record<string, string>;
   /** Default fabric ID for new pieces */
@@ -208,6 +216,7 @@ interface SimulationSliceState {
 
 const initialState: SimulationSliceState = {
   simulationState: 'idle',
+  telaEnMovimiento: false,
   pieceFabrics: {},
   defaultFabricId: 'cotton-poplin',
   particleDistance: 5,
@@ -280,6 +289,8 @@ const simulationSlice = createSlice({
   reducers: {
     /** Start the cloth simulation. */
     startSimulation(state) {
+      // Desde reposo es una corrida nueva: la tela se vuelve a preparar. Reanudar una pausa no.
+      if (state.simulationState === 'idle') state.telaEnMovimiento = false;
       state.simulationState = 'running';
     },
     /** Pause the cloth simulation. */
@@ -289,6 +300,11 @@ const simulationSlice = createSlice({
     /** Reset the cloth simulation to idle. */
     resetSimulation(state) {
       state.simulationState = 'idle';
+      state.telaEnMovimiento = false;
+    },
+    /** El primer cuadro de la corrida llegó (`true`), o la cascada empieza otra (`false`). */
+    marcarTelaEnMovimiento(state, action: PayloadAction<boolean>) {
+      state.telaEnMovimiento = action.payload;
     },
     /**
      * Set the fabric for a specific pattern piece in the SIMULATION runtime cache.
@@ -350,7 +366,7 @@ const simulationSlice = createSlice({
     /**
      * Record the seam → constraint resolution summary for the current init.
      * Pass `null` to clear (sim teardown / project without seams).
-     * Surfaced in `SimulationStatusOverlay`; zero-constraint seams also get
+     * Surfaced in `EstadoDeLaSimulacion`; zero-constraint seams also get
      * a toast + `inspector.seamResolutionErrors` entry (E-async conventions).
      */
     setSeamResolution(state, action: PayloadAction<SeamResolutionSummary | null>) {
@@ -771,6 +787,7 @@ export const {
   startSimulation,
   pauseSimulation,
   resetSimulation,
+  marcarTelaEnMovimiento,
   setSeamResolution,
   setFabric,
   setDefaultFabric,

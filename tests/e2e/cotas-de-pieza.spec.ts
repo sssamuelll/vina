@@ -59,7 +59,8 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     let pieces = (await st(page)).project.pieces;
     expect(bbox(pieces[0])).toMatchObject({ w: 100, h: 100 });
     await expect(cota(page, 'Ancho')).toHaveText('100 mm');
-    await expect(page.getByText('Editando: la pieza nueva')).toBeVisible();
+    // El rótulo «Editando: la pieza nueva» se fue con la tarjeta en P2b (spec
+    // 2026-10-02 § 8): de qué pieza son las cotas lo prueba la edición de abajo.
 
     await cota(page, 'Ancho').click();
     await page.keyboard.type('300');
@@ -93,7 +94,10 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     await page.keyboard.press('z');
     await expect.poll(async () => (await st(page)).editor.activeTool).toBe('select');
     await page.mouse.click(s.x + 20, s.y + 20);
-    await expect(page.getByText('Editando: la pieza seleccionada')).toBeVisible();
+    // Desde P2b no hay rótulo «Editando: la pieza seleccionada»: lo dice la
+    // selección (spec 2026-10-02 § 8).
+    const id = (await st(page)).project.pieces[0].id;
+    await expect.poll(async () => (await st(page)).editor.selectedPieceIds).toEqual([id]);
 
     await cota(page, 'Ancho').click();
     await page.keyboard.type('200');
@@ -170,9 +174,10 @@ test.describe('cotas de pieza (María #223/#225)', () => {
     const s = await toScreen(page, { x: 300, y: 300 });
     await page.mouse.click(s.x, s.y);
     const ancho = await cota(page, 'Ancho').boundingBox();
-    const alto = await cota(page, 'Alto').boundingBox();
-    if (!ancho || !alto) throw new Error('sin chips');
-    // girada 90°: el chip de Ancho queda a un lado (no arriba) y el de Alto arriba o abajo
+    if (!ancho) throw new Error('sin chip de Ancho');
+    // Una cota a la vez (spec 2026-10-02 § 5.5): en Seleccionar solo se ve Ancho.
+    await expect(cota(page, 'Alto')).toHaveCount(0);
+    // girada 90°: el chip de Ancho queda a un lado (no arriba)
     // El oráculo es el CONTORNO pintado, no el grupo `[data-piece-id]`: desde
     // que "Largos" nace encendido (reunión 07-09, fallo 4) el grupo incluye las
     // etiquetas de largo y su caja ya no es la geometría de la pieza. Lo que

@@ -102,6 +102,28 @@ export function getEdgePathD(
   }
 }
 
+/**
+ * El `d` de un borde de varios comandos: los de `[desde, hasta)` encadenados,
+ * cada uno con su curva intacta. Un borde importado son 14-20 comandos, y las
+ * curvas del DXF de María 77-127: pintar solo el primero dejaba de la sisa un
+ * resalte de 2,4 mm (revisión de la entrega 1a de la superficie, 2026-10-05).
+ * El rango ya viene traducido (`rangoMedibleDeBorde`).
+ */
+export function getRangePathD(
+  commands: PathCommand[],
+  [desde, hasta]: readonly [number, number],
+  offsetX: number = 0,
+  offsetY: number = 0,
+): string | null {
+  const tramos: string[] = [];
+  for (let i = desde; i < hasta; i++) {
+    const d = getEdgePathD(commands, i, offsetX, offsetY);
+    // Cada comando empieza donde acabó el anterior: su `M` sobra.
+    if (d) tramos.push(tramos.length === 0 ? d : d.slice(d.indexOf(' ') + 1));
+  }
+  return tramos.length > 0 ? tramos.join(' ') : null;
+}
+
 /** Compute the straight-line length of an edge (chord between endpoints). */
 export function getEdgeLength(commands: PathCommand[], edgeIndex: number): number {
   const ep = getEdgeEndpoints(commands, edgeIndex);

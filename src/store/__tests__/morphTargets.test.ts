@@ -12,6 +12,7 @@ function makeState(overrides: Partial<AvatarState> = {}): AvatarState {
     pose: {
       joints: {},
       activePreset: null,
+      porResolver: false,
       ikChains: [],
       ikTargets: [],
       ikEnabled: false,

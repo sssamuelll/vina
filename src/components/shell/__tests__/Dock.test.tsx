@@ -11,8 +11,10 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
-import dockReducer, { toggleDockSignaling, pinAuto, addDockTool, removeDockTool, reorderDockTool } from '../../../store/dockSlice';
+import dockReducer, { addDockTool, removeDockTool, reorderDockTool } from '../../../store/dockSlice';
+import { activate2DTool } from '../../../store/toolActivation';
 import LeftDock from '../LeftDock';
+import { ShortcutProvider } from '../../../shortcuts/ShortcutProvider';
 
 afterEach(cleanup);
 
@@ -27,34 +29,59 @@ function makeDataTransfer() {
 }
 
 const TOOLS = [
-  { id: 'select', icon: MousePointer2, label: 'Seleccionar', shortcut: 'Z' },
-  { id: 'pen', icon: Pen, label: 'Pluma', shortcut: 'H' },
+  { id: 'select', icon: MousePointer2, label: 'Seleccionar', shortcut: 'Z', grupo: 'editar' as const },
+  { id: 'pen', icon: Pen, label: 'Pluma', shortcut: 'H', grupo: 'dibujar' as const },
 ];
 
 describe('Dock (presentational)', () => {
-  it('renders the domain label and one button per tool', () => {
-    render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
-    expect(screen.getByText('2D')).toBeTruthy();
+  it('es el margen del patrón: papel, sin rótulo «2D», un botón por herramienta', () => {
+    render(<Dock tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
+    const margen = screen.getByRole('navigation', { name: 'Herramientas del patrón' });
+    expect(margen.getAttribute('data-material')).toBe('papel');
+    expect(margen.getAttribute('data-superficie')).toBe('ambiente');
+    expect(screen.queryByText('2D')).toBeNull();
     expect(screen.getByRole('button', { name: /seleccionar · z/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /pluma · h/i })).toBeTruthy();
   });
 
+  it('entre dos grupos hay aire, y dentro de un grupo no', () => {
+    const { container } = render(
+      <Dock
+        tools={[...TOOLS, { id: 'rectangle', icon: Pen, label: 'Rectángulo', shortcut: 'S', grupo: 'dibujar' as const }]}
+        activeToolId="select"
+        onSelectTool={() => {}}
+      />,
+    );
+    // editar | dibujar, dibujar: un solo hueco, entre Seleccionar y Pluma.
+    expect(container.querySelectorAll('.margen__aire')).toHaveLength(1);
+  });
+
+  it('la activa que no está en el margen se pinta al final, marcada', () => {
+    const fuera = { id: 'grainline', icon: Pen, label: 'Hilo', shortcut: '⇧G', grupo: 'dibujar' as const };
+    render(<Dock tools={TOOLS} activeToolId="grainline" activaFuera={fuera} onSelectTool={() => {}} />);
+    const botones = screen.getAllByRole('button');
+    const ultima = botones[botones.length - 1];
+    expect(ultima.getAttribute('aria-label')).toMatch(/^Hilo/);
+    expect(ultima.getAttribute('aria-pressed')).toBe('true');
+    expect(ultima.className).toContain('dock__tool--active');
+  });
+
   it('calls onSelectTool with the tool id on click', () => {
     const onSelectTool = vi.fn();
-    render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={onSelectTool} />);
+    render(<Dock tools={TOOLS} activeToolId="select" onSelectTool={onSelectTool} />);
     fireEvent.click(screen.getByRole('button', { name: /pluma · h/i }));
     expect(onSelectTool).toHaveBeenCalledWith('pen');
   });
 
   it('marks the active tool', () => {
-    render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="pen" onSelectTool={() => {}} />);
+    render(<Dock tools={TOOLS} activeToolId="pen" onSelectTool={() => {}} />);
     const penBtn = screen.getByRole('button', { name: /pluma · h/i });
     expect(penBtn.className).toContain('dock__tool--active');
   });
 
   it('reorders on drop: dragging Select onto Pen calls onReorderTool(select, pen)', () => {
     const onReorderTool = vi.fn();
-    render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} onReorderTool={onReorderTool} />);
+    render(<Dock tools={TOOLS} activeToolId="select" onSelectTool={() => {}} onReorderTool={onReorderTool} />);
     const dt = makeDataTransfer();
     fireEvent.dragStart(screen.getByRole('button', { name: /seleccionar · z/i }), { dataTransfer: dt });
     fireEvent.dragOver(screen.getByRole('button', { name: /pluma · h/i }), { dataTransfer: dt });
@@ -64,7 +91,7 @@ describe('Dock (presentational)', () => {
 
   it('a drop onto the same tool does not reorder', () => {
     const onReorderTool = vi.fn();
-    render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} onReorderTool={onReorderTool} />);
+    render(<Dock tools={TOOLS} activeToolId="select" onSelectTool={() => {}} onReorderTool={onReorderTool} />);
     const dt = makeDataTransfer();
     const sel = screen.getByRole('button', { name: /seleccionar · z/i });
     fireEvent.dragStart(sel, { dataTransfer: dt });
@@ -73,20 +100,20 @@ describe('Dock (presentational)', () => {
   });
 
   it('tool buttons are not draggable without onReorderTool', () => {
-    render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
+    render(<Dock tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
     expect((screen.getByRole('button', { name: /seleccionar · z/i }) as HTMLButtonElement).draggable).toBe(false);
   });
 
   it('clicking a tool still activates it while reorder is enabled', () => {
     const onSelectTool = vi.fn();
-    render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={onSelectTool} onReorderTool={() => {}} />);
+    render(<Dock tools={TOOLS} activeToolId="select" onSelectTool={onSelectTool} onReorderTool={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /pluma · h/i }));
     expect(onSelectTool).toHaveBeenCalledWith('pen');
   });
 
   it('keeps the accessible name and shows a right-positioned tooltip on hover', () => {
     vi.useFakeTimers();
-    const { container } = render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
+    const { container } = render(<Dock tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
     expect(screen.getByRole('button', { name: /seleccionar · z/i })).toBeTruthy();
     fireEvent.mouseEnter(container.querySelectorAll('.tool-tooltip-wrapper')[0]);
     act(() => { vi.advanceTimersByTime(500); });
@@ -98,12 +125,12 @@ describe('Dock (presentational)', () => {
   });
 });
 
-function renderLeftDock(onOpenPanel = vi.fn()) {
+function renderLeftDock() {
   const store = configureStore({
     reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer },
   });
-  render(<Provider store={store}><LeftDock onOpenPanel={onOpenPanel} /></Provider>);
-  return { store, onOpenPanel };
+  render(<Provider store={store}><ShortcutProvider><LeftDock /></ShortcutProvider></Provider>);
+  return { store };
 }
 
 describe('LeftDock (container)', () => {
@@ -117,54 +144,36 @@ describe('LeftDock (container)', () => {
   it('is hidden in 3D-only view', () => {
     const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer } });
     store.dispatch(setViewMode('3d'));
-    render(<Provider store={store}><LeftDock onOpenPanel={vi.fn()} /></Provider>);
-    expect(screen.queryByText('2D')).toBeNull();
+    render(<Provider store={store}><ShortcutProvider><LeftDock /></ShortcutProvider></Provider>);
+    expect(screen.queryByRole('button', { name: /seleccionar · z/i })).toBeNull();
   });
 
-  it('shows a grade ✦ suggestion once pieces exist and runs it', () => {
-    const { store, onOpenPanel } = renderLeftDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Escalar' }));
-    expect(onOpenPanel).toHaveBeenCalledWith('Grading');
+  it('la activa siempre tiene marca: una del catálogo que no está en el margen aparece al final', () => {
+    const { store } = renderLeftDock();
+    expect(screen.queryByRole('button', { name: /hilo/i })).toBeNull();
+    act(() => { activate2DTool(store.dispatch, 'grainline'); });
+    const hilo = screen.getByRole('button', { name: /hilo/i });
+    expect(hilo.getAttribute('aria-pressed')).toBe('true');
+    // Se va en cuanto deja de estar activa: no se queda pegada al margen.
+    act(() => { activate2DTool(store.dispatch, 'select'); });
+    expect(screen.queryByRole('button', { name: /hilo/i })).toBeNull();
   });
 
-  it('keeps a grade suggestion (✦→📌) and records it in the dock slice', () => {
+  it('y una que no es del catálogo sale con su nombre del registro (Transformar, con A)', () => {
+    const { store } = renderLeftDock();
+    act(() => { activate2DTool(store.dispatch, 'transform'); });
+    const transformar = screen.getByRole('button', { name: 'Transformar patrón' });
+    expect(transformar.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('sin zona AUTO: con piezas no aparece ninguna sugerencia (spec 2026-10-02 § 8)', () => {
     const { store } = renderLeftDock();
     act(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Fijar Escalar' }));
-    expect(store.getState().dock.pinnedExtra.left).toEqual(['grade']);
-    expect(screen.getByRole('button', { name: 'Soltar Escalar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Fijar Escalar' })).toBeNull();
-  });
-
-  it('signaling=off mutes the auto layer but shows no suggestion', () => {
-    const { store } = renderLeftDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-      store.dispatch(toggleDockSignaling()); // → 'off'
-    });
-    expect(screen.queryByText('auto')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Fijar Escalar' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Escalar' })).toBeNull();
-  });
-
-  it('off: a kept tool still renders (plain, no Unpin badge)', () => {
-    const { store } = renderLeftDock();
-    act(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
-      store.dispatch(pinAuto({ side: 'left', id: 'grade' }));
-      store.dispatch(toggleDockSignaling()); // → 'off'
-    });
-    expect(screen.getByRole('button', { name: 'Escalar' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Soltar Escalar' })).toBeNull();
+    expect(screen.queryByText('auto')).toBeNull();
   });
 
   // Usaba 'notch' (Piquete), que desde la auditoría de UI del 2026-08-14 viene
@@ -190,7 +199,7 @@ describe('LeftDock (container)', () => {
     expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
     fireEvent.click(add);
     expect(screen.getByRole('group', { name: 'Personalizar herramientas del dock' })).toBeTruthy();
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
   });
 
@@ -202,6 +211,20 @@ describe('LeftDock (container)', () => {
     // inside the ref, so opening it never self-closes — this guards that seam).
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole('group', { name: 'Personalizar herramientas del dock' })).toBeNull();
+  });
+
+  it('el teclado entra al personalizador y vuelve al «+» con Escape', () => {
+    // El personalizador cuelga de <body> (P1b): en el DOM queda lejos del «+»,
+    // y Tab desde el botón ya no entraba en la lista (revisión final de P1b).
+    renderLeftDock();
+    const add = screen.getByRole('button', { name: 'Personalizar herramientas del dock' });
+    add.focus();
+    fireEvent.click(add);
+    const menu = screen.getByRole('group', { name: 'Personalizar herramientas del dock' });
+    expect(menu.contains(document.activeElement), 'el foco se quedó fuera del personalizador').toBe(true);
+    expect(add.getAttribute('aria-controls'), 'el «+» no dice qué abre').toBe(menu.id);
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    expect(document.activeElement, 'Escape no devolvió el foco al «+»').toBe(add);
   });
 
   it('renders tools in tools2d order; reordering moves the tool in the DOM', () => {

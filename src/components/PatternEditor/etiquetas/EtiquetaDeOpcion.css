@@ -1,0 +1,58 @@
+/* La etiqueta de opción (spec 2026-10-02 «la interfaz en papel» § 5.2): papel
+   sobre la hoja, en la capa de las cotas, sin z-index (el orden del DOM la pone
+   encima del svg). Su menú es el de «Más»: los controles del pie, en filas.
+   Todo sale de tokens (R3); cada :hover trae su :focus-visible en la misma
+   línea (R5). */
+/* Su `transform` lo pone el componente: el borde cercano se apoya en el ancla
+   y la pastilla crece hacia fuera del objeto (`hacia`). */
+.etiqueta-de-opcion {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.etiqueta-de-opcion__boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  color: var(--text-primary);
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  cursor: pointer;
+}
+
+.etiqueta-de-opcion__boton:not([aria-disabled='true']):hover, .etiqueta-de-opcion__boton:not([aria-disabled='true']):focus-visible { background: var(--bg-elevated); }
+.etiqueta-de-opcion__boton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Con la pieza bloqueada se ve apagada: el tipo y las medidas siguen a la
+   vista, pero no se cambian. */
+.etiqueta-de-opcion__boton[aria-disabled='true'] {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+.etiqueta-de-opcion__menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 12px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+/* Siete tipos de esquina no caben en una fila de 360 px: bajan. */
+.etiqueta-de-opcion__menu .opcion-del-pie__botones { flex-wrap: wrap; }

@@ -149,6 +149,12 @@ test.describe('trazos — líneas de construcción', () => {
   });
 
   test('«Construcción» apagada: ni se pinta, ni engancha, ni se selecciona', async ({ page }) => {
+    // Pulsa «Construcción», que desde P2 vive en la barra superior: a 1280 (el
+    // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+    // «Mostrar» (spec 2026-10-02 § 4.2). Pasaba por una carrera: hasta que
+    // carga Inter los rótulos miden menos y el grupo sale desplegado un
+    // instante. Se mide en la pantalla de María.
+    await page.setViewportSize({ width: 1366, height: 768 });
     await waitForApp(page);
     await activarHerramienta(page, 'h', 'pen');
     await clic(page, { x: 100, y: 200 }); await clic(page, { x: 300, y: 200 }); await page.keyboard.press('Enter');
@@ -247,7 +253,6 @@ test.describe('trazos — líneas de construcción', () => {
     await expect.poll(async () => (await estado(page)).editor.selectedTrazo, { timeout: 5000 })
       .toMatchObject({ segmentIndex: 2 });
     await expect(page.locator('.cotas button.cota[aria-label^="Largo:"]')).toHaveCount(1);
-    await expect(page.locator('.tool-strip')).toContainText('Editando: el tramo seleccionado');
 
     // Supr se lleva ESE tramo; como era del medio, el trazo queda partido en dos.
     await page.keyboard.press('Delete');

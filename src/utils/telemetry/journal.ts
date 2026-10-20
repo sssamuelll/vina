@@ -22,7 +22,9 @@ export type JournalKind =
   | 'session'
   | 'storage'
   | 'error'
-  | 'solver';
+  | 'solver'
+  | 'agente'
+  | 'puente';
 
 export interface JournalEvent {
   /** `Date.now()` — misma base que los rings existentes. */
@@ -43,8 +45,13 @@ export const JOURNAL_COALESCE_MS = 1000;
 export const JOURNAL_TAIL_KEY = 'vina-last-journal';
 export const RESUMIR_MAX_CHARS = 600;
 
-/** Un gesto, un atajo, una superficie o un evento de storage repetido es información, no ruido. */
-const UNFUSED: ReadonlySet<JournalKind> = new Set(['gesture', 'shortcut', 'ui', 'storage']);
+/**
+ * Un gesto, un atajo, una superficie, un evento de storage, una llamada de un
+ * agente o un cambio del puente repetidos son información, no ruido. Fundido,
+ * un puente que se corta y vuelve en un segundo dejaría «conectado» antes de
+ * «buscando»; las repeticiones idénticas ya las descarta quien registra.
+ */
+const UNFUSED: ReadonlySet<JournalKind> = new Set(['gesture', 'shortcut', 'ui', 'storage', 'agente', 'puente']);
 
 const events: JournalEvent[] = [];
 let dropped = 0;

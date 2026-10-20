@@ -17,6 +17,7 @@ import { reindexEdges, sameSegmentRanges } from '../utils/edgeReindex';
 import { mirrorPctRange } from '../utils/seam/seamRange';
 import { normalizeSpans } from '../utils/seam/allowanceSpans';
 import { autoSew } from '../utils/autoSew';
+import { AVATAR_POR_DEFECTO, avatarPorUrl } from '../avatares/catalogo';
 
 function validSeamAllowanceSpan(span: SeamAllowanceSpan): SeamAllowanceSpan | null {
   if (![span.tStart, span.tEnd, span.width].every(Number.isFinite)) return null;
@@ -162,21 +163,6 @@ function autoDetectLayer(category?: string): number {
 /** Lateral offset in metres when superimposing a piece in 'side' mode. */
 const SUPERIMPOSE_SIDE_OFFSET_M = 0.1;
 
-const defaultAvatar: Avatar = {
-  id: 'default',
-  name: 'Default Avatar',
-  modelUrl: '',
-  measurements: {
-    height: 180,
-    chest: 96,
-    waist: 82,
-    hips: 96,
-    shoulder: 44,
-    armLength: 64,
-    inseam: 82,
-  },
-};
-
 const defaultFabric: Fabric = {
   id: 'default-cotton',
   name: 'Cotton',
@@ -243,9 +229,9 @@ const initialState: ProjectState = {
   elastics: [],
   trims: [],
   fabrics: [defaultFabric],
-  avatar: defaultAvatar,
+  avatar: AVATAR_POR_DEFECTO,
   avatarMode: 'model',
-  avatarModelUrl: '/default-avatar.glb',
+  avatarModelUrl: AVATAR_POR_DEFECTO.modelUrl,
   isDirty: false,
   groups: [],
   seamGroups: [],
@@ -280,7 +266,13 @@ function applyProjectPayload(state: ProjectState, payload: VinaProject, generati
   state.pieces = p.pieces;
   state.seams = p.seams;
   state.fabrics = p.fabrics;
-  state.avatar = p.avatar;
+  // El cuerpo viaja en avatar.modelUrl (spec 2026-09-29 § 5). Uno que no es de la
+  // biblioteca —proyectos de antes ('' o el escaneo borrado) o un modelo propio,
+  // cuyo blob ya no existe al reabrir— vuelve a la talla por defecto; las medidas
+  // del proyecto se quedan: son las del patrón.
+  const modelUrl = avatarPorUrl(p.avatar.modelUrl)?.modelUrl ?? AVATAR_POR_DEFECTO.modelUrl;
+  state.avatar = { ...p.avatar, modelUrl };
+  state.avatarModelUrl = modelUrl;
   state.groups = p.groups ?? [];
   state.poms = p.poms ?? [];
   state.seamGroups = (p as any).seamGroups ?? [];
@@ -537,7 +529,7 @@ const projectSlice = createSlice({
       pieceId: string;
       lineId: string;
       path: PathCommand[];
-      // Optional notch fields (notch-precision F3): the precision modal
+      // Optional notch fields (notch-precision F3): the notch's cota (P3b)
       // re-positions a notch, which moves path AND anchor/depth together.
       notchAnchor?: NotchAnchor;
       notchOptions?: NotchOptions;
@@ -1774,10 +1766,12 @@ export const {
   addReferenceImage, removeReferenceImage, updateReferenceImage,
 } = projectSlice.actions;
 
-const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Lining', 1: 'Shell', 2: 'Trims' };
+// Los nombres de taller (spec 2026-10-02 § 6.1). Solo se ven: `layerNames`
+// no viaja en `stateToProject`, así que ningún proyecto guardado los lleva.
+const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Forro', 1: 'Exterior', 2: 'Avíos' };
 
 export function getLayerDisplayName(state: { project: { layerNames: Record<number, string> } }, layer: number): string {
-  return state.project.layerNames[layer] ?? DEFAULT_LAYER_NAMES[layer] ?? `Layer ${layer}`;
+  return state.project.layerNames[layer] ?? DEFAULT_LAYER_NAMES[layer] ?? `Capa ${layer}`;
 }
 
 export default projectSlice.reducer;

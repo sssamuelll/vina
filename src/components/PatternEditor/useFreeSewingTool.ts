@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '../../store';
+import { useDispatch } from 'react-redux';
 import { clearSelection } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, Seam } from '../../types/types';
 import { screenToPattern } from './sewingUtils';
@@ -29,10 +28,6 @@ export function useFreeSewingTool(
 ) {
   const dispatch = useDispatch();
   const [segmentA, setSegmentA] = useState<SegmentSelection | null>(null);
-
-  const seamType = useSelector(
-    (s: RootState) => (s.tools.toolOptions?.seam?.seamType as Seam['type']) ?? 'standard',
-  );
 
   const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -94,9 +89,11 @@ export function useFreeSewingTool(
       setSegmentA(segment);
       return;
     }
-    onComplete(buildSegmentSeam(segmentA, segment, pieces, seamType));
+    // La costura nace Normal: su tipo se cambia en su etiqueta, con ella
+    // elegida (P3c, spec 2026-10-02 § 5.3). «Tipo de costura» salió del pie.
+    onComplete(buildSegmentSeam(segmentA, segment, pieces, 'standard'));
     setSegmentA(null);
-  }, [segmentA, onComplete, pieces, seamType, dispatch]);
+  }, [segmentA, onComplete, pieces, dispatch]);
 
   const gesture = useEdgeGesture({ resolveTarget, resolveReleaseT, onCommit });
 

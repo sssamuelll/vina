@@ -23,7 +23,6 @@ export {
 export {
   extractAvatarMesh,
   extractMeshData,
-  applyAPose,
   createTestMesh,
   validateMeshData,
   type ExtractedMeshData

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSelector, useDispatch, shallowEqual } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
+import { addPiece, addSeam, updateSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addEdgeSeamAllowanceSpan, updateEdgeSeamAllowanceSpan, setEdgesSeamAllowance, updateReferenceImage, addTrazo, updateTrazo } from '../../store/projectSlice';
 import { batchUndo, beginUndoBatch, endUndoBatch, withUndoBatchToken, isUndoBatchTokenActive, type UndoBatchToken } from '../../store/undoMiddleware';
 import { activate2DTool, SEWING_TOOL_IDS } from '../../store/toolActivation';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, clearSelection, setZoom2D, setPan2D, computeFitView, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, InternalLineType, PathCommand, Trazo, esRectaDeDosPuntos, type CornerType, type NotchOptions } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import type { PenResult } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -17,20 +18,26 @@ import { CotasLayer, type CotasLayerHandle } from './cotas/CotasLayer';
 import { AgruparCotas } from './cotas/CotaChip';
 import CotaLines from './cotas/CotaLines';
 import { admiteLado, cotasDelSujeto, faltaSujeto, refinarAlLado } from './cotas/sujeto';
+import { cotaDelPunto, cotasDelPiquete } from './cotas/loQueSePone';
+import { cotasALaVista, pasarTurno, TURNO_INICIAL, type TurnoDeCota } from './cotas/unaALaVez';
 import { ladoDelHit } from './cotas/lado';
 import { usePuertaDeLado } from './usePuertaDeLado';
 import { cajasDeAsas } from './cotas/cotasGeometry';
 import { resizePieceTo } from './pieceResize';
-import ToolStrip2D from './ToolStrip2D';
-import { suscribirNoPasoNada } from './noPasoNada';
-import FilaDeCapas from './FilaDeCapas';
+import SeccionDelPatron from './SeccionDelPatron';
+import { fraseDeLaFase, fraseDelPie } from './fraseDeLaFase';
+import { noPasoNada, suscribirNoPasoNada } from './noPasoNada';
+import EtiquetaDeOpcion from './etiquetas/EtiquetaDeOpcion';
+import { piezaBloqueada } from '../../utils/piezaBloqueada';
+import { claveDeEtiqueta, etiquetaDeLaSeleccion, posicionDeEtiqueta, presentarEtiqueta } from './etiquetas/etiquetas';
+import { reescribirPiquete } from './etiquetas/piquete';
 import type { Cota } from './cotas/cotas';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
 import { useNotchTool } from './useNotchTool';
-import { usePointTool } from './usePointTool';
+import { usePointTool, type PointToolMode } from './usePointTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
@@ -66,22 +73,19 @@ import { piezasConLargos as seleccionarPiezasConLargos } from './cotas/piezasCon
 import { usePrecisionHint } from './usePrecisionHint';
 import MeasureToolOverlay from './renderers/overlays/MeasureToolOverlay';
 import GridLayer from './renderers/GridLayer';
-import RulerLayer from './renderers/RulerLayer';
+import MarcaDeEscala from './renderers/MarcaDeEscala';
 import PieceRenderer from './renderers/PieceRenderer';
 import TrazosLayer from './renderers/TrazosLayer';
 import SeamRenderer from './renderers/SeamRenderer';
 import ElasticRenderer from './renderers/ElasticRenderer';
 import TrimRenderer from './renderers/TrimRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
-import HintText from './renderers/HintText';
 import EmptyState2D, { shouldShowEmptyState } from './EmptyState2D';
 import ConstructionOverlay from './renderers/ConstructionOverlay';
 import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
-import NotchPrecisionModal from './NotchPrecisionModal';
 import { notchPlacedMessage } from './notchPrecisionCopy';
-import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { useReferenceImages } from './useReferenceImages';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
@@ -90,15 +94,6 @@ import FloatingActionBar from './FloatingActionBar';
 import { resolveTargetKind, type CurationCtx } from './actionCuration';
 import { selectWorkflowStage } from '../../store/selectors';
 import './PatternEditor.css';
-
-/** Faja del dock 2D izquierdo, medida en navegador (no calculada): `.dock--left`
- *  da `x=14, ancho=48` — el borde derecho cae en 62. Los 48 salen de
- *  `Dock.css`: 4px de padding + 38px de icono + 4px de padding + 1px de
- *  `--surface-chrome-border` a cada lado (2px). Hasta el 26-09 el padding era
- *  7 y la faja 68. Lo mide `superficies-por-accion.spec.ts` contra su espejo
- *  `DOCK_ANCHO`. Exportada para que el test de `handleZoomToFit` use el mismo
- *  valor en vez de repetirlo. */
-export const DOCK_WIDTH_PX = 62;
 
 /** Lo que dura en la tira el desenlace de un gesto que no pasó nada (#1117):
  *  suficiente para leerlo, corto para no quedarse contestando el gesto de antes. */
@@ -113,9 +108,12 @@ interface PatternEditorProps {
   onImportDXF?: () => void;
   /** Opens a named ContextPanel (e.g. 'Properties'); wired by AppShell. */
   onOpenPanel?: (name: string) => void;
+  /** La ranura de la línea al pie donde se pinta la sección del patrón (spec
+   *  2026-10-02 § 5.3); la pone AppShell. Sin ella (tests) no se pinta. */
+  ranuraDelPie?: HTMLElement | null;
 }
 
-export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEditorProps) {
+export default function PatternEditor({ onImportDXF, onOpenPanel, ranuraDelPie }: PatternEditorProps) {
   const dispatch = useDispatch();
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
@@ -188,7 +186,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
 
-  // Viewport size (px) for the screen-space ruler layer.
+  // Viewport size (px): the fit-to-view needs it.
   const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
 
   // Context menu state
@@ -323,9 +321,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // empujaba el lienzo y dejaba el chip recién abierto bajo la tira (medido
     // en las capturas de la entrega 33). Si el panel está abierto, se
     // actualiza igual; "Usar el de la pieza" y los tramos siguen viviendo ahí.
-    // La esquina sí lo abre: su tipo no tiene otra puerta.
+    // La esquina tampoco lo abre desde P3c: su tipo está en su etiqueta, sobre
+    // el vértice (spec 2026-10-02 § 5.2 y § 11, «el tipo de esquina ya tiene
+    // puerta fuera de Propiedades»).
     onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); },
-    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
+    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); },
   }, activeTool === 'seamAllowance', layerLocked);
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
@@ -357,6 +357,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // puerta común con el menú contextual, mismo candado, mismo re-anclaje.
   const pointToolHook = usePointTool(zoom2D, pan2D, pieces, {
     addPointOnSegment: editPatternTool.addPointOnSegment,
+    reinsertarPunto: editPatternTool.reinsertarPunto,
     convertSegment: editPatternTool.convertSegment,
     convertSegmentToPoints: editPatternTool.convertSegmentToPoints,
   });
@@ -826,7 +827,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     pieces, selectedPieceIds, cursorPattern: cursorPositionRef,
     puedeAbrir: puedeAbrirLado, esElSujeto: ladoEsElSujetoRef,
   });
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, showActionBar, isDraggingPiece, isDraggingEndpoint } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool: pointToolHook, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, topstitchTool, walkSeamTool, seamEditTool, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, cotas: cotasRef, lados: puertaDeLado.teclas,
     });
@@ -903,6 +904,38 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   // comparten es su desplazamiento, y esa es otra cota que no está hecha.
   const nodoSeleccionado = activeTool === 'editPattern' ? editPatternTool.puntoElegido : null;
 
+  // La cota de lo que se pone (spec 2026-10-02 § 5.2): el piquete recién puesto,
+  // o el de «Ajustar distancia…», con su chip abierto. Las herramientas viven
+  // en refs para que `aplicarCota` y las cotas no se rehagan en cada render.
+  const notchRef = useRef(notchTool);
+  notchRef.current = notchTool;
+  const pointRef = useRef(pointToolHook);
+  pointRef.current = pointToolHook;
+  const piquetePuesto = notchTool.refining;
+  const piezaDelPiquete = piquetePuesto ? pieces.find(p => p.id === piquetePuesto.pieceId) : undefined;
+  const puntoPuesto = pointToolHook.puesto;
+  const piezaDelPunto = puntoPuesto ? pieces.find(p => p.id === puntoPuesto.pieceId) : undefined;
+  const loQueSePone = useMemo(() => {
+    if (piquetePuesto && piezaDelPiquete) {
+      return cotasDelPiquete(piquetePuesto, piezaDelPiquete, {
+        alEscribir: (mm) => notchRef.current.previewRefine(mm),
+        alCerrar: () => {
+          // Enter, Esc, Tab o el siguiente clic: la caja negra ve también el
+          // cierre que no escribió (lo que sí escribe deja su `cota:commit`).
+          pushJournal('gesture', 'cota:loQueSePone:cierra', { que: 'piquete' });
+          notchRef.current.cancelRefine();
+        },
+      });
+    }
+    if (puntoPuesto && piezaDelPunto) {
+      return [cotaDelPunto(puntoPuesto, piezaDelPunto, () => {
+        pushJournal('gesture', 'cota:loQueSePone:cierra', { que: 'punto' });
+        pointRef.current.terminarPuesto();
+      })];
+    }
+    return null;
+  }, [piquetePuesto, piezaDelPiquete, puntoPuesto, piezaDelPunto]);
+
   const sujetoSinLado = useMemo(() => cotasDelSujeto({
     activeTool, pieces, selectedPieceIds, selectedInternalLine: editor.selectedInternalLine,
     hotId, isDragging: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint,
@@ -911,11 +944,59 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     saAncla: seamAllowanceTool.ancla, saHover: seamAllowanceTool.hover,
     tramoEnCurso, nodoSeleccionado,
     trazos: trazosVisibles, selectedTrazo: editor.selectedTrazo,
-  }, defaultRect), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, defaultRect, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo]);
+    loQueSePone,
+  }), [activeTool, pieces, selectedPieceIds, editor.selectedInternalLine, editor.saSelection, hotId, isDraggingPiece, isDraggingEndpoint, transformTool.isDragging, ctxMenu.visible, calibrationMode, hiddenLayerIds, layerLocked, seamAllowanceTool.ancla, seamAllowanceTool.hover, tramoEnCurso, nodoSeleccionado, trazosVisibles, editor.selectedTrazo, loQueSePone]);
   const sujeto = useMemo(
     () => refinarAlLado(sujetoSinLado, ladoSeleccionado, { activeTool, pieces, hiddenLayerIds, layerLocked }),
     [sujetoSinLado, ladoSeleccionado, activeTool, pieces, hiddenLayerIds, layerLocked],
   );
+
+  // La etiqueta de opción de lo elegido (spec 2026-10-02 § 5.2, P3c): el pie
+  // de lo que ya está puesto. Se calla cuando se callan las cotas.
+  const etiqueta = useMemo(() => etiquetaDeLaSeleccion({
+    activeTool, pieces, seams,
+    selectedInternalLine: editor.selectedInternalLine,
+    selectedSeamId: editor.selectedSeamId,
+    saSelection: editor.saSelection,
+    showNotches, showSewingLines, showSeamAllowance, hiddenLayerIds, layerLocked,
+    callada: isDraggingPiece || transformTool.isDragging || isDraggingEndpoint || ctxMenu.visible || calibrationMode !== null,
+  }), [activeTool, pieces, seams, editor.selectedInternalLine, editor.selectedSeamId, editor.saSelection, showNotches, showSewingLines, showSeamAllowance, hiddenLayerIds, layerLocked, isDraggingPiece, transformTool.isDragging, isDraggingEndpoint, ctxMenu.visible, calibrationMode]);
+  // Lo que se escribe en una etiqueta vale para ese objeto y nada más (§ 5.2,
+  // «Lo que no se recuerda»): ninguna opción de herramienta cambia.
+  const cambiarEtiqueta = useCallback((opcion: string, valor: unknown) => {
+    // El escritor mira el candado, no solo la pastilla (#1136): con la pieza
+    // bloqueada, nada se escribe aunque un menú haya quedado abierto.
+    if (etiqueta?.apagada) {
+      dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+      return;
+    }
+    if (etiqueta?.que === 'piquete') {
+      const piece = pieces.find(p => p.id === etiqueta.pieceId);
+      const line = piece?.internals.find(l => l.id === etiqueta.lineId);
+      if (!piece || !line) return;
+      const nuevo = reescribirPiquete(piece, line, { opciones: { [opcion]: valor } as Partial<NotchOptions> });
+      if (!nuevo) {
+        noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: line.id });
+        return;
+      }
+      dispatch(updateInternalLine({ pieceId: piece.id, lineId: line.id, ...nuevo }));
+    } else if (etiqueta?.que === 'esquina') {
+      // Esa esquina y nada más: «Aplicar a todas las esquinas» sigue en Propiedades.
+      const piece = pieces.find(p => p.id === etiqueta.pieceId);
+      if (!piece) return;
+      dispatch(updatePiece({
+        ...piece,
+        cornerTypes: { ...(piece.cornerTypes ?? {}), [etiqueta.vertexIndex]: valor as CornerType },
+        updatedAt: Date.now(),
+      }));
+    } else if (etiqueta?.que === 'costura') {
+      const seam = seams.find(s => s.id === etiqueta.seamId);
+      if (seam) dispatch(updateSeam({ ...seam, type: valor as Seam['type'] }));
+    }
+  }, [etiqueta, pieces, seams, dispatch]);
+  const avisarBloqueada = useCallback(() => {
+    dispatch(showInfoToast('Pieza bloqueada: se puede mover, pero no editar. Desbloquéala con clic derecho.'));
+  }, [dispatch]);
   // Los dos refs que la puerta de Tab consulta. Se escriben del sujeto REAL, no
   // de una lista paralela: «¿cabría un lado?» y «¿el lado está a la vista?»
   // tienen una sola respuesta cada una, y sale de `admiteLado`.
@@ -947,12 +1028,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     [drawablePieces, lineLengthMode, suppressLengths],
   );
   // Las cuatro herramientas que toman el sujeto de la selección lo dicen en la
-  // tira antes del clic, en vez de morirse mudas (#1117).
+  // línea al pie antes del clic, en vez de morirse mudas (#1117).
   const falta = faltaSujeto(activeTool, selectedPieceIds);
 
   // El desenlace de un gesto que se armó y no dejó nada (#1117, hallazgo G).
-  // Va a la tira y no a un toast: el mismo gesto se repite cinco veces en tres
-  // segundos y serían cinco toasts encima del lienzo.
+  // Va a la frase de la línea al pie y no a un toast: el mismo gesto se repite
+  // cinco veces en tres segundos y serían cinco toasts encima del lienzo.
   const [desenlace, setDesenlace] = useState<string | null>(null);
   useEffect(() => {
     let borrado: ReturnType<typeof setTimeout> | undefined;
@@ -963,10 +1044,10 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     });
     return () => { cancelar(); clearTimeout(borrado); };
   }, []);
-  // La tira pinta el nombre de la herramienta activa en su cabecera. Sin esto,
-  // fallar un piquete y pasarse a Hilo dentro de los 4 s deja «Hilo» arriba y
-  // el mensaje del piquete debajo: el aviso queda atribuido a la herramienta
-  // equivocada. Es el mismo defecto que este canal vino a arreglar, al reves.
+  // La línea al pie nombra la herramienta activa junto a la frase. Sin esto,
+  // fallar un piquete y pasarse a Hilo dentro de los 4 s deja «Hilo» al lado
+  // del mensaje del piquete: el aviso queda atribuido a la herramienta
+  // equivocada. Es el mismo defecto que este canal vino a arreglar, al revés.
   useEffect(() => setDesenlace(null), [activeTool]);
 
   const abrirChipVisto = useRef(0);
@@ -1003,6 +1084,21 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
   }, [activeTool, tramoSeq, tramoEnCurso, markPrecisionUsed]);
 
+  // La cota del piquete se abre sola, una vez por sesión: el clic que lo puso
+  // deja el número listo para teclear, como lo dejaba el modal. La del punto
+  // no: descansa en reposo y las teclas siguen siendo del lienzo (firma D3).
+  const claveDeLoQueSePone = piquetePuesto ? `piquete:${piquetePuesto.sesion}` : '';
+  const loQueSePoneVisto = useRef('');
+  useEffect(() => {
+    if (loQueSePoneVisto.current === claveDeLoQueSePone) return;
+    loQueSePoneVisto.current = claveDeLoQueSePone;
+    if (!claveDeLoQueSePone) return;
+    const abrio = cotasRef.current?.abrirPrimero() ?? false;
+    pushJournal('gesture', 'cota:loQueSePone', { clave: claveDeLoQueSePone, abrio });
+    // Sin chip, la sesión no tendría quien la cerrara.
+    if (!abrio) notchRef.current.cancelRefine();
+  }, [claveDeLoQueSePone]);
+
   // Tab sobre la pieza abre la caja del lado (#1167). Igual que el tramo
   // congelado de la Pluma: el chip no existe hasta el render siguiente, así que
   // se espera a la SECUENCIA —no a la posición del lado, que repetiría el mismo
@@ -1016,6 +1112,31 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       pushJournal('gesture', 'lado:abre', { via: 'tab', commandIndex: puertaDeLado.lado.commandIndex });
     }
   }, [puertaDeLado.seq, puertaDeLado.lado]);
+
+  // Una cota de la pieza a la vez (spec 2026-10-02 § 5.5). El turno vive
+  // aquí porque es de la vista: qué cota se ve no es un dato del proyecto.
+  // Como el tramo congelado y el lado, la cota siguiente no existe hasta el
+  // render que la monta: se cuenta la secuencia y entonces se abre.
+  const [turnoDeCota, setTurnoDeCota] = useState<TurnoDeCota>(TURNO_INICIAL);
+  const [abrirTurno, setAbrirTurno] = useState(0);
+  const cotasVisibles = useMemo(
+    () => cotasALaVista(sujeto, activeTool, turnoDeCota, selectedPieceIds),
+    [sujeto, activeTool, turnoDeCota, selectedPieceIds],
+  );
+  const salirDeLaCota = useCallback((hacia: 'siguiente' | 'anterior'): boolean => {
+    const siguiente = pasarTurno(sujeto, activeTool, turnoDeCota, selectedPieceIds, hacia);
+    if (!siguiente) return false;
+    setTurnoDeCota(siguiente);
+    setAbrirTurno(n => n + 1);
+    pushJournal('gesture', 'cota:turno', { hacia, indice: siguiente.indice });
+    return true;
+  }, [sujeto, activeTool, turnoDeCota, selectedPieceIds]);
+  const turnoVisto = useRef(0);
+  useEffect(() => {
+    if (turnoVisto.current === abrirTurno) return;
+    turnoVisto.current = abrirTurno;
+    cotasRef.current?.abrirPrimero();
+  }, [abrirTurno]);
 
   // Enfriamiento irreversible (spec § 3.1): en cuanto la selección deja de ser
   // la pieza nueva, cambia la herramienta o la pieza desaparece, se enfría y
@@ -1091,6 +1212,26 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       if (!herramienta) return;
       if (motivo === 'tab') herramienta.setNextPointValues(update.largoMm, update.anguloDeg);
       else herramienta.placePolar(update.largoMm, update.anguloDeg);
+    } else if (update.kind === 'piquete') {
+      // Lo escribe la herramienta, que sabe regenerar el path desde el ancla.
+      notchRef.current.confirmRefine(update.distanciaMm, update.profundidadMm);
+    } else if (update.kind === 'piqueteElegido') {
+      // El piquete elegido con Seleccionar (P3c): por el ancla, como al ponerlo.
+      // El mismo escritor que su etiqueta.
+      const piece = pieces.find(p => p.id === update.pieceId);
+      const line = piece?.internals.find(l => l.id === update.lineId);
+      // El candado, también aquí: la cota se apaga, pero el escritor no se fía.
+      if (!piece || !line || piezaBloqueada(piece, layerLocked)) return;
+      const nuevo = reescribirPiquete(piece, line, { distanciaMm: update.distanciaMm });
+      if (!nuevo) {
+        noPasoNada('notch:ancla-perdida', { pieceId: piece.id, notchId: line.id });
+        return;
+      }
+      const accion = updateInternalLine({ pieceId: piece.id, lineId: line.id, ...nuevo });
+      dispatch(token ? withUndoBatchToken(accion, token) : accion);
+    } else if (update.kind === 'punto') {
+      // Moverlo es volver a ponerlo desde la pieza de antes del clic.
+      pointRef.current.moverPuesto(update.distanciaMm);
     } else if (update.kind === 'nodo') {
       // Lo escribe `useEditPattern`, no este archivo: es quien ya mueve nodos
       // en el arrastre, con compensación de pivote, re-anclado de piquetes y
@@ -1104,14 +1245,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       if (!trazos.some(t => t.id === update.trazoId)) return;
       const accion = updateTrazo({ id: update.trazoId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
-    } else {
+    } else if (update.kind === 'internal') {
       const piece = pieces.find(p => p.id === update.pieceId);
       if (!piece) return;
       if (!piece.internals.some(line => line.id === update.lineId)) return;
       const accion = updateInternalLine({ pieceId: update.pieceId, lineId: update.lineId, path: update.path });
       dispatch(token ? withUndoBatchToken(accion, token) : accion);
     }
-  }, [pieces, trazos, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id]);
+  }, [pieces, trazos, dispatch, activeTool, figuraDelCirculo, sujeto.piece?.id, layerLocked]);
   const aplicarRef = useRef(aplicarCota);
   aplicarRef.current = aplicarCota;
 
@@ -1252,8 +1393,20 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     handleMouseUpRef.current(e);
   }, []);
 
+  // Soltar fuera de la hoja apaga los resaltes, como salir de ella (#1132). El
+  // gesto sigue oyendo el ratón fuera (T#212, abajo) y las herramientas
+  // calculan su resalte con esas coordenadas: lo que eso encendía no tenía
+  // quién lo apagara, porque el mouseleave ya había pasado al salir.
+  const handleMouseLeaveRef = useRef(handleMouseLeave);
+  handleMouseLeaveRef.current = handleMouseLeave;
   useEffect(() => {
-    const finishGlobalMouseInteraction = () => finishMouseInteraction();
+    const finishGlobalMouseInteraction = (ev: Event) => {
+      const svg = svgRef.current;
+      const sueltaFuera = mouseInteractionActiveRef.current
+        && !(ev.target instanceof Node && svg?.contains(ev.target));
+      finishMouseInteraction();
+      if (sueltaFuera) handleMouseLeaveRef.current();
+    };
     window.addEventListener('mouseup', finishGlobalMouseInteraction);
     window.addEventListener('blur', finishGlobalMouseInteraction);
     return () => {
@@ -1261,9 +1414,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       window.removeEventListener('blur', finishGlobalMouseInteraction);
       finishMouseInteraction();
     };
-  }, [finishMouseInteraction]);
+  }, [finishMouseInteraction, svgRef]);
 
-  // Track SVG viewport size for the ruler layer (screen-space ticks/labels).
+  // Track SVG viewport size: the fit-to-view needs it.
   useEffect(() => {
     const el = svgRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -1289,20 +1442,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     // teclazo repetible desde cualquier estado, así que se cierra aquí.
     if (!svgEl || (pieces.length === 0 && trazosVisibles.length === 0)) return;
     const rect = svgEl.getBoundingClientRect();
-    // El dock 2D flota (no reserva espacio real, § 2.1), así que el encuadre
-    // tiene que descontar su faja a mano (ver DOCK_WIDTH_PX arriba). Se resta
-    // del ancho Y se desplaza el paneo por lo mismo — encuadrar en
-    // [DOCK, ancho], no en [0, ancho-DOCK]. Restar sin desplazar corre el
-    // patrón HACIA el dock, que es lo contrario.
+    // El margen de herramientas es una columna al lado de la hoja, no encima
+    // (spec 2026-10-02 § 4.3): el svg ya empieza donde termina, así que se
+    // encuadra en el svg entero. Hasta P2 el dock flotaba y aquí se le
+    // descontaba su faja a mano.
     const fit = computeFitView(
       // El `path` de un trazo va en coordenadas de patrón: sin posición propia.
       [...pieces, ...trazosVisibles.map(t => ({ position: { x: 0, y: 0 }, outline: t.path }))],
-      Math.max(0, rect.width - DOCK_WIDTH_PX),
+      rect.width,
       rect.height,
     );
     if (fit) {
       dispatch(setZoom2D(fit.zoom));
-      dispatch(setPan2D({ x: fit.pan.x + DOCK_WIDTH_PX, y: fit.pan.y }));
+      dispatch(setPan2D(fit.pan));
     }
   }, [pieces, trazosVisibles, dispatch, svgRef]);
 
@@ -1405,6 +1557,31 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     finishMouseInteraction(e);
   }, [finishMouseInteraction]);
 
+  // Un gesto que empezó en la hoja la sigue oyendo fuera de ella (T#212). El
+  // <svg> solo recibe mousemove con el ratón encima: el mouseup ya se oía en
+  // window y el movimiento no, así que al salir del lienzo la pieza se quedaba
+  // en el borde, y con zoom alto eso son unos 30 mm. Lo mismo el paneo, la caja
+  // y los puntos. Las herramientas convierten con
+  // `e.currentTarget.getBoundingClientRect()`, así que el evento les llega con
+  // el <svg> de currentTarget, como dentro. En captura, para que nada fuera de
+  // la hoja lo pare antes.
+  const handleMouseMoveRef = useRef(handleMouseMove);
+  handleMouseMoveRef.current = handleMouseMove;
+  useEffect(() => {
+    const seguirFuera = (ev: MouseEvent) => {
+      const svg = svgRef.current;
+      if (!mouseInteractionActiveRef.current || !svg || (ev.target instanceof Node && svg.contains(ev.target))) return;
+      handleMouseMoveRef.current({
+        clientX: ev.clientX, clientY: ev.clientY, button: ev.button, buttons: ev.buttons, detail: ev.detail,
+        shiftKey: ev.shiftKey, altKey: ev.altKey, ctrlKey: ev.ctrlKey, metaKey: ev.metaKey,
+        target: ev.target, currentTarget: svg, nativeEvent: ev,
+        preventDefault: () => ev.preventDefault(), stopPropagation: () => ev.stopPropagation(),
+      } as unknown as React.MouseEvent<SVGSVGElement>);
+    };
+    window.addEventListener('mousemove', seguirFuera, true);
+    return () => window.removeEventListener('mousemove', seguirFuera, true);
+  }, [svgRef]);
+
   // Shift de la herramienta activa (spec 2026-09-23): sus guías, para el
   // lienzo, y su modo y su segundo marco, para la pista. Cada herramienta
   // calcula las suyas con `guiasShift`; aquí solo se elige de cuál leer.
@@ -1422,8 +1599,42 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     : shiftActivo.guias ? (shiftActivo.guias.tenue ? shiftActivo.marco : null)
     : activeTool === 'editPattern' ? shiftActivo.marco : null;
 
+  // Vacía es «no hay nada en la hoja», no «no hay piezas»: un trazo o una foto
+  // para calcar ya son trabajo (spec 2026-10-02 § 4.6). De esto cuelgan el
+  // estado vacío y la marca de escala.
+  const pantallaVacia = shouldShowEmptyState(pieces.length + trazos.length + referenceImages.length, activeTool);
+
+  // La frase de la línea al pie (spec 2026-10-02 § 5.4), de la fase de la
+  // herramienta activa. El desenlace y lo que falta le ganan (`fraseDelPie`).
+  const fase = fraseDeLaFase({
+    activeTool,
+    penNodesLength: pen.nodes.length,
+    nodeEditorIsEditing: isNodeEditing,
+    seamPhase: seamTool.phase,
+    topstitchMode: topstitchTool.mode,
+    walkSeamPhase: walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle',
+    slashPhase: slashAndSpreadTool.phase,
+    saDefaultWidthMm: seamAllowanceTool.widthMm,
+    internalShapeNodesLength: internalShapeTool.nodes.length,
+    cotasVisibles: sujeto.cotas.length > 0,
+    hasSeams: seams.length > 0,
+    extendTrimMode: (toolOptions?.extendTrim?.mode as 'extend' | 'trim') ?? 'extend',
+    extendTrimArmed: extendTrimTool.selectedSnap !== null,
+    modoShift: shiftActivo?.modo,
+    segundoMarco,
+    rectanguloPorDefecto: defaultRect,
+    tijerasEmpezadas: scissorsTool.startPoint !== null,
+    medidaEmpezada: measureTool.currentStart !== null,
+    modoDelPunto: (toolOptions?.point?.mode as PointToolMode | undefined) ?? 'point',
+    loQueSePone: loQueSePone === null ? null : piquetePuesto ? 'piquete' : 'punto',
+    etiqueta: etiqueta?.que ?? null,
+  });
+
   return (
-    <div className="pattern-editor">
+    // La hoja es papel desde P2b (spec 2026-10-02 § 7.2): se fue la tira, la
+    // última superficie oscura que vivía encima. Lo que se dibuja del patrón,
+    // dentro del <svg>, sigue con --ink-*.
+    <div className="pattern-editor" data-material="papel">
       <svg
         ref={svgRef}
         className="pattern-svg"
@@ -1434,12 +1645,16 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         onMouseMove={handleMouseMove}
         onMouseUp={handleHostMouseUp}
         onMouseLeave={handleMouseLeave}
+        // Una selección de texto que cubre la hoja convertía cualquier gesto
+        // en un arrastre nativo del navegador: dragstart a ~6 px y después ni
+        // mousemove ni mouseup (T#212). En la hoja no se arrastra nada nativo.
+        onDragStart={e => e.preventDefault()}
         onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
       >
-        <GridLayer zoom2D={zoom2D} pan2D={pan2D} gridSize={gridSize} />
+        <GridLayer zoom2D={zoom2D} pan2D={pan2D} gridSize={gridSize} units={units} />
 
         <g data-pan-zoom-group transform={`translate(${pan2D.x}, ${pan2D.y}) scale(${zoom2D})`}>
           <ReferenceImageLayer
@@ -1483,7 +1698,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             onPieceNameCancel={handlePieceNameCancel}
           />
           <TrazosLayer trazos={trazosVisibles} seleccion={editor.selectedTrazo} zoom2D={zoom2D} />
-          <CotaLines cotas={sujeto.cotas} zoom2D={zoom2D} />
+          <CotaLines cotas={cotasVisibles} zoom2D={zoom2D} />
           <ConstructionOverlay zoom2D={zoom2D} pieces={pieces} />
           {/* `showSewingLines` sigue siendo el interruptor maestro del usuario
               (menú del logo → "Líneas de costura"); lo que se le suma es el
@@ -1505,7 +1720,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           )}
           <ElasticRenderer zoom2D={zoom2D} selectedElasticId={elasticTool.selectedElasticId} />
           <TrimRenderer zoom2D={zoom2D} />
-          {activeTool === 'seamAllowance' && (
+          {/* Con Seleccionar, la esquina elegida también se marca (P3c): su
+              etiqueta dice el tipo y el anillo dice cuál es. */}
+          {(activeTool === 'seamAllowance' || (activeTool === 'select' && editor.saSelection?.kind === 'vertex')) && (
             <SeamAllowanceSelectionOverlay
               saSelection={editor.saSelection}
               hoverEdge={sujeto.bordeLeido}
@@ -1685,36 +1902,19 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           )}
         </g>
 
-        <HintText
-          activeTool={activeTool}
-          pieces={pieces}
-          penNodesLength={pen.nodes.length}
-          nodeEditorIsEditing={isNodeEditing}
-          seamPhase={seamTool.phase}
-          topstitchMode={topstitchTool.mode}
-          walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
-          slashPhase={slashAndSpreadTool.phase}
-          saDefaultWidthMm={seamAllowanceTool.widthMm}
-          internalShapeNodesLength={internalShapeTool.nodes.length}
-          cotasVisibles={sujeto.cotas.length > 0}
-          hasSeams={seams.length > 0}
-          extendTrimMode={(toolOptions?.extendTrim?.mode as 'extend' | 'trim') ?? 'extend'}
-          extendTrimArmed={extendTrimTool.selectedSnap !== null}
-          modoShift={shiftActivo?.modo}
-          segundoMarco={segundoMarco}
-        />
-
-        <RulerLayer
-          zoom2D={zoom2D}
-          pan2D={pan2D}
-          gridSize={gridSize}
-          units={units}
-          width={svgSize.width}
-          height={svgSize.height}
-        />
+        {!pantallaVacia && svgSize.height > 0 && (
+          <MarcaDeEscala
+            zoom2D={zoom2D}
+            pan2D={pan2D}
+            gridSize={gridSize}
+            units={units}
+            izquierda={12}
+            alto={svgSize.height}
+          />
+        )}
       </svg>
       <FloatingActionBar
-        show={showTransformBox}
+        show={showActionBar}
         bbox={transformTool.bbox}
         pan2D={pan2D}
         zoom2D={zoom2D}
@@ -1723,10 +1923,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
         calibrationActive={calibrationMode !== null}
         ctx={barCtx}
       />
-      <AgruparCotas cotas={sujeto.cotas} pan2D={pan2D} zoom2D={zoom2D} estorbos={estorbosDeLasAsas}>
+      <AgruparCotas cotas={cotasVisibles} pan2D={pan2D} zoom2D={zoom2D} estorbos={estorbosDeLasAsas}>
         <CotasLayer
           ref={cotasRef}
-          cotas={sujeto.cotas}
+          cotas={cotasVisibles}
+          onSalir={salirDeLaCota}
           piezasConLargos={piezasConLargos}
           piezaAcotadaId={sujeto.piece?.id}
           units={units}
@@ -1743,21 +1944,33 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           onScrubCancel={handleCotaScrubCancel}
         />
       </AgruparCotas>
-      {/* La tira ya no cede la esquina a nadie. La cedía porque `NextPointPanel`
-          vivía en ella; los chips del tramo en curso viven sobre el trazo, que
-          es donde está el gesto, así que no hay nada que esquivar (#1129). */}
-      <ToolStrip2D
-        lineaDeSujeto={sujeto.lineaDeSujeto}
-        onClearMeasurements={measureTool.clear}
-        hasMeasurements={measureTool.measurements.length > 0 || !!measureTool.selectedEdge || !!measureTool.comparison}
-        falta={falta}
-        desenlace={desenlace}
-        /* El modal de piquete no usa portal ni atrapa el foco, y la tira vive
-           en su misma esquina: se declara inerte mientras esté abierto (#1125). */
-        inerte={Boolean(notchTool.refining?.notch.notchAnchor)}
-      />
-      <FilaDeCapas />
-      {shouldShowEmptyState(pieces.length, activeTool) && (
+      {etiqueta && (
+        <EtiquetaDeOpcion
+          // Otra selección es otra etiqueta: su menú se cierra.
+          key={claveDeEtiqueta(etiqueta)}
+          que={etiqueta.que}
+          {...presentarEtiqueta(etiqueta)}
+          {...posicionDeEtiqueta(etiqueta, pan2D, zoom2D)}
+          hacia={etiqueta.hacia}
+          apagada={etiqueta.apagada}
+          alPulsarApagada={avisarBloqueada}
+          alCambiar={cambiarEtiqueta}
+        />
+      )}
+      {/* La sección del patrón de la línea al pie (spec 2026-10-02 § 5.3):
+          vive en el marco, al pie de la ventana, pero su frase sale del estado
+          de las herramientas de aquí, así que se pinta por portal en la ranura
+          que deja AppShell. En 3D no hay hoja que explicar: la franja se queda
+          y su sección del 3D llega en P5. */}
+      {ranuraDelPie && editor.viewMode !== '3d' && createPortal(
+        <SeccionDelPatron
+          frase={fraseDelPie(desenlace, falta, fase)}
+          onClearMeasurements={measureTool.clear}
+          hasMeasurements={measureTool.measurements.length > 0 || !!measureTool.selectedEdge || !!measureTool.comparison}
+        />,
+        ranuraDelPie,
+      )}
+      {pantallaVacia && (
         <EmptyState2D onImportDXF={onImportDXF} />
       )}
       <ContextMenu
@@ -1799,16 +2012,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           pixelDistance={calibrationPixelDist}
           onConfirm={handleCalibrationConfirm}
           onCancel={handleCalibrationCancel}
-        />
-      )}
-      {notchTool.refining?.notch.notchAnchor && (
-        <NotchPrecisionModal
-          initialDistanceMm={notchTool.refining.notch.notchAnchor.distanceMm}
-          initialDepthMm={notchTool.refining.notch.notchOptions?.length ?? DEFAULT_NOTCH_OPTIONS.length}
-          maxDistanceMm={notchTool.refining.maxDistanceMm}
-          onPreview={notchTool.previewRefine}
-          onConfirm={notchTool.confirmRefine}
-          onCancel={notchTool.cancelRefine}
         />
       )}
     </div>

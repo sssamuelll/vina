@@ -5,21 +5,22 @@ import avatarReducer, {
   resetPose,
   togglePoseEditor,
   mirrorJoint,
-  POSE_PRESETS,
+  presetResuelta,
+  savePose,
   type AvatarState,
 } from '../avatarSlice';
+import { NEW_PROJECT } from '../actions';
 
 function getInitialState(): AvatarState {
   return avatarReducer(undefined, { type: '@@INIT' });
 }
 
 describe('avatarSlice', () => {
-  it('initializes with A-pose preset', () => {
+  it('initializes with A-pose preset, pendiente de resolver contra el esqueleto que cargue', () => {
     const state = getInitialState();
     expect(state.pose.activePreset).toBe('A-pose');
-    // A-pose: arms lowered ~25° on X axis (adduction), verified via axis discovery
-    expect(state.pose.joints.LeftArm).toEqual({ x: 25, y: 0, z: 0 });
-    expect(state.pose.joints.RightArm).toEqual({ x: 25, y: 0, z: 0 });
+    expect(state.pose.porResolver).toBe(true);
+    expect(state.pose.joints).toEqual({});
   });
 
   it('setJointRotation updates a specific joint', () => {
@@ -31,16 +32,49 @@ describe('avatarSlice', () => {
     expect(state.pose.activePreset).toBeNull();
   });
 
-  it('setPreset applies all preset joints', () => {
-    const state = avatarReducer(getInitialState(), setPreset('Sitting'));
+  it('setPreset deja la preset por resolver: las rotaciones dependen del esqueleto', () => {
+    const editada = avatarReducer(getInitialState(), setJointRotation({ joint: 'Neck', rotation: { x: 10, y: 0, z: 0 } }));
+    const state = avatarReducer(editada, setPreset('Sitting'));
     expect(state.pose.activePreset).toBe('Sitting');
-    expect(state.pose.joints).toEqual(POSE_PRESETS['Sitting']);
+    expect(state.pose.porResolver).toBe(true);
+    expect(state.pose.joints).toEqual({});
   });
 
-  it('setPreset T-pose clears joints', () => {
-    const state = avatarReducer(getInitialState(), setPreset('T-pose'));
-    expect(state.pose.joints).toEqual({});
-    expect(state.pose.activePreset).toBe('T-pose');
+  it('presetResuelta pone las rotaciones de la preset que sigue activa', () => {
+    const joints = { LeftUpLeg: { x: 88.1, y: 1.2, z: -3 } };
+    const state = avatarReducer(avatarReducer(getInitialState(), setPreset('Sitting')), presetResuelta({ nombre: 'Sitting', joints }));
+    expect(state.pose.joints).toEqual(joints);
+    expect(state.pose.porResolver).toBe(false);
+    expect(state.pose.activePreset).toBe('Sitting');
+  });
+
+  it('presetResuelta ignora la resolución de una preset que ya no está activa', () => {
+    let state = avatarReducer(getInitialState(), setPreset('Sitting'));
+    state = avatarReducer(state, setPreset('T-pose'));
+    const next = avatarReducer(state, presetResuelta({ nombre: 'Sitting', joints: { LeftUpLeg: { x: 90, y: 0, z: 0 } } }));
+    expect(next).toEqual(state);
+  });
+
+  it('editar una articulación deja de esperar la resolución', () => {
+    const state = avatarReducer(getInitialState(), setJointRotation({ joint: 'Neck', rotation: { x: 10, y: 0, z: 0 } }));
+    expect(state.pose.porResolver).toBe(false);
+  });
+
+  it('una pose guardada se aplica tal cual, sin resolver', () => {
+    let state = avatarReducer(getInitialState(), setJointRotation({ joint: 'Neck', rotation: { x: 12, y: 0, z: 0 } }));
+    state = avatarReducer(state, savePose('Mía'));
+    const id = state.savedPoses[state.savedPoses.length - 1].id;
+    state = avatarReducer(state, resetPose());
+    state = avatarReducer(state, setPreset(id));
+    expect(state.pose.joints.Neck).toEqual({ x: 12, y: 0, z: 0 });
+    expect(state.pose.porResolver).toBe(false);
+  });
+
+  it('Nuevo proyecto vuelve a la A-pose por resolver', () => {
+    let state = avatarReducer(getInitialState(), setPreset('Sitting'));
+    state = avatarReducer(state, presetResuelta({ nombre: 'Sitting', joints: { LeftUpLeg: { x: 90, y: 0, z: 0 } } }));
+    state = avatarReducer(state, NEW_PROJECT());
+    expect(state.pose).toMatchObject({ activePreset: 'A-pose', porResolver: true, joints: {} });
   });
 
   it('resetPose clears all rotations', () => {
@@ -48,14 +82,6 @@ describe('avatarSlice', () => {
     state = avatarReducer(state, resetPose());
     expect(state.pose.joints).toEqual({});
     expect(state.pose.activePreset).toBeNull();
-  });
-
-  it('A-pose preset has arms at 25° X rotation', () => {
-    expect(POSE_PRESETS['A-pose'].LeftArm?.x).toBe(25);
-    expect(POSE_PRESETS['A-pose'].RightArm?.x).toBe(25);
-    // Y and Z are zero in current A-pose
-    expect(POSE_PRESETS['A-pose'].LeftArm?.y).toBe(0);
-    expect(POSE_PRESETS['A-pose'].LeftArm?.z).toBe(0);
   });
 
   it('togglePoseEditor toggles', () => {

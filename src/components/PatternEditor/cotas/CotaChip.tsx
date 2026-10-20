@@ -20,6 +20,12 @@ export interface CotaChipProps {
   onScrubEnd: (cota: Cota, valueMm: number) => void;
   /** El scrub se cancela (pointercancel, desmontaje): la pieza vuelve al valor de partida, sin clic fantasma. */
   onScrubCancel: (cota: Cota) => void;
+  /**
+   * Una cota a la vez (spec 2026-10-02 § 5.5): el Tab que sale del chip le
+   * pregunta a la capa si hay otra cota del mismo objeto. `true` = la capa
+   * pasó de turno y abre la siguiente; el chip no mueve el foco.
+   */
+  onSalir?: (hacia: 'siguiente' | 'anterior') => boolean;
 }
 
 const round1 = (v: number) => Math.round(v * 10) / 10;
@@ -27,7 +33,7 @@ const acota = (v: number, c: Cota) => Math.min(c.max, Math.max(c.min, v));
 /** El valor como lo escribiría ella: coma decimal, sin unidad. */
 const aTexto = (v: number) => String(round1(v)).replace('.', ',');
 const referenciaVisible = (cota: Cota) =>
-  cota.unit === 'deg' && cota.referenceLabel ? ' ' + cota.referenceLabel : '';
+  cota.referenceLabel ? ' ' + cota.referenceLabel : '';
 const textoVisible = (cota: Cota) =>
   formatMedida(cota.valueMm, cota.unit, cota.referenceLabel);
 /** Una sola escala de modificadores para scrub y flechas: Shift grueso, Alt fino (Figma). */
@@ -61,7 +67,9 @@ export function AgruparCotas({ cotas, pan2D, zoom2D, estorbos, children }: {
       return {
         cota,
         campos,
-        ...(campos.length > 1 ? {
+        // La distancia sobre un borde vive fuera de la pieza, como su chip
+        // suelto; el par del tramo se queda en su punto medio.
+        ...(campos.length > 1 && cota.kind !== 'borde' ? {
           left: pan2D.x + (cota.a.x + cota.b.x) / 2 * zoom2D,
           top: pan2D.y + (cota.a.y + cota.b.y) / 2 * zoom2D,
         } : chipScreenPosition(cota, pan2D, zoom2D)),
@@ -107,7 +115,7 @@ function chipsHermanos(el: HTMLElement | null): HTMLElement[] {
  * ignora targets editables; esto es el cinturón.
  */
 function ChipEditable({
-  cota, campos, left, top, zoom2D, disabled = false, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel,
+  cota, campos, left, top, zoom2D, disabled = false, onCommit, onScrubStart, onScrub, onScrubEnd, onScrubCancel, onSalir,
 }: CotaChipProps & { campos: Cota[] }) {
   const [editing, setEditing] = useState(false);
   const [activo, setActivo] = useState(0);
@@ -126,6 +134,11 @@ function ChipEditable({
   const focoAlCerrar = useRef<'boton' | 'siguiente' | 'anterior' | null>(null);
   /** Cerrado por tecla: el blur que pueda seguir no hace nada. */
   const cerrado = useRef(false);
+  // Por ref: el efecto de abajo corre al cerrar la edición, y con la prop en
+  // sus dependencias se repetiría (y volvería a seleccionar el texto) cada vez
+  // que el editor se pinta de nuevo.
+  const onSalirRef = useRef(onSalir);
+  onSalirRef.current = onSalir;
 
   useEffect(() => {
     if (editing) {
@@ -138,14 +151,17 @@ function ChipEditable({
     if (!destino) return;
     const boton = buttonRef.current;
     if (destino === 'boton' || !boton) { boton?.focus(); return; }
+    if (onSalirRef.current?.(destino)) return;
     const hermanos = chipsHermanos(boton);
     const i = hermanos.indexOf(boton);
     const vecino = hermanos[i + (destino === 'siguiente' ? 1 : -1)];
     if (!vecino) {
-      // Borde del grupo: hacia adelante sale a la tira (el siguiente control del
-      // lienzo); hacia atrás se queda en el botón. Sin esto Tab se comía un paso.
+      // Borde del grupo: hacia adelante sale a la línea al pie (el siguiente
+      // control de la herramienta); hacia atrás se queda en el botón. Sin esto
+      // Tab se comía un paso. Restar y Sumar no cuentan: no están en el orden
+      // del teclado.
       const fuera = destino === 'siguiente'
-        ? document.querySelector<HTMLElement>('.tool-strip input, .tool-strip select, .tool-strip button')
+        ? document.querySelector<HTMLElement>('.seccion-del-patron input, .seccion-del-patron select, .seccion-del-patron button:not([tabindex="-1"])')
         : null;
       (fuera ?? boton).focus();
       return;
@@ -184,6 +200,7 @@ function ChipEditable({
     cerrado.current = true;
     focoAlCerrar.current = foco;
     setEditing(false);
+    cota.alCerrar?.();
   };
   const parsea = (): number | null => {
     // Lo ESCRITO se redondea a un decimal, igual que el chip lo pinta
@@ -252,7 +269,11 @@ function ChipEditable({
           cambiarCampo(indice);
         }}
         onFocus={() => { if (indice !== activo) cambiarCampo(indice); }}
-        onChange={(e) => { setDraft(e.target.value); setDirty(true); setInvalid(false); }}
+        onChange={(e) => {
+          setDraft(e.target.value); setDirty(true); setInvalid(false);
+          const v = parseMedida(e.target.value);
+          campo.alEscribir?.(v !== null && v >= campo.min && v <= campo.max ? v : null);
+        }}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === 'Enter') {
@@ -272,9 +293,11 @@ function ChipEditable({
             e.preventDefault();
             const base = parseMedida(draft) ?? campoActivo.valueMm;
             const paso = ganancia(e) * (e.key === 'ArrowUp' ? 1 : -1);
-            setDraft(aTexto(acota(base + paso, campoActivo)));
+            const nuevo = acota(base + paso, campoActivo);
+            setDraft(aTexto(nuevo));
             setDirty(true);
             setInvalid(false);
+            campoActivo.alEscribir?.(nuevo);
           }
         }}
         onBlur={(e) => {
@@ -293,7 +316,7 @@ function ChipEditable({
         >
           <label className="cota-campo">
             {unico}
-            <span>{'°' + referenciaVisible(cota)}</span>
+            <span>{(cota.unit === 'mm' ? ' mm' : '°') + referenciaVisible(cota)}</span>
           </label>
         </div>
       );
@@ -307,7 +330,7 @@ function ChipEditable({
           <label key={campo.id} className="cota-campo">
             <span>{campo.label}</span>
             {input(campo, indice)}
-            <span>{campo.unit === 'mm' ? 'mm' : '°' + referenciaVisible(campo)}</span>
+            <span>{(campo.unit === 'mm' ? 'mm' : '°') + referenciaVisible(campo)}</span>
           </label>
         ))}
         {cota.grupo === 'tramo-en-curso' && (
@@ -345,6 +368,8 @@ function ChipEditable({
         // Espacio y Enter son del botón (abren la edición por el clic
         // nativo); que no lleguen al atajo global de simular ni al router.
         if (e.key === ' ' || e.key === 'Enter') e.stopPropagation();
+        // Una cota a la vez: Tab sobre el chip pasa a la siguiente del objeto.
+        if (e.key === 'Tab' && onSalirRef.current?.(e.shiftKey ? 'anterior' : 'siguiente')) e.preventDefault();
       }}
       onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {

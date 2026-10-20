@@ -85,53 +85,52 @@ async function solape(page: Page, a: string, b: string) {
   }, [a, b] as const);
 }
 
-test.describe('F1 — la barra de IA sigue siendo clicable con la fila de capas puesta', () => {
+/**
+ * F1 se cerró de raíz en P2 de «la interfaz en papel» (spec 2026-10-02 § 4.2):
+ * los interruptores dejaron el lienzo y viven en la barra superior, que la
+ * barra de IA no puede tapar (`barPosition.ts` la acota por debajo). Lo que
+ * sigue midiéndose es el resultado: ninguno de los dos tapa al otro.
+ */
+test.describe('F1 — la barra de IA y los interruptores del patrón no se pisan', () => {
   test.use({ viewport: MARIA });
   test.setTimeout(90_000);
 
-  test('los tres botones de modo se pueden clicar en vista dividida', async ({ page }) => {
+  test('convocada en Split, la cápsula se alcanza entera y no pisa el grupo del patrón', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
-    await expect(page.locator('.fila-de-capas')).toBeVisible();
-
-    const modos = await alcanzables(page, '.unified-bar__modes button');
-    expect(modos.length, 'la barra de IA no expuso sus botones de modo').toBeGreaterThanOrEqual(3);
-    const tapados = modos.filter((m) => !m.alcanzable);
-    expect(
-      tapados,
-      `botones de la barra de IA tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`,
-    ).toEqual([]);
+    await unaPieza(page);
+    await page.keyboard.press('Control+/');
+    await expect(page.locator('.unified-bar')).toBeVisible();
+    const tapados = (await alcanzables(page, '.unified-bar input')).filter((m) => !m.alcanzable);
+    expect(tapados, `tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`).toEqual([]);
+    expect(await solape(page, '.grupo-del-patron', '.unified-bar')).toBe(0);
   });
 
-  test('y la fila de capas tampoco queda tapada por la barra', async ({ page }) => {
+  test('y los interruptores tampoco quedan tapados por la barra', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
-    const toggles = await alcanzables(page, '.fila-de-capas button');
-    expect(toggles.length).toBeGreaterThanOrEqual(4);
+    await unaPieza(page);
+    const toggles = await alcanzables(page, '.grupo-del-patron button');
+    expect(toggles.length).toBeGreaterThanOrEqual(6);
     const tapados = toggles.filter((t) => !t.alcanzable);
     expect(
       tapados,
-      `toggles de la fila tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`,
+      `interruptores tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`,
     ).toEqual([]);
   });
 
-  test('sus rectángulos no se solapan en absoluto', async ({ page }) => {
-    await abrirApp(page);
-    await vistaDividida(page);
-    expect(await solape(page, '.fila-de-capas', '.unified-bar')).toBe(0);
-  });
-
   // Viewport ANTES de abrir: la posición por defecto de la barra se calcula al
-  // montarla (barPosition.ts), así que redimensionar después no la recoloca y
-  // el test pasaría sin haber medido nada.
+  // montarla (barPosition.ts). A 1280 el grupo se pliega en «Mostrar»: lo que
+  // se mide es ese botón.
   for (const vp of [{ width: 1280, height: 720 }, { width: 1366, height: 768 }]) {
     test(`tampoco a ${vp.width}×${vp.height}`, async ({ page }) => {
       await page.setViewportSize(vp);
       await abrirApp(page);
       await vistaDividida(page);
-      expect(await solape(page, '.fila-de-capas', '.unified-bar')).toBe(0);
-      const tapados = (await alcanzables(page, '.unified-bar__modes button')).filter((m) => !m.alcanzable);
-      expect(tapados, `tapados: ${tapados.map((t) => `${t.nombre} ← ${t.culpable}`).join(', ')}`).toEqual([]);
+      await unaPieza(page);
+      await page.keyboard.press('Control+/');
+      await expect(page.locator('.unified-bar')).toBeVisible();
+      expect(await solape(page, '.grupo-del-patron', '.unified-bar')).toBe(0);
     });
   }
 });
@@ -140,7 +139,7 @@ test.describe('F2 — la pista de la herramienta se lee entera', () => {
   test.use({ viewport: MARIA });
   test.setTimeout(90_000);
 
-  test('la fila de capas no la tapa', async ({ page }) => {
+  test('nada la tapa y no se sale por la derecha', async ({ page }) => {
     await abrirApp(page);
     await vistaDividida(page);
     await unaPieza(page);
@@ -150,25 +149,24 @@ test.describe('F2 — la pista de la herramienta se lee entera', () => {
     await page.waitForTimeout(400);
 
     const medida = await page.evaluate(() => {
-      const svg = document.querySelector('svg.pattern-svg')!;
-      let pista: Element | null = null;
-      for (const t of svg.querySelectorAll('text')) {
-        const s = (t.textContent ?? '').trim();
-        if (s.length > 20 && /^(Clic|Pasa|Arrastra|Haz)/.test(s)) pista = t;
-      }
+      const pista = document.querySelector<HTMLElement>('.seccion-del-patron__texto');
       if (!pista) return null;
       const rp = pista.getBoundingClientRect();
-      const rf = document.querySelector('.fila-de-capas')?.getBoundingClientRect();
-      const solape = rf
-        ? Math.max(0, Math.min(rp.right, rf.right) - Math.max(rp.left, rf.left)) *
-          Math.max(0, Math.min(rp.bottom, rf.bottom) - Math.max(rp.top, rf.top))
-        : 0;
-      return { texto: (pista.textContent ?? '').trim(), solape: Math.round(solape), fueraPorDerecha: Math.round(Math.max(0, rp.right - window.innerWidth)) };
+      // Desde P2b la frase vive en la línea al pie: lo que hay encima de ella,
+      // en su centro, tiene que ser ella misma.
+      const encima = document.elementFromPoint(rp.left + Math.min(rp.width / 2, 40), rp.top + rp.height / 2);
+      return {
+        texto: (pista.textContent ?? '').trim(),
+        tapada: encima && pista.contains(encima) ? null : (encima as HTMLElement | null)?.className?.toString() ?? 'nada',
+        recortada: pista.scrollWidth > pista.clientWidth + 1,
+        fueraPorDerecha: Math.round(Math.max(0, rp.right - window.innerWidth)),
+      };
     });
 
-    expect(medida, 'no encontré la pista de la herramienta al pie del lienzo').not.toBeNull();
-    expect(medida!.solape, `la fila tapa ${medida!.solape} px² de la pista "${medida!.texto}"`).toBe(0);
-    expect(medida!.fueraPorDerecha, 'la pista se sale del viewport por la derecha').toBe(0);
+    expect(medida, 'no encontré la frase de la herramienta en la línea al pie').not.toBeNull();
+    expect(medida!.tapada, `algo tapa la frase "${medida!.texto}"`).toBeNull();
+    expect(medida!.recortada, `la frase "${medida!.texto}" no cabe en una línea`).toBe(false);
+    expect(medida!.fueraPorDerecha, 'la frase se sale del viewport por la derecha').toBe(0);
   });
 });
 

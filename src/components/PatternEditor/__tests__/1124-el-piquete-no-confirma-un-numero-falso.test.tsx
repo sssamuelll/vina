@@ -100,7 +100,7 @@ function montar(piezasIniciales: PatternPiece[], onUpdate = vi.fn()) {
 }
 
 describe('#1124 — el techo del piquete se mide, no se recuerda', () => {
-  it('recalcula el techo cuando el contorno encoge con el modal abierto', () => {
+  it('recalcula el techo cuando el contorno encoge con la cota abierta', () => {
     const { result, rerender } = montar([pieza]);
 
     act(() => { result.current.refineExisting(pieza.id, notch); });
@@ -171,7 +171,9 @@ describe('#1124 hermano — confirmar sin ancla no puede cerrar en silencio', ()
       // se cerrara mudo — «Colocar exacto» que no coloca tiene que decirlo.
       expect(onUpdate).not.toHaveBeenCalled();
       expect(avisos.map(a => a.razon)).toContain('notch:ancla-perdida');
-      expect(avisos[0].texto).toMatch(/colócalo otra vez/i);
+      // Dice qué hacer: volver a ponerlo (el texto se acortó en P2b para caber
+      // junto a las cuatro opciones del piquete en la línea al pie).
+      expect(avisos[0].texto).toMatch(/otra vez con un clic/i);
     } finally {
       cancelar();
     }

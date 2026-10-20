@@ -3,6 +3,7 @@ name = "xpbd-wasm"
 version = "0.1.0"
 edition = "2021"
 description = "XPBD cloth simulation solver compiled to WebAssembly"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

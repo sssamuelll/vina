@@ -1,10 +1,8 @@
 .snapshot-bar {
   position: absolute;
-  /* Por encima del UnifiedBar default (58+24, barPosition.ts) — a bottom:12
-     el capsule quedaba medio recortado detrás del bar (Fase1-S3). El número
-     ahora sale del token `--band-bar`, compartido con los controles del visor
-     3D y la fila de capas del lienzo 2D. */
-  bottom: var(--band-bar);
+  /* La barra de IA ya no está en reposo (spec 2026-10-02 § 6.2): nada
+     reserva su franja, y esto vuelve al suelo. */
+  bottom: var(--sp-3);
   left: 50%;
   transform: translateX(-50%);
   display: flex;

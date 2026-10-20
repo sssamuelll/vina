@@ -231,6 +231,14 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
     [toPattern, pieces, snapToOutline, validateCut],
   );
 
+  /** Lo que haría un mousemove lejos del contorno, que al salir del lienzo de
+   *  golpe no llega (#1132). El inicio del corte se queda. */
+  const limpiarHover = useCallback(() => {
+    setState(prev => (prev.hoveredEdgePoint || prev.endPoint
+      ? { ...prev, hoveredEdgePoint: null, endPoint: null, previewValid: false }
+      : prev));
+  }, []);
+
   const handleMouseUp = useCallback(() => {
     // No-op — scissors uses clicks, not drag
   }, []);
@@ -259,5 +267,6 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
     handleKeyDown,
     getCursor,
     reset,
+    limpiarHover,
   };
 }

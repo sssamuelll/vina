@@ -22,6 +22,7 @@ import {
   setViewMode3D,
 } from '../../../../store/simulationSlice';
 import { setCameraPreset, focusOnPiece } from '../../../../store/cameraSlice';
+import { medidasDelCuerpo } from '../../../../avatares/catalogo';
 
 function parseFinitePositiveNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
@@ -526,7 +527,7 @@ export const tools: ToolDefinition[] = [
       dispatch(clearArrangementSnapshot());
 
       // Arrange
-      const placements = placeGarmentPieces(pieces, state.project.avatar.measurements);
+      const placements = placeGarmentPieces(pieces, medidasDelCuerpo(state.project));
       const snapshot: Record<string, [number, number, number]> = {};
       pieces.forEach((p, i) => {
         snapshot[p.id] = [placements[i].position[0], placements[i].position[1], placements[i].position[2]];
@@ -571,7 +572,7 @@ export const tools: ToolDefinition[] = [
       dispatch(clearArrangementOverrides());
       dispatch(clearArrangementSnapshot());
 
-      const placements = placeGarmentPieces(pieces, state.project.avatar.measurements);
+      const placements = placeGarmentPieces(pieces, medidasDelCuerpo(state.project));
       const snapshot: Record<string, [number, number, number]> = {};
       pieces.forEach((p, i) => {
         snapshot[p.id] = [placements[i].position[0], placements[i].position[1], placements[i].position[2]];

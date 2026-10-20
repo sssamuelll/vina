@@ -113,7 +113,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
       lineLengthModeSetByUser: false,
       showSewingLines: true,
       renderMode2D: 'textured' as const,
-      snapToGrid: true,
       gridSize: 10,
       units: 'mm',
       clipboard: null,
@@ -124,6 +123,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
     },
     simulation: {
       simulationState: 'idle',
+      telaEnMovimiento: false,
       pieceFabrics: { 'piece-1': 'cotton-poplin' },
       defaultFabricId: 'cotton-poplin',
       particleDistance: 5,
@@ -191,6 +191,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       pose: {
         joints: { LeftArm: { x: 50, y: 0, z: 0 }, RightArm: { x: 50, y: 0, z: 0 }, LeftShoulder: { x: 8, y: 0, z: 0 }, RightShoulder: { x: 8, y: 0, z: 0 } },
         activePreset: 'A-pose',
+        porResolver: false,
         ikChains: [],
         ikTargets: [],
         ikEnabled: false,
@@ -241,6 +242,15 @@ function mockState(overrides?: Partial<RootState>): RootState {
       ghostPreview: null,
       actionLogVisible: false,
     },
+    ia: {
+      abierta: false,
+      modoDeApertura: 'conversacion',
+      aperturas: 0,
+      mensajes: [],
+      trabajando: false,
+      enCurso: [],
+    },
+    puente: { estado: 'apagado', agente: null },
     camera: {
       pendingPreset: null,
       pendingFocusPieceId: null,
@@ -329,8 +339,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
       lastGradedAt: null,
     },
     dock: {
-      pinnedExtra: { left: [], right: [] },
-      signaling: 'subtle' as const,
       tools2d: ['select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam'],
     },
     inputScheme: {

@@ -43,12 +43,16 @@ describe('3. la mono solo viste datos', () => {
   /** Dónde es legal `var(--font-mono)` / `var(--font-mono-2d)` en CSS. `*` = todo el archivo. */
   const PERMITIDOS: Record<string, string[] | '*'> = {
     'src/styles/base.css': ['.mono'],
+    // El comando que se copia para configurar tu agente: texto exacto, como una tecla.
+    'src/styles/layout.css': ['.hoja-del-agente__codigo'],
     'src/styles/floating.css': ['.logo-menu__shortcut', '.context-menu__shortcut'],
     'src/styles/unified-bar.css': ['.chat-markdown code'],
     'src/components/shared/SubMenu.css': ['.submenu-shortcut'],
     'src/components/shell/ToolTooltip.css': ['.tool-tooltip-shortcut'],
     'src/components/shell/Dock.css': ['.dock-picker__kbd'],
-    'src/components/PatternEditor/ToolStrip2D.css': ['.tool-strip__shortcut'],
+    'src/components/PatternEditor/SeccionDelPatron.css': ['.seccion-del-patron__tecla'],
+    // La tecla de la herramienta del 3D en la línea al pie: una tecla, como la del patrón.
+    'src/components/shell/SeccionDel3D.css': ['.seccion-del-3d__tecla'],
     'src/components/PatternEditor/cotas/cotas.css': '*',
   };
   const css = rastreados('src/**/*.css');

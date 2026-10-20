@@ -10,14 +10,26 @@
   height: var(--top-bar-h);
   background: var(--bg-deeper);
   border-bottom: 1px solid var(--border);
-  display: flex;
+  /* Tres columnas: los lados reparten a partes iguales lo que sobra y pueden
+     encogerse hasta cero, así que el selector de vista queda en el centro de
+     la ventana y no se mueve con lo que haya a cada lado (spec 2026-10-02
+     § 4.2). Hasta P2 eran dos espaciadores `flex: 1`, y su x dependía de los
+     vecinos. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   padding: 0 var(--sp-3);
-  gap: var(--sp-3);
+  column-gap: var(--sp-3);
   flex-shrink: 0;
   z-index: var(--z-bar);
 }
-.top-bar__spacer { flex: 1; }
+.top-bar__lado {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.top-bar__lado--derecho { justify-content: flex-end; }
 .top-bar__status {
   display: flex;
   align-items: center;
@@ -25,6 +37,74 @@
   font-size: var(--text-sm);
   color: var(--text-muted);
 }
+
+/* El grupo del patrón (FilaDeCapas.tsx): los seis interruptores de lo que se
+   ve, sobre el marco. El estado se lee en la marca, llena o hueca, y en el
+   tono del texto: no depende solo del color (ley de estado del contrato). 8 px
+   entre ellos y sin relleno lateral, porque así caben a 1366 px (spec § 4.2:
+   con 12 px no cabían por 7; con 2 px de relleno, medido, por 5). */
+.grupo-del-patron {
+  flex: 1 1 0;
+  min-width: 0;
+  /* Recorta la fila mientras no cabe y aún no se plegó, pero deja asomar el
+     anillo de foco: 2 px a 1 px del botón. Con `hidden` se comía 3 px arriba,
+     abajo y a la izquierda del primero (barra-superior.spec.ts). */
+  overflow: clip;
+  overflow-clip-margin: 3px;
+  display: flex;
+  align-items: center;
+}
+.grupo-del-patron__fila { display: flex; align-items: center; gap: 8px; }
+/* `.opcion-del-pie__interruptor` es el interruptor de una opción en la línea
+   al pie (ToolOptionControls.tsx): un solo estilo de interruptor, el mismo en la
+   barra superior (marco) y en el pie (papel desde el 2026-10-11). */
+.grupo-del-patron__interruptor,
+.grupo-del-patron__plegado,
+.opcion-del-pie__interruptor {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.grupo-del-patron__interruptor--activo, .opcion-del-pie__interruptor--activo { color: var(--text-primary); }
+.grupo-del-patron__marca, .opcion-del-pie__marca {
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+}
+.grupo-del-patron__interruptor--activo .grupo-del-patron__marca, .opcion-del-pie__interruptor--activo .opcion-del-pie__marca { background: currentColor; }
+.grupo-del-patron__interruptor:hover, .grupo-del-patron__plegado:hover, .opcion-del-pie__interruptor:hover { color: var(--text-primary); }
+.grupo-del-patron__interruptor:focus-visible, .grupo-del-patron__plegado:focus-visible, .opcion-del-pie__interruptor:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--text-primary); }
+
+/* «Mostrar», plegado: el menú cuelga de <body> y es papel (contrato § 2,
+   «todo portal nace papel»). Los mismos interruptores, en columna. */
+.grupo-del-patron__menu {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface-overlay-bg);
+  border: var(--surface-overlay-border);
+  border-radius: var(--surface-overlay-radius);
+  box-shadow: var(--surface-overlay-shadow);
+}
+.grupo-del-patron__menu .grupo-del-patron__interruptor { padding: 4px 8px; }
+.grupo-del-patron__menu .grupo-del-patron__interruptor:hover { background: var(--bg-elevated); }
+.grupo-del-patron__menu .grupo-del-patron__interruptor:focus-visible { background: var(--bg-elevated); }
 
 .canvas-area {
   flex: 1;
@@ -36,11 +116,19 @@
   position: relative;
   overflow: hidden;
   background: var(--canvas-2d); /* un solo papel: el del lienzo */
+  /* El margen de herramientas y la hoja, uno al lado de la otra (spec
+     2026-10-02 § 4.3): el margen es una columna, no flota encima. */
+  display: flex;
 }
 
+/* Entre la hoja y el escenario de Split (spec 2026-10-02 § 4.5, P5): una línea de
+   pelo sobre papel, no la franja negra de antes (la que dejaba ver lo que hay
+   detrás). Los 4 px son área de agarre y pintan el papel; lo que se ve es la
+   línea del centro. Lleva data-material="papel" (AppShell.tsx): sin el ámbito,
+   `--border-subtle` es la del marco oscuro y sobre papel no se vería. */
 .canvas-area__divider {
   width: 4px;
-  background: transparent;
+  background: var(--canvas-2d);
   cursor: col-resize;
   flex-shrink: 0;
   position: relative;
@@ -55,7 +143,7 @@
   bottom: 0;
   left: 50%;
   width: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   transition: background 0.15s ease;
 }
 .canvas-area__divider:hover {
@@ -69,6 +157,106 @@
 .canvas-area__3d {
   position: relative;
   overflow: hidden;
+  /* El escenario es el papel de la hoja (spec 2026-10-02 § 4.5). El lienzo es
+     transparente (renderSettings.backgroundMode: 'transparent') y el color lo
+     pone esto: `scene.background` pasa por el mapeo de tonos y un #faf4e3 sale
+     #e1e0da. Con un fondo sólido o HDRI, el lienzo pinta encima. */
+  background: var(--canvas-2d);
 }
 
+/* La línea al pie (spec 2026-10-02 «la interfaz en papel» § 5.3): del alto de la
+   barra superior, de lado a lado y siempre. Es una fila de la ventana, no flota:
+   la hoja termina encima y nada la empuja. La sección del patrón la pinta
+   PatternEditor por portal en su ranura (SeccionDelPatron.css); la del 3D es un
+   hijo directo (SeccionDel3D.css).
+
+   Es papel, con los colores del margen de herramientas (Dock.css): el color de la
+   hoja, la tinta del ámbito (`data-material="papel"` en su raíz, AppShell.tsx) y
+   una línea de pelo arriba. Hasta el 2026-10-11 era marco, del material de la
+   barra superior; Samuel, con P5 desplegada: «me equivoqué con la línea al pie …
+   creo que va mejor en los colores de la barra de herramientas: Herramientas del
+   patrón». El estado de la simulación se fue ese día al pie del margen del 3D.
+
+   Cómo se reparte el ancho (spec § 5.3, P5): la herramienta del patrón ocupa lo
+   que necesita; la sección del 3D, lo que sobra, y es la primera que se recorta.
+   La ranura del patrón mide lo que pide su sección (`flex: 0 1 auto`): lo que
+   necesita para mostrar TODO, «quién», todas sus opciones y la frase entera, con
+   200 px como mínimo. Solo se encoge si no hay sitio, hasta 320 px;
+   la del 3D crece a todo lo demás (`flex: 1 100 auto`) y es la que se encoge casi
+   todo: su voz cede hasta desaparecer (SeccionDel3D.css) y le queda su relleno
+   (`min-width: auto`). Con 12 herramientas del margen en Split a 1366 px las doce
+   frases caben enteras (medido con el navegador); a 1000 px la frase del patrón
+   conserva sus 200 px (e2e). Con la vista 3D sola la ranura del patrón se esconde y
+   el 3D se lleva todo el pie, sin la línea de pelo que lo separaba del patrón.
+
+   Por qué la sección PIDE un ancho en vez de medir su contenido: la medida que
+   decide cuántas opciones se pliegan en «Más» (`useCuantasCaben`) sale del ancho
+   de la sección. Si la ranura midiera lo que su contenido mide ahora, plegar una
+   opción la encogería, la ranura encogida plegaría otra, y así hasta cero (medido
+   con el navegador: Desplazar contorno a 1100 px y Piquete perdían todas sus
+   opciones, y una frase de menos de 200 px las plegaba aun con la ventana ancha).
+   La sección calcula lo que necesita con lo que midió estando todo a la vista
+   (`anchoDelPie.ts`) y lo pide como su `width`: no depende de lo plegado, así que
+   plegar no realimenta nada. */
+.linea-al-pie {
+  height: var(--top-bar-h);
+  flex-shrink: 0;
+  display: flex;
+  background: var(--canvas-2d);
+  border-top: var(--hairline);
+  color: var(--text-primary);
+}
+.linea-al-pie__patron { flex: 0 1 auto; min-width: 320px; display: flex; }
+.linea-al-pie__patron[hidden] { display: none; }
+.linea-al-pie__3d {
+  flex: 1 100 auto;
+  min-width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-3);
+  border-left: var(--hairline);
+}
+.linea-al-pie--3d-solo .linea-al-pie__3d { flex: 1 1 auto; border-left: 0; }
+
 /* unified-bar-slot removed — bar is now position:fixed overlay */
+
+/* «IA» (spec 2026-10-02 § 4.2): el botón de la barra superior que llama a la
+   IA. Marcado = relleno y tinta plena, no solo tono; trabajando con la barra
+   oculta, una señal que late (quieta con movimiento reducido). */
+.boton-ia { position: relative; height: 26px; padding: 0 10px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font: inherit; font-weight: 600; cursor: pointer; }
+.boton-ia:hover { color: var(--text-primary); }
+.boton-ia:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.boton-ia--activo { background: var(--bg-elevated); color: var(--text-primary); }
+.boton-ia__actividad { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: boton-ia-latido 1.2s ease-in-out infinite; }
+@keyframes boton-ia-latido { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .boton-ia__actividad { animation: none; } }
+
+/* «Tu agente» (spec 2026-10-09, P1): el enchufe al lado de «IA», del mismo
+   alto, y su hoja de papel, que cuelga de <body> como el menú «Mostrar». */
+.puerta-del-agente { position: relative; height: 26px; width: 30px; display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); cursor: pointer; }
+.puerta-del-agente:hover { color: var(--text-primary); }
+.puerta-del-agente:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.puerta-del-agente--abierta { background: var(--bg-elevated); color: var(--text-primary); }
+.puerta-del-agente__punto { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+.hoja-del-agente { position: fixed; z-index: var(--z-menu); width: 330px; padding: 14px 16px; background: var(--surface-overlay-bg); border: var(--surface-overlay-border); border-radius: var(--surface-overlay-radius); box-shadow: var(--surface-overlay-shadow); color: var(--text-primary); font-size: var(--text-3); line-height: var(--line-height); }
+.hoja-del-agente__titulo { margin: 0 0 6px; font-size: var(--text-3); font-weight: 600; }
+.hoja-del-agente p { margin: 0 0 10px; color: var(--text-secondary); }
+.hoja-del-agente__estado { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-weight: 600; }
+.hoja-del-agente__senal { width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary); }
+.hoja-del-agente__senal--ok { background: var(--success); }
+.hoja-del-agente__accion { height: 28px; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; }
+.hoja-del-agente__accion:hover { background: var(--bg-elevated); }
+.hoja-del-agente__accion:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hoja-del-agente__accion--principal { border-color: var(--accent-fuerte); background: var(--accent-fuerte); color: var(--on-accent); font-weight: 600; }
+.hoja-del-agente__accion--principal:hover { background: var(--accent-fuerte-hover); }
+.hoja-del-agente .hoja-del-agente__nota { margin: 10px 0 0; font-size: var(--text-2); }
+.hoja-del-agente__configuracion { margin: 12px -16px 0; padding: 12px 16px 0; border-top: var(--hairline); }
+.hoja-del-agente__subtitulo { font-size: var(--text-2); font-weight: 600; }
+.hoja-del-agente__fila { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 3px; font-size: var(--text-2); color: var(--text-secondary); }
+.hoja-del-agente__copiar { padding: 0; border: 0; background: transparent; color: var(--accent-fuerte); font: inherit; font-weight: 600; cursor: pointer; }
+.hoja-del-agente__copiar:hover { text-decoration: underline; }
+.hoja-del-agente__copiar:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.hoja-del-agente__codigo { display: block; padding: 6px 8px; background: var(--bg-elevated); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--text-1); color: var(--text-primary); white-space: pre-wrap; word-break: break-all; }

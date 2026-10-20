@@ -39,7 +39,7 @@ async function abrirApp(page: Page) {
 
 const nPiezas = async (p: Page) => (await st(p)).project.pieces.length;
 
-/** Vive `disabled` mientras no haya mediciones (`ToolStrip2D.tsx`). Sale gratis
+/** Vive `disabled` mientras no haya mediciones (la línea al pie, `SeccionDelPatron.tsx`). Sale gratis
  *  y es el único oráculo que distingue «no midió» de «midió y se borró». */
 const botonBorrarMediciones = (p: Page) => p.getByRole('button', { name: 'Borrar mediciones' });
 
@@ -143,18 +143,19 @@ test.describe('#1173 — un diálogo abierto no deja que Supr borre lo de atrás
     // dejaba la pregunta en pantalla. Sin este caso nada lo protege.
     await conPiezaSeleccionada(page);
     await abrirDialogo(page);
-    const modoAntes = await page.evaluate(() => (window as unknown as {
-      __VINA_STORE__: { getState: () => { simulation: { viewMode3D: string } } };
-    }).__VINA_STORE__.getState().simulation.viewMode3D);
+    // El estado de la simulación, no `viewMode3D`: desde el 2026-10-11 Espacio
+    // es el botón «Simular» (corre o pausa) y ya no toca el modo del visor, así
+    // que mirar el modo dejaba este caso ciego a un arranque detrás del diálogo.
+    const simulacion = () => page.evaluate(() => (window as unknown as {
+      __VINA_STORE__: { getState: () => { simulation: { simulationState: string } } };
+    }).__VINA_STORE__.getState().simulation.simulationState);
+    const antes = await simulacion();
 
     await page.keyboard.press(' ');
     await page.waitForTimeout(500);
 
     await expect(page.locator('.confirm-dialog'), 'Espacio no activó el botón enfocado').toHaveCount(0);
-    const modoDespues = await page.evaluate(() => (window as unknown as {
-      __VINA_STORE__: { getState: () => { simulation: { viewMode3D: string } } };
-    }).__VINA_STORE__.getState().simulation.viewMode3D);
-    expect(modoDespues, 'Espacio arrancó la simulación detrás del diálogo').toBe(modoAntes);
+    expect(await simulacion(), 'Espacio arrancó la simulación detrás del diálogo').toBe(antes);
   });
 });
 
@@ -176,8 +177,11 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
   test('M6 · con mediciones en pantalla, Supr no se lleva la pieza', async ({ page }) => {
     await conPiezaSeleccionada(page);
     await activarHerramienta(page, 'm', 'measure');
+    // A la izquierda de la tarjeta de herramienta, que en Split a 1280 empieza
+    // en x 326: desde que el margen corre la hoja 44 px, el (300, 100) de antes
+    // caía dentro de ella (P2a). P2b la borra.
     await clickAt(page, { x: 100, y: 100 });
-    await clickAt(page, { x: 300, y: 100 });
+    await clickAt(page, { x: 250, y: 100 });
     await page.waitForTimeout(300);
     await expect(botonBorrarMediciones(page), 'el caso no se ejerce: los clics no midieron nada')
       .toBeEnabled();
@@ -194,8 +198,11 @@ test.describe('#1172 — Medir y Recorrer costura no escriben: tampoco borran', 
   test('M7 · Retroceso hace lo mismo que Supr midiendo', async ({ page }) => {
     await conPiezaSeleccionada(page);
     await activarHerramienta(page, 'm', 'measure');
+    // A la izquierda de la tarjeta de herramienta, que en Split a 1280 empieza
+    // en x 326: desde que el margen corre la hoja 44 px, el (300, 100) de antes
+    // caía dentro de ella (P2a). P2b la borra.
     await clickAt(page, { x: 100, y: 100 });
-    await clickAt(page, { x: 300, y: 100 });
+    await clickAt(page, { x: 250, y: 100 });
     await page.waitForTimeout(300);
 
     await expect(botonBorrarMediciones(page), 'el caso no se ejerce: los clics no midieron nada')

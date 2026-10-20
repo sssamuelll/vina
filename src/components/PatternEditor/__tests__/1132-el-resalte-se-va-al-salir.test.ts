@@ -52,10 +52,11 @@ const LIMPIAN = hooksQueLimpian(CENSO);
 const SIN_LIMPIAR = CENSO.filter(f => !LIMPIAN.includes(f));
 
 /**
- * Deuda declarada: hooks con hover que TODAVÍA no se limpian al salir. Bajar
- * este número es el trabajo; subirlo es la regresión que este test caza.
+ * Deuda declarada: hooks con hover que TODAVÍA no se limpian al salir. Llegó a
+ * cero el 13-10 (T#212 + #1132): las nueve que quedaban se cablearon juntas.
+ * Un hook nuevo con hover nace con su `limpiarHover`.
  */
-const TECHO = 13;
+const TECHO = 0;
 
 describe('#1132 — trinquete del resalte que se queda pegado', () => {
   it('el censo encuentra hooks (control: si el regex se rompe, esto falla)', () => {
@@ -85,5 +86,15 @@ describe('#1132 — trinquete del resalte que se queda pegado', () => {
     for (const llamada of ['seamAllowanceTool.limpiarHover', 'seamEditTool.limpiarHover', 'seamTool.limpiarHover']) {
       expect(cuerpo, `handleMouseLeave debería llamar a ${llamada}`).toContain(llamada);
     }
+  });
+
+  it('`handleMouseLeave` llama a un `limpiarHover` por cada hook del censo', () => {
+    // Tener `limpiarHover` no basta: un hook que lo expone y nadie llama
+    // sigue dejando el resalte. Una llamada por hook, contadas en el cuerpo.
+    const src = readFileSync(join(DIR, 'useEditorInteractions.ts'), 'utf8');
+    const i = src.indexOf('const handleMouseLeave');
+    const cuerpo = src.slice(i, src.indexOf('}, [', i));
+    const llamadas = cuerpo.match(/\.limpiarHover\b/g) ?? [];
+    expect(llamadas.length, `limpiarHover llamados en handleMouseLeave: ${llamadas.length}`).toBe(CENSO.length);
   });
 });

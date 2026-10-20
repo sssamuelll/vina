@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import projectReducer, { addPiece, linkPieces, updatePiece, movePiece, loadProject, addInternalLine, setLayerLocked } from '../projectSlice';
+import projectReducer, { addPiece, linkPieces, updatePiece, movePiece, loadProject, addInternalLine, setLayerLocked, updateInternalLine } from '../projectSlice';
 import { linkedEditingMiddleware } from '../linkedEditingMiddleware';
 import { undoMiddleware, getUndoLength } from '../undoMiddleware';
 import type { PatternPiece, InternalLine } from '../../types/types';
@@ -373,5 +373,42 @@ describe('linkedEditingMiddleware + undoMiddleware (BUG-7)', () => {
     store.dispatch({ type: 'editor/undo' });
     expect(store.getState().project.pieces.find(p => p.id === 'a')!.internals).toHaveLength(0);
     expect(store.getState().project.pieces.find(p => p.id === 'b')!.internals).toHaveLength(0);
+  });
+});
+
+describe('linkedEditingMiddleware — el piquete viaja entero (P3b)', () => {
+  const piquete: InternalLine = {
+    id: 'piquete',
+    type: 'notch',
+    path: [{ type: 'M', values: [40, 0] }, { type: 'L', values: [40, 8] }],
+    notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 40, metric: 2 },
+    notchOptions: { shape: 'slit', subType: 'straightforward', length: 8, width: 3, angle: 0, count: 1 },
+  };
+  const movido = {
+    path: [{ type: 'M' as const, values: [60, 0] }, { type: 'L' as const, values: [60, 12] }],
+    notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw' as const, distanceMm: 60, metric: 2 as const },
+    notchOptions: { shape: 'slit' as const, subType: 'straightforward' as const, length: 12, width: 3, angle: 0, count: 1 },
+  };
+
+  function vinculadas(mode: 'instance' | 'symmetry') {
+    const store = createStore();
+    store.dispatch(addPiece(makePiece('a', 'Left')));
+    store.dispatch(addPiece(makePiece('b', 'Right')));
+    store.dispatch(linkPieces({ pieceIdA: 'a', pieceIdB: 'b', mode }));
+    store.dispatch(addInternalLine({ pieceId: 'a', line: piquete }));
+    store.dispatch(updateInternalLine({ pieceId: 'a', lineId: 'piquete', ...movido }));
+    return store.getState().project.pieces.find(p => p.id === 'b')!.internals[0];
+  }
+
+  it('una instancia recibe el ancla y las opciones del piquete, no solo el path', () => {
+    const pareja = vinculadas('instance');
+    expect(pareja.notchAnchor).toEqual(movido.notchAnchor);
+    expect(pareja.notchOptions).toEqual(movido.notchOptions);
+  });
+
+  it('un espejo recibe las opciones pero no el ancla, que se suelta a propósito (mirrorInternalsX)', () => {
+    const pareja = vinculadas('symmetry');
+    expect(pareja.notchOptions).toEqual(movido.notchOptions);
+    expect(pareja.notchAnchor).toBeUndefined();
   });
 });

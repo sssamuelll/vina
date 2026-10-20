@@ -180,10 +180,10 @@ for (const vp of VIEWPORTS) {
   await clickViewMode('3D');
   await settle(1500);
   await shot(P('14-3d'));
-  await page.locator('.dock--right').getByRole('button', { name: 'Simular', exact: true }).click().catch(() => {});
+  await page.locator('nav[aria-label="Herramientas del 3D"]').getByRole('button', { name: 'Simular', exact: true }).click().catch(() => {});
   await settle(4000);
   await shot(P('15-3d-simulando'));
-  await page.locator('.dock--right').getByRole('button', { name: /Detener|Pausar|Parar|Simular/ }).first().click().catch(() => {});
+  await page.locator('nav[aria-label="Herramientas del 3D"]').getByRole('button', { name: /Detener|Pausar|Parar|Simular/ }).first().click().catch(() => {});
 }
 
 await writeFile(path.join(OUT, 'superficies.json'), JSON.stringify(registro, null, 2) + '\n');

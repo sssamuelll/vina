@@ -26,20 +26,10 @@ export const seamTool: ToolDefinition = {
   icon: SeamIcon,
   cursor: 'pointer',
   group: 'sewing',
-  options: [
-    {
-      id: 'seamType',
-      label: 'Tipo de costura',
-      type: 'select',
-      value: 'standard',
-      choices: [
-        { label: 'Normal', value: 'standard' },
-        { label: 'Francesa', value: 'french' },
-        { label: 'Flat-felled', value: 'flat-felled' },
-        { label: 'Overlock', value: 'overlock' },
-      ],
-    },
-  ],
+  // Sin opciones desde P3c (spec 2026-10-02 § 5.3): «Tipo de costura» salió de
+  // la línea al pie a la etiqueta de la costura, con la costura elegida. Una
+  // costura nueva nace Normal («“Tipo de costura” fuera del gesto de coser»,
+  // María 30-08 [22:47]).
   copilot: {
     description: 'Create seams to connect pattern pieces. Click on an edge of one piece, then click on the corresponding edge of another piece to create a seam. Seams define how pieces are sewn together in 3D simulation.',
     examples: [

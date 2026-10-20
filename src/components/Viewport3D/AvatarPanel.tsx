@@ -5,37 +5,41 @@ import {
   setPreset, resetPose, selectJoint, setJointRotation, mirrorJoint,
   loadSavedPosesFromStorage, loadSavedPosesAsync, savePose, deleteSavedPose, overwriteSavedPose,
   togglePoseEditor, toggleIK,
-  POSE_PRESETS, JOINT_CONSTRAINTS,
+  JOINT_CONSTRAINTS,
   loadProfilesFromStorage, loadProfilesAsync, setActiveProfile, addProfile, updateProfile, deleteProfile,
   setMorphTarget,
 } from '../../store/avatarSlice';
 import {
   setAvatarModelUrl, setAvatarMode, updateMeasurements,
 } from '../../store/projectSlice';
-import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
+import { MIN_MEASUREMENT_CM, MAX_MEASUREMENT_CM, type AvatarProfile } from '../../utils/avatar/avatarLibrary';
+import { AVATAR_POR_DEFECTO, avatarPorUrl, registrarModeloPropio } from '../../avatares/catalogo';
+import { PRESETS_DE_POSE } from '../../utils/avatar/posePorDireccion';
 import type { BodyMeasurements } from '../../types/types';
 import type { AvatarMode } from '../../store/projectSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
+import CampoDeMedida from './CampoDeMedida';
 import './AvatarPanel.css';
 
-interface SliderDef {
+interface MedidaDef {
   key: keyof BodyMeasurements;
   label: string;
-  min: number;
-  max: number;
 }
 
-const SLIDERS: SliderDef[] = [
-  { key: 'height', label: 'Estatura', min: 140, max: 210 },
-  { key: 'chest', label: 'Pecho', min: 70, max: 130 },
-  { key: 'waist', label: 'Cintura', min: 55, max: 120 },
-  { key: 'hips', label: 'Cadera', min: 70, max: 130 },
-  { key: 'shoulder', label: 'Ancho de hombros', min: 35, max: 55 },
-  { key: 'armLength', label: 'Largo de brazo', min: 50, max: 75 },
-  { key: 'inseam', label: 'Entrepierna', min: 65, max: 90 },
+// Los rangos del deslizador viejo (140-210 de estatura, 35-55 de hombros…)
+// eran de adulto, y el catálogo trae cuerpos de niño: los campos aceptan lo
+// que aceptan los perfiles guardados (MIN/MAX_MEASUREMENT_CM).
+const MEDIDAS: MedidaDef[] = [
+  { key: 'height', label: 'Estatura' },
+  { key: 'chest', label: 'Pecho' },
+  { key: 'waist', label: 'Cintura' },
+  { key: 'hips', label: 'Cadera' },
+  { key: 'shoulder', label: 'Ancho de hombros' },
+  { key: 'armLength', label: 'Largo de brazo' },
+  { key: 'inseam', label: 'Entrepierna' },
 ];
 
-// Las keys de POSE_PRESETS son estado Redux (activePreset) — no se traducen; solo el label visible.
+// Las keys de PRESETS_DE_POSE son estado Redux (activePreset) — no se traducen; solo el label visible.
 const PRESET_LABELS: Record<string, string> = {
   'Relaxed': 'Relajada',
   'Arms Forward': 'Brazos al frente',
@@ -45,11 +49,7 @@ const PRESET_LABELS: Record<string, string> = {
 const AXIS_LABELS = ['X', 'Y', 'Z'] as const;
 const AXIS_KEYS = ['x', 'y', 'z'] as const;
 
-interface AvatarPanelProps {
-  open: boolean;
-}
-
-export default function AvatarPanel({ open }: AvatarPanelProps) {
+export default function AvatarPanel() {
   const dispatch = useDispatch<AppDispatch>();
 
   // Avatar state
@@ -58,6 +58,9 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
   const activeProfileId = useSelector((s: RootState) => s.avatar.activeProfileId);
   const avatarMode = useSelector((s: RootState) => s.project.avatarMode);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
+  const modeloDelProyecto = useSelector((s: RootState) => s.project.avatar.modelUrl);
+  // El cuerpo que se ve, si es de la biblioteca: no se estira (spec § 5).
+  const deLaBiblioteca = avatarPorUrl(avatarModelUrl);
   const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
 
   // Pose state
@@ -95,19 +98,23 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
     void loadSavedPosesAsync().then(poses => dispatch(loadSavedPosesFromStorage(poses)));
   }, [dispatch]);
 
-  // Sync gizmos with panel open state + pose section
+  // Con la sección «Pose» abierta, los mandos de las articulaciones se ven.
   useEffect(() => {
-    if (open && poseOpen && !poseEditorOpen) {
-      dispatch(togglePoseEditor());
-    }
-    if (!open && poseEditorOpen) {
-      dispatch(togglePoseEditor());
-    }
-  }, [open, poseOpen, poseEditorOpen, dispatch]);
+    if (poseOpen && !poseEditorOpen) dispatch(togglePoseEditor());
+  }, [poseOpen, poseEditorOpen, dispatch]);
+
+  // Al cerrarse el panel, o al reemplazarlo otro en su ranura, el modo pose se
+  // apaga: sin el panel no quedaba puerta para apagarlo, y los mandos y
+  // «● MODO POSE» se quedaban en el 3D.
+  const poseAlDesmontar = useRef(poseEditorOpen);
+  poseAlDesmontar.current = poseEditorOpen;
+  useEffect(() => () => {
+    if (poseAlDesmontar.current) dispatch(togglePoseEditor());
+  }, [dispatch]);
 
   // Derive model name
   useEffect(() => {
-    if (!avatarModelUrl || avatarModelUrl === '/default-avatar.glb') {
+    if (!avatarModelUrl || avatarPorUrl(avatarModelUrl)) {
       setModelName(null);
     }
   }, [avatarModelUrl]);
@@ -117,10 +124,13 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
     const ext = file.name.toLowerCase().split('.').pop() || '';
     const supported = ['obj', 'fbx', 'glb', 'gltf', 'vrm'];
     if (!supported.includes(ext)) return;
-    const url = URL.createObjectURL(file);
+    // El blob no trae extensión: sin el nombre en el fragmento, AvatarModel no sabe qué cargador
+    // usar y la subida fallaba en silencio. fetch ignora el fragmento de una URL blob.
+    const url = `${URL.createObjectURL(file)}#${encodeURIComponent(file.name)}`;
+    registrarModeloPropio(url, measurements);
     dispatch(setAvatarModelUrl(url));
     setModelName(file.name);
-  }, [dispatch]);
+  }, [dispatch, measurements]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -190,7 +200,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
   const canMirror = selectedJoint ? (selectedJoint.startsWith('Left') || selectedJoint.startsWith('Right')) : false;
 
   return (
-    <div className={`avatar-panel-wrapper ${open ? 'open' : 'closed'}`}>
+    <div className="avatar-panel-wrapper">
       <div className="avatar-panel">
         {/* Fase1-S6: sin header propio — el host (ContextPanel "Avatar") ya
             pone título y botón de cerrar; aquí había un segundo par. */}
@@ -224,13 +234,13 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   📁 Suelta un archivo .obj, .fbx, .glb, .gltf o .vrm
                 </div>
                 <div className="ap-model-info">
-                  <span>{modelName ?? 'Avatar por defecto'}</span>
-                  {modelName && (
+                  <span>{modelName ?? deLaBiblioteca?.name ?? 'Modelo propio'}</span>
+                  {!deLaBiblioteca && (
                     <button
                       className="ap-btn"
                       style={{ flex: 'none', padding: '2px 8px' }}
                       onClick={() => {
-                        dispatch(setAvatarModelUrl('/default-avatar.glb'));
+                        dispatch(setAvatarModelUrl(avatarPorUrl(modeloDelProyecto)?.modelUrl ?? AVATAR_POR_DEFECTO.modelUrl));
                         setModelName(null);
                       }}
                     >
@@ -298,29 +308,22 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
                   )}
                 </div>
 
-                {/* Measurements */}
-                <div className="ap-slider-group">
-                  {SLIDERS.map(({ key, label, min, max }) => {
-                    const val = (measurements[key] as number) ?? min;
-                    return (
-                      <div key={key}>
-                        <div className="ap-slider-label">
-                          <span>{label}</span>
-                          <span>{val} cm</span>
-                        </div>
-                        <div className="ap-slider-control">
-                          <input
-                            type="range" min={min} max={max} step={1} value={val}
-                            onChange={e => handleMeasurement(key, Number(e.target.value))}
-                          />
-                          <input
-                            type="number" min={min} max={max} step={1} value={val}
-                            onChange={e => handleMeasurement(key, Number(e.target.value))}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                {avatarMode === 'model' && deLaBiblioteca && (
+                  <div className="ap-hint">El cuerpo es la talla {deLaBiblioteca.name}; tus cambios se usan en el patrón.</div>
+                )}
+                {/* Las siete medidas, un campo cada una (spec 2026-10-02 § 6.1). */}
+                <div className="ap-medidas">
+                  {MEDIDAS.map(({ key, label }) => (
+                    <CampoDeMedida
+                      key={key}
+                      id={`ap-medida-${key}`}
+                      label={label}
+                      min={MIN_MEASUREMENT_CM}
+                      max={MAX_MEASUREMENT_CM}
+                      valor={measurements[key] as number | undefined}
+                      alFijar={(v) => handleMeasurement(key, v)}
+                    />
+                  ))}
                 </div>
               </div>
             )}
@@ -375,7 +378,7 @@ export default function AvatarPanel({ open }: AvatarPanelProps) {
               <div className="ap-section-body">
                 {/* Presets */}
                 <div className="ap-preset-row">
-                  {Object.keys(POSE_PRESETS).map(name => (
+                  {Object.keys(PRESETS_DE_POSE).map(name => (
                     <button
                       key={name}
                       className={`ap-preset-btn ${activePreset === name ? 'active' : ''}`}

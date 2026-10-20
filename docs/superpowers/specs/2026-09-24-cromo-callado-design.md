@@ -5,6 +5,9 @@
 > direcciones juzgadas, crítico de completitud). Este documento es la norma; aquel es la evidencia.
 > Las capturas citadas están en `docs/reports/ui-audit-2026-09-24/` (ignorada por git) y se rehacen
 > en F0 con build de producción. Cada cita archivo:línea se verificó sobre `main` `b6c20565`.
+>
+> **Enmendado el 2026-10-02:** las fases F2 a F6, § 4.4, § 4.6 y § 8 quedan sustituidas por
+> `2026-10-02-interfaz-en-papel-design.md`. F0 y F1 siguen vigentes, con sus valores.
 
 ## 0. La frase que ordena el documento
 

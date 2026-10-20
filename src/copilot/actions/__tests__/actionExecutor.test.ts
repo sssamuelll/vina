@@ -99,7 +99,6 @@ function createMockState(overrides: Partial<RootState['project']> = {}): () => R
       defaultSeamAllowanceWidth: 10,
       showGrainlines: true,
       showAnchorPoints: false,
-      snapToGrid: true,
       gridSize: 10,
       units: 'mm',
     },

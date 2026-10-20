@@ -18,20 +18,19 @@ import { selectSeam, clearSelection } from '../../store/editorSlice';
 import PropertySection from './PropertySection';
 import PieceProperties from './PieceProperties';
 import SeamPropertiesPanel from './SeamPropertiesPanel';
-import MaterialTab from './MaterialTab';
+import ProduccionDeLaPieza from './ProduccionDeLaPieza';
 import EdgePropertiesSection from './EdgePropertiesSection';
 import VertexPropertiesSection from './VertexPropertiesSection';
 import SeamAllowanceDefaultSection from './SeamAllowanceDefaultSection';
 import NotchPropertiesSection from './NotchPropertiesSection';
+import { TIPOS_DE_COSTURA } from '../../utils/seam/tiposDeCostura';
 import './PropertiesPanel.css';
 
-// Etiquetas ES para el badge de tipo de costura (los valores son keys de datos).
-const SEAM_TYPE_LABELS: Record<string, string> = {
-  standard: 'estándar',
-  french: 'francesa',
-  'flat-felled': 'sobrecargada',
-  overlock: 'overlock',
-};
+// La insignia del tipo de costura, con los nombres de la etiqueta de la
+// costura y de la línea al pie (un término por concepto, P3c), en minúscula.
+const SEAM_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  TIPOS_DE_COSTURA.map(t => [t.value, t.label.toLowerCase()]),
+);
 
 export default function PropertiesPanel() {
   const dispatch = useDispatch();
@@ -56,12 +55,11 @@ export default function PropertiesPanel() {
     ? pieces.find(p => p.id === editor.selectedInternalLine!.pieceId)
         ?.internals.find(i => i.id === editor.selectedInternalLine!.lineId && i.type === 'notch') ?? null
     : null;
+  // «Producción» arranca plegada (spec 2026-10-02 § 6.1). El estado vive aquí,
+  // así que sobrevive a cambiar de pieza y se olvida al cerrar el panel.
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-    piece: false,
-    material: false,
     seams: false,
-    // Progressive disclosure (Fase 3): los parámetros del solver arrancan plegados.
-    sim: true,
+    produccion: true,
   });
 
   const toggleSection = useCallback((sectionId: string) => {
@@ -72,7 +70,7 @@ export default function PropertiesPanel() {
   }, []);
 
   const seamsList = seams.length > 0 && (
-    <PropertySection id="seams" title={`COSTURAS (${seams.length})`} collapsed={!!collapsedSections.seams} onToggle={toggleSection}>
+    <PropertySection id="seams" title={`Costuras (${seams.length})`} collapsed={!!collapsedSections.seams} onToggle={toggleSection}>
       {seams.map(seam => {
         const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
         const pB = pieces.find(p => p.id === seam.pieceB.pieceId);
@@ -122,7 +120,12 @@ export default function PropertiesPanel() {
           )}
           {selectedNotch && <NotchPropertiesSection />}
           {selectedPiece && (
-            <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} simCollapsed={!!collapsedSections.sim} onToggle={toggleSection} />
+            <>
+              <PieceProperties piece={selectedPiece} />
+              <PropertySection id="produccion" title="Producción" collapsed={!!collapsedSections.produccion} onToggle={toggleSection}>
+                <ProduccionDeLaPieza piece={selectedPiece} />
+              </PropertySection>
+            </>
           )}
 
           {selectedSeam && (
@@ -137,13 +140,9 @@ export default function PropertiesPanel() {
             />
           )}
 
-          {selectedPiece && (
-            <PropertySection id="material" title="MATERIAL" collapsed={!!collapsedSections.material} onToggle={toggleSection}>
-              <MaterialTab />
-            </PropertySection>
-          )}
-
-          {seamsList}
+          {/* La lista es del proyecto, no de la pieza: con una pieza elegida
+              no sale (captura 08 de la spec). */}
+          {!selectedPiece && seamsList}
 
           {/* Acción destructiva al FINAL del panel, nunca en mitad del
               formulario (Fase 3 — hallazgo de prevención de errores). */}

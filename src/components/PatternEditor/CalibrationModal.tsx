@@ -27,7 +27,7 @@ export default function CalibrationModal({
   }, [value, onConfirm, onCancel]);
 
   return (
-    <div className="calibration-overlay" onClick={onCancel}>
+    <div className="calibration-overlay" data-material="papel" onClick={onCancel}>
       <div
         className="calibration-modal"
         data-superficie="modal"

@@ -14,7 +14,7 @@ Browser-based garment CAD with AI copilot and real-time XPBD cloth simulation. B
 - **Typecheck command.** Use `npx tsc -b --noEmit` (build mode), NOT bare `tsc --noEmit`. Root tsconfig has `"files": []` and returns clean vacuously. Pre-commit hook uses `-b`; manual verification must match.
 - **IDs.** Use `newId()` from `src/utils/ids.ts` (v4 UUID via `crypto.randomUUID()`). State-encoded composite IDs (e.g., `pin_${vertexIndex}`, `auto-seam-${rankIndex}`) marked `// state-encoded ID` are preserved — do not replace.
 - **Persistence.** IDB canonical via `storageSet`/`storageGet` from `src/utils/storage.ts`. Never write LS+IDB in parallel. Inline shape comment required at every `storageSet` callsite: `// shape: <Type> v<N> — opt-in envelope: <yes|no>`. LS-only writes need inline justification.
-- **Contrato de interfaz.** Antes de tocar CUALQUIER cosa visual —un componente, un panel, un botón, un color, un z-index, una cadena que la usuaria lee— invoca la skill `contrato-de-interfaz` (`.claude/skills/contrato-de-interfaz/`). Existe porque la auditoría del 2026-08-14 encontró ocho contratos ya escritos y los ocho rodeados: el problema nunca fue la falta de regla, fue que nadie la consultaba antes de escribir. Lo verifica `node scripts/ui-contract-lint.mjs`, un trinquete de ocho reglas que falla si un contador sube y que corre en el hook de pre-commit. Desde el 2026-09-26 hay dos trinquetes más en navegador —superficies por acción (≤ 4) y contraste del cromo—, con línea base en `tests/e2e/*-baseline.json` que solo baja; una superficie nueva declara `data-superficie` o el trinquete no la cuenta. Nunca edites `scripts/ui-contract-baseline.json` para tapar un contador que subió. Informe: `docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md`.
+- **Contrato de interfaz.** Antes de tocar CUALQUIER cosa visual —un componente, un panel, un botón, un color, un z-index, una cadena que la usuaria lee— invoca la skill `contrato-de-interfaz` (`.claude/skills/contrato-de-interfaz/`). Existe porque la auditoría del 2026-08-14 encontró ocho contratos ya escritos y los ocho rodeados: el problema nunca fue la falta de regla, fue que nadie la consultaba antes de escribir. Lo verifica `node scripts/ui-contract-lint.mjs`, un trinquete de ocho reglas que falla si un contador sube y que corre en el hook de pre-commit. Hay tres trinquetes más en navegador —superficies por acción (≤ 4) y contraste del cromo desde el 2026-09-26, y reposo (solo lo que perdura) desde el 2026-10-02—, con línea base en `tests/e2e/*-baseline.json` que solo baja y que corren en el gate de `scripts/deploy-prod.sh`; una superficie nueva declara `data-superficie` o el trinquete no la cuenta. Nunca edites `scripts/ui-contract-baseline.json` para tapar un contador que subió. Informe: `docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md`.
 - **Don't bypass gates.** No `--no-verify`. The Husky pre-commit hook (`.husky/pre-commit`) runs the *fast* gate — `npx tsc -b --noEmit` + `npx lint-staged` (eslint `--max-warnings=0` on staged `*.{ts,tsx}`). It does **not** run the test suite (too slow per commit); run the full gate including tests manually before committing (see "After Every Task"). The hook is tracked: `.husky/` is intentionally NOT gitignored (only the generated `.husky/_/` self-ignores) and `.gitattributes` pins it to LF — do not re-ignore it or the gate silently no-ops.
 
 ## Commands
@@ -26,7 +26,18 @@ Browser-based garment CAD with AI copilot and real-time XPBD cloth simulation. B
 | E2E tests | `npm run test:e2e` |
 | Lint | `npm run lint` |
 | Typecheck | `npx tsc -b --noEmit` |
+| Quién tiene la máquina | `node scripts/pesado.mjs --estado` |
 | WASM rebuild | `cd crates/xpbd-wasm && wasm-pack build --target web --out-dir pkg && cp pkg/xpbd_wasm.{js,_bg.wasm} ../../public/wasm/` |
+
+## Recursos escasos
+
+La máquina es una sola y la comparten varias sesiones y las aplicaciones de Samuel (Ableton, Blender). Todo lo pesado pasa por `scripts/pesado.mjs`, un candado: quien lo tiene corre; los demás hacen cola o paran diciendo de quién es. `npm run test`, `test:coverage`, `test:e2e`, `build`, el ensayo y el deploy (`scripts/deploy-prod.sh`) y el pre-push ya lo piden solos. Además de turno pide cupo: no arranca con poca memoria libre ni con la CPU ocupada por otras aplicaciones, y espera diciendo por qué.
+
+- Antes de lanzar algo largo, `node scripts/pesado.mjs --estado`: quién la tiene, memoria libre y CPU.
+- «Ocupada por …»: no insistas ni lo rodees. Espera (`--espera=<minutos>` hace cola; lo largo, en segundo plano) o habla con quien la tiene. Ni matas lo suyo ni saltas el candado: `--sin-admision` y `VINA_PESADO_OMITIR=1` son de Samuel.
+- Una prueba suelta (`npx vitest run <archivo>`, un solo spec de Playwright) es ligera y no pide candado. Una suite entera por fuera de `npm run`, sí debería.
+- El chat entre sesiones es para decidir, no para avisar «voy a correr»: eso ya lo dice el candado.
+- Detalle y límites en el encabezado de `scripts/pesado.mjs`.
 
 ## Key Directories
 

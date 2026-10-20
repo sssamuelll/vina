@@ -192,6 +192,13 @@ export function endUndoBatch(dispatch: UndoDispatch, token: UndoBatchToken): voi
   dispatch({ type: 'undo/endBatch', payload: token });
 }
 
+/**
+ * ¿Hay un lote abierto? Mientras María arrastra o escribe en una cota, su
+ * gesto es un lote sin cerrar: un verbo del agente que escriba ahora se mete
+ * en su paso, y un deshacer se lleva su gesto (revisión final de la 1b).
+ */
+export function hayLoteAbierto(): boolean { return undoState.batchStack.length > 0; }
+
 /** Lets long-lived gesture owners detect undo/load invalidation and reopen safely. */
 export function isUndoBatchTokenActive(token: UndoBatchToken): boolean {
   return undoState.batchStack.some((batch) => batch.token === token);

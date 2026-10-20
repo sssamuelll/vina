@@ -1,0 +1,801 @@
+{
+  "instrucciones": "Vina is a CAD for garment patterns, open in the user's browser. These tools read and change the pattern that is open right now.\nAll lengths are in millimetres.\nRead before you act: read_pattern gives every piece with its edges and notches, and every seam; read_piece gives one piece in full (its points and internal lines). Use the ids they return.\nEvery answer carries the project revision, which goes up with every change. A receipt gives revision.before and revision.after: if before is not the revision you last saw, someone else changed the pattern in between, so read it again. The revision starts again from 0 when the user reloads Vina.\nEvery tool that changes the pattern returns a receipt. done is true only when the measured result confirms the change. done: false is an honest answer, not a crash: read its warnings; nothing was half-changed.\nEach change is one undo step for the user (Ctrl+Z). The undo tool reverts only steps made by an agent.\nA locked piece keeps its shape: the tools that would change its outline or internal lines, or remove it, answer done: false.\nThe simulation runs in the user's browser and only advances while Vina is visible on screen. simulate waits for the cloth to settle and says why when it cannot; fit_map reads the result piece by piece.\nThe user works in Spanish: pieza = piece, costura = seam, piquete = notch, pinza = dart, patrón = pattern.",
+  "definiciones": [
+    {
+      "name": "read_pattern",
+      "description": "Read the whole pattern, measured now: every piece (size, area, lock, edges with length and end points, notches with their edge and distance, seam allowance) and every seam (both sewn lengths, the difference B minus A, and whether it walks within 3 mm). Units: mm, pattern space. Edges are named by `name`. Call it before acting.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "read_piece",
+      "description": "Read one piece in detail: every outline command with its index and end point (pattern space, mm), its edges with their command ranges and lengths, its internals (darts, grainline, notches) with ids, and its notches.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "piece_id": {
+            "type": "string",
+            "description": "a piece id from read_pattern"
+          }
+        },
+        "required": [
+          "piece_id"
+        ]
+      }
+    },
+    {
+      "name": "measure",
+      "description": "Measure along the curve: a whole edge, or the stretch between two ends given as fractions of the edge (0..1) or as points on it (pattern space, mm). A point more than 1 mm off the edge is an error, not a guess. Returns mm measured now.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "piece_id": {
+            "type": "string",
+            "description": "a piece id from read_pattern"
+          },
+          "edge": {
+            "type": "string",
+            "description": "an edge name from read_pattern"
+          },
+          "from": {
+            "default": 0,
+            "description": "start: a fraction of the edge (0..1), or a point on it in pattern space",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ]
+              }
+            ]
+          },
+          "to": {
+            "default": 1,
+            "description": "end: a fraction of the edge (0..1), or a point on it in pattern space",
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "x",
+                  "y"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "piece_id",
+          "edge"
+        ]
+      }
+    },
+    {
+      "name": "walk_seam",
+      "description": "Walk two stretches against each other, like the Walk seam tool: both lengths, the difference (B minus A), the ease %, and whether they walk: |difference - ease_mm| under the tolerance (default 3 mm). Give a seam_id, or two stretches a and b. ease_mm is ease wanted on purpose (a sleeve cap is often longer than its armhole); Vina does not guess it, the default is 0.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "seam_id": {
+            "description": "a seam id from read_pattern",
+            "type": "string"
+          },
+          "a": {
+            "type": "object",
+            "properties": {
+              "piece_id": {
+                "type": "string",
+                "description": "a piece id from read_pattern"
+              },
+              "edge": {
+                "type": "string",
+                "description": "an edge name from read_pattern"
+              },
+              "from": {
+                "default": 0,
+                "description": "start: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              },
+              "to": {
+                "default": 1,
+                "description": "end: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "piece_id",
+              "edge"
+            ]
+          },
+          "b": {
+            "type": "object",
+            "properties": {
+              "piece_id": {
+                "type": "string",
+                "description": "a piece id from read_pattern"
+              },
+              "edge": {
+                "type": "string",
+                "description": "an edge name from read_pattern"
+              },
+              "from": {
+                "default": 0,
+                "description": "start: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              },
+              "to": {
+                "default": 1,
+                "description": "end: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "piece_id",
+              "edge"
+            ]
+          },
+          "tolerance_mm": {
+            "description": "default 3",
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "ease_mm": {
+            "description": "ease wanted on purpose, B minus A, in mm; default 0",
+            "type": "number"
+          }
+        }
+      }
+    },
+    {
+      "name": "verify",
+      "description": "Check the garment with numbers measured now: walks every active seam over its sewn stretches, and finds open outlines and notches without a partner across their seam. A difference may be ease on purpose (a sleeve cap is often longer than its armhole): verify does not guess it; pass it per seam in ease_mm. A seam allowance of 0 is normal, not a problem.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "ease_mm": {
+            "description": "ease wanted on purpose per seam id, B minus A, in mm; default 0",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "fit_map",
+      "description": "How the simulated garment fits, piece by piece, measured now on the cloth: how much the fabric is stretched along the mesh (median and 95th percentile, in %), and the share of each piece's cloth, by length, that is tight or can't be worn (stretched past 80% or 100% of what its fabric takes before breaking). Mesh slivers under 1 mm are left out, and contact with the body is not measured. On WebGPU a garment that fits still reads a few percent (the simulation leaves some local stretch); on other tiers the numbers read high, and the result says so. Needs a simulation (simulate).",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "create_piece",
+      "description": "Create a piece: a rectangle from its width and height (x, y is its top-left corner; default: to the right of every piece), or a polygon from its corners in order. Pattern space, mm. The piece is born net (seam allowance 0) and its edges are detected. Returns its id, width, height, area and every edge measured.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "default \"Pieza N\"",
+            "type": "string",
+            "minLength": 1
+          },
+          "rectangle": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "height": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "width",
+              "height"
+            ]
+          },
+          "points": {
+            "description": "the corners in order, pattern space, mm",
+            "minItems": 3,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "x",
+                "y"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "edit_outline",
+      "description": "Change the outline of a piece, the way its handles and dimensions do in the editor. Modes: move_point (an outline point by its index from read_piece, to a point in pattern space); set_length (an edge made of one straight segment gets a new length, keeping its start and its direction); set_size (the width and/or height of the piece, scaling it). Returns the edges that changed, with their lengths before and after, and every seam that uses them, measured again.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "piece_id": {
+            "type": "string",
+            "description": "a piece id from read_pattern"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "move_point",
+              "set_length",
+              "set_size"
+            ]
+          },
+          "point_index": {
+            "description": "move_point: an outline point index from read_piece",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "to": {
+            "description": "move_point: where the point goes, pattern space, mm",
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          },
+          "edge": {
+            "description": "set_length: an edge name from read_pattern",
+            "type": "string"
+          },
+          "length": {
+            "description": "set_length: the new length, mm",
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "width": {
+            "description": "set_size: the new width, mm",
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "height": {
+            "description": "set_size: the new height, mm",
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "piece_id",
+          "mode"
+        ]
+      }
+    },
+    {
+      "name": "sew",
+      "description": "Sew two stretches together: a on one edge, b on another (they may be on the same piece). Each stretch runs along its own edge from `from` to `to`, given as fractions of the edge (0..1) or as points on it; default the whole edge. reversed: B is sewn from its end to its start, so the start of A meets the end of B. Returns both sewn lengths, the difference B minus A, and whether it walks within 3 mm (ease_mm: ease wanted on purpose, default 0).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "a": {
+            "type": "object",
+            "properties": {
+              "piece_id": {
+                "type": "string",
+                "description": "a piece id from read_pattern"
+              },
+              "edge": {
+                "type": "string",
+                "description": "an edge name from read_pattern"
+              },
+              "from": {
+                "default": 0,
+                "description": "start: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              },
+              "to": {
+                "default": 1,
+                "description": "end: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "piece_id",
+              "edge"
+            ]
+          },
+          "b": {
+            "type": "object",
+            "properties": {
+              "piece_id": {
+                "type": "string",
+                "description": "a piece id from read_pattern"
+              },
+              "edge": {
+                "type": "string",
+                "description": "an edge name from read_pattern"
+              },
+              "from": {
+                "default": 0,
+                "description": "start: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              },
+              "to": {
+                "default": 1,
+                "description": "end: a fraction of the edge (0..1), or a point on it in pattern space",
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "piece_id",
+              "edge"
+            ]
+          },
+          "reversed": {
+            "default": false,
+            "type": "boolean"
+          },
+          "ease_mm": {
+            "description": "ease wanted on purpose, B minus A, in mm; default 0",
+            "type": "number"
+          }
+        },
+        "required": [
+          "a",
+          "b"
+        ]
+      }
+    },
+    {
+      "name": "unsew",
+      "description": "Unsew a seam. Returns which seam went and the two stretches it joined, measured before.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "seam_id": {
+            "type": "string",
+            "description": "a seam id from read_pattern"
+          }
+        },
+        "required": [
+          "seam_id"
+        ]
+      }
+    },
+    {
+      "name": "notch",
+      "description": "Put a notch on an edge at a distance from its start (mm along the edge, as read_pattern measures notches; from_end counts from its end), or move an existing one with notch_id. pair: also put the corresponding notch across the seam that sews this point, at the same sewn distance, following the seam direction; refused if no seam sews this point. Returns where each notch landed, measured.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "piece_id": {
+            "type": "string",
+            "description": "a piece id from read_pattern"
+          },
+          "edge": {
+            "type": "string",
+            "description": "an edge name from read_pattern"
+          },
+          "distance": {
+            "type": "number",
+            "minimum": 0,
+            "description": "mm along the edge from its start"
+          },
+          "from_end": {
+            "default": false,
+            "type": "boolean"
+          },
+          "notch_id": {
+            "description": "move this notch instead of adding one",
+            "type": "string"
+          },
+          "pair": {
+            "default": false,
+            "type": "boolean"
+          },
+          "depth_mm": {
+            "description": "notch depth; default 8, or the moved notch's own",
+            "type": "number",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "piece_id",
+          "edge",
+          "distance"
+        ]
+      }
+    },
+    {
+      "name": "remove",
+      "description": "Remove a piece (with its seams), or one internal of it: a notch, dart, grainline or line, by internal_id from read_piece. The user sees a notice with Undo. Returns what was removed.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "piece_id": {
+            "type": "string",
+            "description": "a piece id from read_pattern"
+          },
+          "internal_id": {
+            "description": "remove only this internal of the piece",
+            "type": "string"
+          }
+        },
+        "required": [
+          "piece_id"
+        ]
+      }
+    },
+    {
+      "name": "undo",
+      "description": "Undo the last step of the history, only if an agent made it. If the last step was made by the user, nothing is undone: done is false and the warning says so. Returns which step was undone.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "classify",
+      "description": "Say what a piece is: its category and its side. Dressing reads them to place the piece on the body. If no seam, seam group, pleat, elastic or point of measure uses the piece yet, its edges are detected again and named for the category (armhole, sleeveCap, neckline...); otherwise they keep their names. Omit side for a piece with no side. Returns the category, the side, where the piece goes when dressed, and its edges, measured.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "piece_id": {
+            "type": "string",
+            "description": "a piece id from read_pattern"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "bodice",
+              "sleeve",
+              "collar",
+              "skirt",
+              "trouser",
+              "waistband",
+              "facing",
+              "lining",
+              "pocket",
+              "cuff",
+              "hood",
+              "yoke",
+              "other"
+            ]
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "front",
+              "back",
+              "left",
+              "right",
+              "center",
+              "both"
+            ]
+          }
+        },
+        "required": [
+          "piece_id",
+          "category"
+        ]
+      }
+    },
+    {
+      "name": "assign_fabric",
+      "description": "Give pieces a fabric from Vina's library; by default every active piece. The simulation drapes the whole garment with one fabric: when all the active pieces share one, the simulation uses it; when they differ, it keeps its own and the receipt says which. Returns the fabric of each piece and the fabric the simulation uses.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "fabric": {
+            "type": "string",
+            "enum": [
+              "cotton-poplin",
+              "cotton-broadcloth",
+              "muslin",
+              "cotton-voile",
+              "denim-12oz",
+              "stretch-denim",
+              "gabardine",
+              "cotton-twill",
+              "silk-charmeuse",
+              "duchess-satin",
+              "cotton-jersey",
+              "ponte-roma",
+              "rib-knit",
+              "lycra-spandex",
+              "athletic-mesh",
+              "scuba-knit",
+              "organza",
+              "chiffon",
+              "tulle",
+              "linen",
+              "wool-crepe",
+              "wool-flannel",
+              "canvas-12oz",
+              "ripstop-nylon",
+              "lambskin-leather",
+              "faux-leather",
+              "neoprene-3mm",
+              "felt",
+              "fleece",
+              "velvet",
+              "polyester-lining",
+              "fusible-interfacing-medium"
+            ]
+          },
+          "piece_ids": {
+            "description": "piece ids from read_pattern; default every active piece",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "fabric"
+        ]
+      }
+    },
+    {
+      "name": "dress",
+      "description": "Place the pieces on the avatar, in the 3D view (arrange mode; from 2D the view switches to Split), ready to simulate. It changes nothing in the pattern, and stops the simulation if it runs. Returns where each active piece goes and what decided it (its category and side, or its name), the pieces left out and why, and how many seams are active. A piece Vina cannot place drapes on the front torso: classify it.",
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "simulate",
+      "description": "Start or stop the cloth simulation on the avatar, in the 3D view (from 2D the view switches to Split). start drapes from the dressed pose; stop pauses it and the cloth stays where it is. With wait (default), it answers when the cloth settles, with the fit map, or after wait_seconds with done: false and why. The simulation runs in the user's browser and only advances while Vina is visible on screen.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "start",
+              "stop"
+            ]
+          },
+          "wait": {
+            "default": true,
+            "type": "boolean"
+          },
+          "wait_seconds": {
+            "default": 60,
+            "description": "how long to wait for the cloth to settle; default 60",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 110
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  ]
+}

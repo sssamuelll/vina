@@ -97,7 +97,6 @@ function createMockState(overrides: Partial<any> = {}): RootState {
       defaultSeamAllowanceWidth: 10,
       showGrainlines: true,
       showAnchorPoints: false,
-      snapToGrid: true,
       gridSize: 10,
       units: 'mm',
       ...overrides.editor,

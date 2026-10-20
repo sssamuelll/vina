@@ -13,6 +13,7 @@ import type { RootState } from '../../store';
 import { addTape, setPendingTape } from '../../store/avatarTapeSlice';
 import { deriveDimensions } from '../../utils/cloth/garmentPlacement';
 import { newId } from '../../utils/ids';
+import { medidasDelCuerpo } from '../../avatares/catalogo';
 
 // Tape colors cycling
 const TAPE_COLORS = ['#ff6b6b', '#4ecdc4', '#ffd93d', '#a29bfe', '#fd79a8', '#00b894'];
@@ -77,7 +78,7 @@ function getCircumferenceAtHeight(
 export function useAvatarTape(activeTool3D: string) {
   const dispatch = useDispatch();
   const pendingTape = useSelector((s: RootState) => s.avatarTape.pendingTape);
-  const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  const measurements = useSelector((s: RootState) => medidasDelCuerpo(s.project));
 
   const isTapeTool = activeTool3D === 'tape-circumference' || activeTool3D === 'tape-linear';
 

@@ -1,0 +1,27 @@
+/* La sección del 3D de la línea al pie (SeccionDel3D.tsx, spec 2026-10-02 § 5.3,
+   P5): la voz de la vista. Su caja (`.linea-al-pie__3d`) y cómo se reparte el
+   ancho con la sección del patrón están en layout.css. Vive en la línea al pie,
+   que es papel desde el 2026-10-11 (tinta del ámbito sobre --canvas-2d). El
+   estado de la simulación se mudó ese día al pie del margen del 3D
+   (EstadoDeLaSimulacion.css). */
+
+/* La voz: nombre, tecla y frase, en el orden de la sección del patrón. Es lo
+   PRIMERO que se recorta (spec § 5.3): `width: 0` hace que su ancho natural no
+   cuente para el tamaño de la sección (la sección mide sus márgenes y crece a lo
+   que sobra), y `flex: 1 1 0` le da todo lo que haya. Sin el `width: 0`, la voz
+   entera (311 px) sería el mínimo de la sección y le quitaría el ancho a la frase
+   del patrón.
+   Ceder es recortar de verdad: `overflow: hidden` en la voz. Sin él, su caja
+   medía 0 px pero el nombre (que no se encogía) se desbordaba y se pintaba encima
+   de lo que hubiera a su derecha, o fuera de la ventana (revisión final de P5, a
+   1366 px en Split con Piquete y la Plancha a vapor). Cede en este orden: primero
+   la frase (con puntos suspensivos), luego el nombre (también), y la tecla no. */
+.seccion-del-3d__voz { flex: 1 1 0; min-width: 0; width: 0; display: flex; align-items: center; column-gap: 12px; overflow: hidden; font-size: var(--text-sm); }
+.seccion-del-3d__quien { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.seccion-del-3d__nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); font-size: var(--text-ui); font-weight: var(--weight-semibold); white-space: nowrap; }
+.seccion-del-3d__tecla { flex: none; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-tertiary); }
+/* La frase cede primero: lo que no quepa se corta con puntos suspensivos y queda
+   entero en el título y en la región viva. Su `flex-shrink` enorme hace que el nombre
+   solo ceda cuando la frase ya no tiene nada que dar. */
+.seccion-del-3d__frase { flex: 1 1000 auto; min-width: 0; overflow: hidden; }
+.seccion-del-3d__texto { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); }

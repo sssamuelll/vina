@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import SubMenu from '../shared/SubMenu';
 import type { SubMenuItem } from '../shared/SubMenu';
 import { displayShortcut } from '../shell/shortcutDisplay';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 
 export interface ContextMenu3DState {
   visible: boolean;
@@ -100,16 +101,13 @@ export default function ContextMenu3D({
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onCloseRef.current();
     };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
     document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
+    return () => document.removeEventListener('mousedown', handleClick);
   }, [menu.visible]);
+
+  // Esc lo cierra antes que la barra de IA, un panel y la selección: un peldaño
+  // de la escalera de lo que se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('contextual-3d', 'menu', menu.visible, () => onCloseRef.current());
 
   const act = useCallback((fn: () => void) => {
     fn();
@@ -266,6 +264,7 @@ export default function ContextMenu3D({
       ref={ref}
       className="context-menu context-menu--scroll"
       data-superficie="menu"
+      data-material="papel"
       style={{ left: menu.x, top: menu.y }}
     >
       {menu.target === 'piece' && menu.pieceName && (

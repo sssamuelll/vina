@@ -125,8 +125,9 @@ test('escenario 5: Stop→Play deja dos corridas con generaciones distintas y la
   // La primera corrida eligió tier (su init puede seguir en vuelo).
   await expect.poll(() => solverTier(page), { timeout: 60_000 }).toBe('wasm');
   // Stop→Play en ticks distintos: en el mismo tick React batchea los dos
-  // dispatches y el efecto de la cascada solo vería el estado final.
-  await dispatch(page, 'simulation/pauseSimulation');
+  // dispatches y el efecto de la cascada solo vería el estado final. Stop es
+  // «Restablecer» (idle): pausar ya no suelta el solver ni abre otra corrida.
+  await dispatch(page, 'simulation/resetSimulation');
   await page.waitForTimeout(200);
   await dispatch(page, 'simulation/startSimulation');
   await waitForFrames(page);

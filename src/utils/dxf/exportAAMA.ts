@@ -1,5 +1,5 @@
 /**
- * AAMA/ASTM D6673 compliant DXF export.
+ * DXF export following the AAMA/ASTM D6673 layer conventions.
  * 
  * Features:
  * - Numbered AAMA layers: 1 (cut), 4 (notch), 7 (grainline), 8 (draw), 11 (intcut)
@@ -887,7 +887,7 @@ ENDSEC
 // ─── Public API ───
 
 /**
- * Generate an AAMA/ASTM D6673 compliant DXF string from pattern pieces.
+ * Generate a DXF string following the AAMA/ASTM D6673 layer conventions.
  *
  * Produces a complete DXF with HEADER, TABLES (layers + block records),
  * BLOCKS (one per piece with outline, internals, and label), and ENTITIES

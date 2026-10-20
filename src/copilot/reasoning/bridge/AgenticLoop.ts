@@ -126,6 +126,9 @@ function toRingRecord(
 
 // ─── AgenticLoop ─────────────────────────────────────────────────────────────
 
+/** Lo que queda en la conversación cuando María detiene al agente (spec 2026-10-02 § 6.2). */
+export const RESPUESTA_DETENIDA = 'Detenida. Lo que alcanzó a hacer sigue en el patrón.';
+
 export class AgenticLoop {
   private send: AgenticLoopOptions['send'];
   private metaTools: Map<string, MetaToolDefinition>;
@@ -144,6 +147,9 @@ export class AgenticLoop {
   // a fresh system prompt (with refreshed knowledge retrieval) can be prepended
   // each turn.
   private conversationHistory: ChatMessage[] = [];
+
+  /** «Detener»: el turno en curso no hace nada más. Lo mira `runInner`. */
+  private detenido = false;
 
   constructor(options: AgenticLoopOptions) {
     this.send = options.send;
@@ -171,6 +177,15 @@ export class AgenticLoop {
   }
 
   /**
+   * «Detener» (spec 2026-10-02 § 6.2). Es cooperativo: la respuesta que esté
+   * en camino se descarta al llegar y no se ejecuta otra herramienta. Lo que
+   * ya hizo se queda en el patrón.
+   */
+  detener(): void {
+    this.detenido = true;
+  }
+
+  /**
    * Read-only view of the current conversation history (for debugging /
    * tests). Does NOT include the system message.
    */
@@ -186,6 +201,7 @@ export class AgenticLoop {
    */
   async run(userRequest: string, onEvent: AgenticEventHandler): Promise<string> {
     this.lastToolCalls = [];
+    this.detenido = false;
 
     try {
       return await this.runInner(userRequest, onEvent);
@@ -210,6 +226,7 @@ export class AgenticLoop {
 
     while (true) {
       const response = await this.send(messages, allToolDefs, this.providerConfig);
+      if (this.detenido) return this.detenidaEnLaHistoria(messages);
 
       // ── presentToUser early-exit ────────────────────────────────────────
       // Under provider modes that enforce `toolCalls.minItems: 1` (the M2
@@ -487,7 +504,8 @@ export class AgenticLoop {
       }
 
       // Execute each tool call and append results
-      for (const toolCall of response.toolCalls) {
+      for (const [i, toolCall] of response.toolCalls.entries()) {
+        if (this.detenido) return this.detenidaEnLaHistoria(messages, response.toolCalls.slice(i));
         const timestamp = Date.now();
         const start = performance.now();
         let args: Record<string, unknown> = {};
@@ -564,6 +582,26 @@ export class AgenticLoop {
         });
       }
     }
+  }
+
+  /**
+   * Cierra el turno detenido en la historia: el pedido, lo que alcanzó a hacer
+   * y «Detenida». Sin esto, un «sigue» o un «deshazlo» llega al modelo sin
+   * saber qué se pidió ni qué se hizo, y puede volver a aplicarlo. Cada
+   * herramienta pedida y no ejecutada recibe su resultado: un tool_call sin
+   * respuesta hace que el proveedor rechace la historia entera.
+   */
+  private detenidaEnLaHistoria(messages: ChatMessage[], sinEjecutar: ProviderToolCall[] = []): string {
+    for (const tc of sinEjecutar) {
+      messages.push({
+        role: 'tool',
+        content: JSON.stringify({ success: false, error: 'Not run: the user pressed Stop before this tool ran.' }),
+        tool_call_id: tc.id,
+      });
+    }
+    messages.push({ role: 'assistant', content: RESPUESTA_DETENIDA });
+    this.conversationHistory = messages.slice(1);
+    return RESPUESTA_DETENIDA;
   }
 
   /**

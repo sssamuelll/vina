@@ -1,72 +1,65 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, MessageSquare, Settings, ArrowUp } from 'lucide-react';
-import { useDispatch } from 'react-redux';
+import { MessageSquare, Search, ArrowUp } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import type { RootState } from '../../store';
 import { showErrorToast } from '../../store/copilotUISlice';
+import { ocultarIA } from '../../store/iaSlice';
+import { enviar } from '../../copilot/conversacion';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, type PendingDXFAttachment } from './dxfImport';
 import UnifiedBarChat from './UnifiedBarChat';
-import { displayShortcut } from './shortcutDisplay';
 import UnifiedBarCommands from './UnifiedBarCommands';
-import AgentSettings from '../../copilot/AgentSettings';
-import InputSchemeSection from './InputSchemeSection';
 import { loadPosition, clampPosition, savePosition } from './barPosition';
-
-export type BarMode = 'chat' | 'commands' | 'settings';
 
 interface UnifiedBarProps {
   onOpenPanel: (name: string) => void;
 }
 
-const MODE_ICONS: Record<BarMode, typeof MessageSquare> = {
-  chat: MessageSquare,
-  commands: Search,
-  settings: Settings,
-};
-
-const MODE_LABELS: Record<BarMode, string> = {
-  chat: 'Modo chat',
-  commands: 'Modo comandos',
-  settings: 'Modo ajustes',
-};
-
-const MODE_PLACEHOLDERS: Record<BarMode, string> = {
-  chat: 'Diseña con la IA...',
-  commands: 'Escribe un comando...',
-  settings: 'Buscar en ajustes...',
-};
-
+/**
+ * La barra de IA convocada (spec 2026-10-02 «la interfaz en papel» § 6.2): una
+ * cápsula de papel de una línea, que solo existe abierta (la monta AppShell con
+ * `ia.abierta`). Un solo modo: escribir es conversación; `Ctrl+K`, o «/» al
+ * empezar, son comandos. La conversación y el agente viven en el store, así
+ * que ocultarla no los pierde.
+ */
 export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
-  const [mode, setMode] = useState<BarMode>('chat');
+  const dispatch = useDispatch();
+  const { modoDeApertura, aperturas, mensajes, trabajando } = useSelector((s: RootState) => s.ia);
+  const [comandos, setComandos] = useState(modoDeApertura === 'comandos');
   const [input, setInput] = useState('');
-  const [panelOpen, setPanelOpen] = useState(false);
-  // Submit nonce — incremented only when the user actually presses Enter or
-  // clicks Send in chat mode. UnifiedBarChat watches this counter (NOT the
-  // raw `input` prop) to decide when to fire a chat send. Pre-2026-05-28
-  // UnifiedBarChat watched `input` directly, which meant every keystroke
-  // arriving from `setInput(e.target.value)` was interpreted as a submit —
-  // typing "hola" sent four separate messages "h", "o", "l", "a". Switching
-  // to a nonce decouples per-keystroke input updates from submit intent.
-  const [submitNonce, setSubmitNonce] = useState(0);
   const [position, setPosition] = useState(loadPosition);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const barRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
-  const dispatch = useDispatch();
 
-  // ─── DXF chat attachment (Claude-style: drop → attach → send with text) ──
+  // Cada apertura —«IA», Ctrl+/, Ctrl+K, la pantalla vacía— pone el foco en el
+  // campo; un Ctrl+K con la barra ya abierta pasa a comandos.
+  useEffect(() => {
+    setComandos(modoDeApertura === 'comandos');
+    inputRef.current?.focus();
+  }, [aperturas, modoDeApertura]);
+
+  // Esc (spec § 6.2): con texto, lo borra; con el campo vacío, la oculta. La
+  // conversación y el agente siguen. Un peldaño por delante del panel y de la
+  // selección.
+  usePeldanoDeEscape('ia', 'ia', true, () => {
+    if (inputRef.current?.value) { setInput(''); return; }
+    dispatch(ocultarIA());
+  });
+
+  // ─── DXF adjunto (soltar → adjuntar → enviar con texto) ──────────
   const [pendingDXF, setPendingDXF] = useState<PendingDXFAttachment | null>(null);
   const [dxfDragActive, setDxfDragActive] = useState(false);
   const dxfDragCounter = useRef(0);
 
-  // Parse on attach (validates + counts pieces, surfaces bad files early).
-  // Does NOT import — pieces land in Redux only when the message is sent.
+  // Se lee al adjuntar (valida y cuenta las piezas, avisa pronto de un archivo
+  // malo). NO importa: las piezas llegan al proyecto solo al enviar.
   const attachDXF = useCallback(async (file: File) => {
     try {
       const { name, result } = await readAndParseDXFFile(file, { unit: 'auto', autoDetect: true });
       setPendingDXF({ name, pieces: result.pieces });
-      setMode('chat');
-      setPanelOpen(true);
+      setComandos(false);
     } catch (err) {
       dispatch(showErrorToast(dxfErrorMessage(err)));
     }
@@ -111,7 +104,7 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
     // Don't drag from input, buttons, or panel
     const target = e.target as HTMLElement;
     if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'SELECT'
-      || target.closest('.unified-bar__input-wrap') || target.closest('.unified-bar__mode-btn')
+      || target.closest('.unified-bar__input-wrap') || target.closest('.unified-bar__esc')
       || target.closest('.unified-bar__send') || target.closest('.unified-bar__panel')) {
       return;
     }
@@ -150,64 +143,29 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
     };
   }, [isDragging]);
 
-  // ─── Keyboard shortcuts ────────────────────────────────────────
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setMode('commands');
-        setPanelOpen(true);
-        setTimeout(() => inputRef.current?.focus(), 50);
-      }
-      if (e.key === 'Escape') {
-        setPanelOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  // The 2D empty-state's "describe it to the AI" hint dispatches this; switch to
-  // chat mode and focus the prompt input.
-  useEffect(() => {
-    const handler = () => {
-      setMode('chat');
-      setPanelOpen(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
-    };
-    window.addEventListener('vina:focusChat', handler);
-    return () => window.removeEventListener('vina:focusChat', handler);
-  }, []);
-
-  const handleInputFocus = useCallback(() => {
-    if (mode === 'commands' || mode === 'settings') {
-      setPanelOpen(true);
-    }
-  }, [mode]);
-
   const handleSubmit = useCallback(() => {
-    // An attached DXF can be sent on its own (no text required).
-    if (!input.trim() && !pendingDXF) return;
-    if (mode === 'chat') {
-      setPanelOpen(true);
-      // Signal the chat panel that THIS specific input value should be sent.
-      // The nonce changes only on intentional submit (Enter / Send button),
-      // never on per-keystroke setInput updates from onChange.
-      setSubmitNonce((n) => n + 1);
-    }
-  }, [input, mode, pendingDXF]);
+    // Con la IA trabajando, lo escrito y el DXF se quedan donde están: se
+    // envían cuando termine el turno, no se pierden.
+    if (comandos || trabajando || (!input.trim() && !pendingDXF)) return;
+    const adjunto = pendingDXF;
+    setInput('');
+    setPendingDXF(null);
+    void enviar(input, adjunto);
+  }, [comandos, trabajando, input, pendingDXF]);
 
+  const conPanel = comandos || mensajes.length > 0 || trabajando || pendingDXF !== null;
+  const Icono = comandos ? Search : MessageSquare;
   const barClasses = [
     'unified-bar',
-    panelOpen ? 'unified-bar--panel-open' : '',
+    conPanel ? 'unified-bar--panel-open' : '',
     isDragging ? 'unified-bar--dragging' : 'unified-bar--draggable',
   ].filter(Boolean).join(' ');
 
   return (
     <div
-      ref={barRef}
       className={barClasses}
       data-superficie="barra"
+      data-material="papel"
       style={{ left: position.x, top: position.y }}
       onMouseDown={handleMouseDown}
       onDragEnter={handleDxfDragEnter}
@@ -238,77 +196,46 @@ export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps) {
         </div>
       )}
 
-      {/* Mode toggle */}
-      <div className="unified-bar__modes">
-        {(Object.keys(MODE_ICONS) as BarMode[]).map(m => {
-          const Icon = MODE_ICONS[m];
-          return (
-            <button
-              key={m}
-              className={`unified-bar__mode-btn ${mode === m ? 'unified-bar__mode-btn--active' : ''}`}
-              onClick={() => { setMode(m); setPanelOpen(m !== 'chat'); inputRef.current?.focus(); }}
-              aria-label={MODE_LABELS[m]}
-            >
-              <Icon size={16} />
-            </button>
-          );
-        })}
-      </div>
+      <Icono size={16} className="unified-bar__icono" aria-hidden="true" />
 
-      {/* Input */}
       <div className="unified-bar__input-wrap">
         <input
           ref={inputRef}
           className="unified-bar__input"
+          aria-label={comandos ? 'Buscar un comando' : 'Pedirle algo a la IA'}
           value={input}
-          onChange={e => { setInput(e.target.value); if (mode === 'commands') setPanelOpen(true); }}
-          onFocus={handleInputFocus}
-          onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
-          placeholder={MODE_PLACEHOLDERS[mode]}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (!comandos && input === '' && v.startsWith('/')) { setComandos(true); setInput(v.slice(1)); return; }
+            setInput(v);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSubmit();
+            if (e.key === 'Backspace' && comandos && input === '') setComandos(false);
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setComandos(true); }
+          }}
+          placeholder={comandos ? 'Escribe un comando' : 'Pide algo o pregunta'}
         />
-        {mode === 'commands' && <span className="unified-bar__shortcut">{displayShortcut('⌘K')}</span>}
       </div>
 
-      {/* Send button (chat mode) */}
-      {mode === 'chat' && (
-        <button className="unified-bar__send" aria-label="Enviar" onClick={handleSubmit} disabled={!input.trim() && !pendingDXF}>
-          <ArrowUp size={18} />
+      {!comandos && (input.trim() || pendingDXF) ? (
+        <button className="unified-bar__send" aria-label="Enviar" disabled={trabajando} onClick={handleSubmit}>
+          <ArrowUp size={16} />
         </button>
+      ) : (
+        <kbd className="unified-bar__esc" aria-hidden="true">Esc</kbd>
       )}
 
-      {/* Expanding panel */}
-      {panelOpen && (
+      {conPanel && (
         <div className="unified-bar__panel" data-superficie="paleta" onClick={e => e.stopPropagation()}>
-          {mode === 'chat' && (
-            <UnifiedBarChat
-              input={input}
-              setInput={setInput}
-              submitNonce={submitNonce}
-              pendingDXF={pendingDXF}
-              clearAttachment={() => setPendingDXF(null)}
-            />
-          )}
-          {mode === 'commands' && (
+          {comandos ? (
             <UnifiedBarCommands
               query={input}
-              onExecute={() => { setPanelOpen(false); setInput(''); }}
+              onExecute={() => { setInput(''); dispatch(ocultarIA()); }}
               onOpenPanel={onOpenPanel}
             />
-          )}
-          {mode === 'settings' && (
-            <>
-              <InputSchemeSection />
-              <AgentSettings
-                onClose={() => setPanelOpen(false)}
-                onSave={() => {
-                  // `vina:provider-config-changed` is fired by `ConnectionsList`
-                  // on every connection mutation directly — this onSave callback
-                  // is here only for preference changes (teaching mode, language,
-                  // budget) and panel close after Save preferences.
-                  window.dispatchEvent(new CustomEvent('vina:provider-config-changed'));
-                }}
-              />
-            </>
+          ) : (
+            <UnifiedBarChat pendingDXF={pendingDXF} clearAttachment={() => setPendingDXF(null)} />
           )}
         </div>
       )}

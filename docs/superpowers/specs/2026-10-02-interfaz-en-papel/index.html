@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La interfaz en papel</title>
+<style>
+  :root { --tinta: #292621; --suave: #59554e; --papel: #faf4e3; --pelo: rgba(40, 36, 30, 0.14); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--papel); color: var(--tinta); font: 16px/1.55 Inter, system-ui, 'Segoe UI', sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 40px 24px 96px; }
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 12px; }
+  h2 { font-size: 21px; font-weight: 600; margin: 72px 0 8px; }
+  p { margin: 0 0 12px; max-width: 72ch; }
+  .nota { color: var(--suave); font-size: 14px; }
+  .rotulo { display: inline-block; margin: 22px 0 0; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; color: var(--suave); }
+  .marco { margin-top: 8px; border: 1px solid var(--pelo); border-radius: 8px; background: #fff; }
+  .marco img { display: block; width: 100%; height: auto; border-radius: 7px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>La interfaz en papel</h1>
+  <p>Así queda Vina con lo decidido el 2 de octubre de 2026: la hoja es papel, y la barra de arriba, la línea al pie y los paneles van en oscuro. Son capturas de producción con el patrón de María (1366 × 768), retocadas dentro del navegador. El documento que lo explica es <code>../2026-10-02-interfaz-en-papel-design.md</code>.</p>
+
+  <h2>Hoy, para comparar</h2>
+  <span class="rotulo">Solo el patrón</span>
+  <div class="marco"><img src="00-hoy-2d.png" alt="Vina hoy, vista 2D"></div>
+  <span class="rotulo">Patrón y prenda (así arranca)</span>
+  <div class="marco"><img src="00-hoy-split.png" alt="Vina hoy, vista Split"></div>
+
+  <h2>1 · En reposo</h2>
+  <p>La barra de arriba y la línea al pie, en oscuro. Las herramientas, en el margen de la hoja. La línea al pie dice siempre qué herramienta está activa y cuál es su tecla.</p>
+  <div class="marco"><img src="01-reposo-2d.png" alt="Reposo con patrón: barra superior y línea al pie oscuras, hoja de papel"></div>
+
+  <h2>2 · Con una pieza seleccionada</h2>
+  <p>Una medida a la vez, que se escribe ahí mismo; Tab pasa a la siguiente. Y cuatro acciones.</p>
+  <div class="marco"><img src="02-pieza-seleccionada.png" alt="Pieza seleccionada con una medida y cuatro acciones"></div>
+
+  <h2>3 · El piquete, antes de ponerlo</h2>
+  <p>La forma, la cantidad, la profundidad y el ancho están en la línea al pie, a un clic, antes de tocar el patrón.</p>
+  <div class="marco"><img src="03-piquete-opciones-al-pie.png" alt="Piquete con sus opciones en la línea al pie"></div>
+  <span class="rotulo">De cerca</span>
+  <div class="marco"><img src="03-de-cerca.png" alt="La línea al pie del piquete, ampliada"></div>
+
+  <h2>4 · El piquete, después del clic</h2>
+  <p>La distancia se escribe sobre el borde, y el piquete se mueve con cada tecla. Al lado dice cuánto mide el borde, y un círculo marca desde qué esquina se cuenta.</p>
+  <div class="marco"><img src="04-piquete-cota-en-el-borde.png" alt="Piquete recién puesto con su distancia escribible"></div>
+  <span class="rotulo">De cerca</span>
+  <div class="marco"><img src="04-de-cerca.png" alt="La distancia del piquete, ampliada"></div>
+
+  <h2>5 · Patrón y prenda</h2>
+  <p>Lo que se ve del patrón, arriba a la izquierda; lo que se ve de la prenda, arriba a la derecha. La línea al pie va de lado a lado: primero la herramienta del patrón, después la vista 3D.</p>
+  <div class="marco"><img src="05-split.png" alt="Vista Split"></div>
+
+  <h2>6 · Solo la prenda</h2>
+  <div class="marco"><img src="06-3d.png" alt="Vista 3D"></div>
+  <p class="nota" style="margin-top:12px">En la app real el avatar conserva una sombra suave bajo los pies. La maqueta no pudo dejarla sin el piso gris.</p>
+
+  <h2>7 · La pantalla vacía</h2>
+  <div class="marco"><img src="07-pantalla-vacia.png" alt="Pantalla vacía"></div>
+
+  <h2>8 · Un panel, cuando se pide</h2>
+  <p>A la derecha, pegado al borde y en oscuro. Cuatro campos; lo demás, plegado en «Producción». Al abrirse, las herramientas y el patrón se quedan donde estaban: lo que cae debajo del panel queda tapado.</p>
+  <div class="marco"><img src="08-panel-a-peticion.png" alt="Panel Propiedades oscuro, a la derecha"></div>
+
+  <h2>9 · La IA, cuando se llama</h2>
+  <p>Una línea y un solo modo. Esc la cierra. Lo que flota sobre el papel es claro: esta barra, la barrita de la pieza, los menús.</p>
+  <div class="marco"><img src="09-ia-convocada.png" alt="Barra de IA convocada"></div>
+
+  <h2>10 · La pantalla de María</h2>
+  <p>1366 × 643, con patrón y prenda a la vez, y el piquete activo. Caben las cuatro opciones.</p>
+  <div class="marco"><img src="13-pantalla-de-maria-split.png" alt="La pantalla de María, 1366 por 643, en Split"></div>
+
+  <h2>11 · El modo oscuro</h2>
+  <p>Cambia la hoja, que pasa a gris neutro; el marco es el mismo. Las piezas siguen blancas. El claro es el de fábrica; el oscuro se escoge.</p>
+  <span class="rotulo">En reposo</span>
+  <div class="marco"><img src="10-oscuro-reposo-2d.png" alt="Modo oscuro en reposo"></div>
+  <span class="rotulo">Con una pieza seleccionada</span>
+  <div class="marco"><img src="11-oscuro-pieza-seleccionada.png" alt="Modo oscuro con una pieza seleccionada"></div>
+  <span class="rotulo">Patrón y prenda</span>
+  <div class="marco"><img src="12-oscuro-split.png" alt="Modo oscuro en Split"></div>
+</main>
+</body>
+</html>

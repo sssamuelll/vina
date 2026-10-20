@@ -13,6 +13,11 @@ import { DEFAULT_SHORTCUTS } from './defaults';
 import { ShortcutContext } from './ShortcutContext';
 import { pushJournal } from '../utils/telemetry/journal';
 import { hayModalDelante } from '../utils/superficieModal';
+import { esTeclaDeBotonera } from './teclaDeBotonera';
+import { bajarLaEscalera } from './escaleraDeLoLlamado';
+
+/** Ctrl+/ y Ctrl+K no escriben: llaman a la IA también desde un campo (spec 2026-10-02 § 6.2). */
+const LLAMAN_A_LA_IA = new Set(['copilot.focusChat', 'app.commandPalette']);
 
 /** Determine which panel has focus based on the active element */
 function getActiveContext(): ShortcutCtx[] {
@@ -63,8 +68,18 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
           e.target instanceof HTMLTextAreaElement ||
           e.target instanceof HTMLSelectElement
         ) {
-          return;
+          // Menos Ctrl+/ y Ctrl+K, que llaman a la IA: desde un campo de la
+          // línea al pie no abrían la barra, y Chrome se llevaba Ctrl+K a su
+          // barra de direcciones. Un campo que ya atendió la tecla (la propia
+          // barra) se la queda.
+          const id = e.defaultPrevented ? null : registryRef.current.matchEvent(e, ['global']);
+          if (!id || !LLAMAN_A_LA_IA.has(id)) return;
         }
+
+        // Y Enter y Espacio sobre un botón de la línea al pie, que son su
+        // pulsación: Espacio no es la simulación con el foco en una
+        // alternativa.
+        if (esTeclaDeBotonera(e)) return;
 
         // Y un modal tapa MAS que un campo, no menos (#1173). `edit.delete`
         // es de contexto `global`, asi que sin esto Supr se llevaba la pieza
@@ -73,10 +88,10 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
         //
         // El detector es el del estandar y no una marca nuestra: `aria-modal`
         // dice exactamente «esto bloquea lo de atras». Y deja fuera, a
-        // proposito, a los dialogos NO modales, que es justo lo que hay que
-        // dejar fuera: `NotchPrecisionModal` es `role="dialog"` SIN velo, se
-        // abre junto a la pieza y el lienzo sigue vivo detras. Un detector
-        // por `role` lo habria apagado con los demas.
+        // proposito, lo que no es modal, que es justo lo que hay que dejar
+        // fuera: la cota del piquete (P3b) vive sobre el borde, junto a la
+        // pieza, y el lienzo sigue vivo detras. Un detector por `role` o por
+        // «hay algo abierto» la habria apagado con los demas.
         if (hayModalDelante()) {
           // Retirarse no es soltarle la tecla al NAVEGADOR: sin esto, Ctrl+R
           // detrás de un diálogo destructivo recarga la app entera y Ctrl+A
@@ -90,6 +105,19 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
           if ((e.ctrlKey || e.metaKey) && registryRef.current.matchEvent(e, getActiveContext())) {
             e.preventDefault();
           }
+          return;
+        }
+      }
+
+      // Lo que se llama se cierra antes que la selección (spec 2026-10-02
+      // § 6.2): un menú, la barra de IA, un panel. Un Escape, un peldaño. Un
+      // modal delante se queda su Escape.
+      if (e.key === 'Escape' && !hayModalDelante()) {
+        const peldano = bajarLaEscalera();
+        if (peldano) {
+          pushJournal('shortcut', 'escape', { peldano });
+          e.preventDefault();
+          e.stopPropagation();
           return;
         }
       }

@@ -10,8 +10,8 @@
  * Misma escena que el runner CPU (cusickGate.cpu.test.ts): disco de 30 cm
  * (seed 42) a y=0.855 sobre pedestal rígido de 18 cm (topY=0.85), 300 frames
  * = 5 s de sim, substeps 15, dt 1/60. La física es la del tier GPU REAL:
- * initMultiPieceTsl con el fabricCompliance de producción
- * (useSimulationLifecycle.ts:521-538) y el dispatch de GarmentSimulation.tsx
+ * initMultiPieceTsl con el fabricCompliance de producción (`complianceDeTela`,
+ * el de la rama WebGPU de la cascada) y el dispatch de GarmentSimulation.tsx
  * (~:493-587) espejado MINIMAL — incluye self-collision (always-on en GPU,
  * #897 F3) y strain-limit (#gummy STEP 4), que el runner CPU no tiene: por
  * eso este gate lleva SU PROPIO baseline. Excluidos: tether (el harness nunca
@@ -27,17 +27,16 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { WebGPURenderer, MeshStandardNodeMaterial } from 'three/webgpu';
-// Same type-only deep import as GarmentSimulation.tsx — the per-substep batch
-// list is typed against the solver's node fields.
-import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
+import { nodosDelSubpaso } from '../Viewport3D/nodosDelSubpaso';
 import { buildCusickDiscMesh, buildCusickPedestal } from '../../utils/cloth/cusickScene';
 import {
   extractOrderedBoundaryLoop,
   computeDrapeCoefficient,
   countFolds,
 } from '../../utils/cloth/cusickMetric';
-import { getPhysicalFabric, toXPBDParams } from '../../utils/cloth/physicalFabric';
+import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
+import { complianceDeTela } from '../../utils/cloth/complianceDeTela';
 
 // Constantes de escena — MISMOS valores que cusickGate.cpu.test.ts.
 const PEDESTAL_TOP_Y = 0.85;
@@ -118,7 +117,6 @@ function CusickScene({ fabricId }: { fabricId: string }) {
       try {
         const pf = getPhysicalFabric(fabricId);
         if (!pf) throw new Error(`cusick harness: fabric '${fabricId}' not in library`);
-        const xpbd = toXPBDParams(pf);
 
         // Device propio como en useSimulationLifecycle (los kernels TSL corren
         // en el device del RENDERER; este es el señuelo de init — #901).
@@ -129,20 +127,13 @@ function CusickScene({ fabricId }: { fabricId: string }) {
         if (cancelled) return;
 
         client = new GpuSolverClient(device);
-        // fabricCompliance — espejo campo a campo de useSimulationLifecycle.ts:521-538
+        // fabricCompliance: la misma función que la rama WebGPU de la cascada
         // (stretch RIGID 0.0, shear 0.001, bend + density de la tela).
         await client.initMultiPieceTsl(
           [{ pieceId: 'cusick-disc', vertices: scene.mesh.vertices, triIds: scene.mesh.triIds, uvs: scene.mesh.uvs }],
           [], // sin seams
           { internalDamping: pf.internalDamping }, // substeps 15 / dt 1/60 / gravedad -9.81 = defaults del cliente
-          {
-            stretchComplianceWarp: 0.0,
-            stretchComplianceWeft: 0.0,
-            shearCompliance: 0.001,
-            bendComplianceWarp: xpbd.bendComplianceWarp,
-            bendComplianceWeft: xpbd.bendComplianceWeft,
-            density: xpbd.density,
-          },
+          complianceDeTela(fabricId),
         );
         if (cancelled) return;
 
@@ -215,25 +206,13 @@ function CusickScene({ fabricId }: { fabricId: string }) {
       return; // pose congelada post-gate — Samuel puede orbitar e inspeccionar
     }
 
-    // Espejo MINIMAL del dispatch TSL de GarmentSimulation.tsx (~:493-587),
-    // MISMO ORDEN de producción. Incluidos: self-collision (always-on GPU) y
-    // strain-limit. Excluidos: wind (windForce=0 → no-op), seams (no hay),
-    // tether (B1: el gate mide el drape que el tether congelaría), face-poke
-    // (avatar-only: se construye solo para el body '__avatar__'), brush/grab.
-    const substepNodes: ComputeNode[] = [solver.preSolve];
-    substepNodes.push(...solver.stretchColors);
-    substepNodes.push(...solver.bendColors);
-    if (solver.selfCollisionNodes) {
-      const sc = solver.selfCollisionNodes;
-      substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
-    }
-      // strainLimit: fusionado dentro del stretch (2026-07-02) — implícito.
-    substepNodes.push(solver.groundClamp);
-    substepNodes.push(solver.snapshotPreCollision);
-    for (const body of solver.collisionBodies) {
-      substepNodes.push(body.findBestNode, body.applyPushNode);
-    }
-    substepNodes.push(solver.postSolve);
+    // La MISMA lista de producción (`nodosDelSubpaso.ts`, la que usa
+    // GarmentSimulation), para que el gate mida lo que Samuel ve: antes era una
+    // copia a mano y no corría los repasos del estiramiento (revisión IA 1b-2).
+    // Sin tether (B1: el gate mide el drape que el tether congelaría), sin
+    // grab y sin face-poke (avatar-only); wind con fuerza 0 no empuja, y no hay
+    // costuras.
+    const substepNodes = nodosDelSubpaso(solver, { tether: false, grab: false, facePoke: false });
 
     for (let s = 0; s < SUBSTEPS; s++) {
       renderer.compute(substepNodes);

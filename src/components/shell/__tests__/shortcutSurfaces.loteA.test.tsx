@@ -18,13 +18,13 @@ const LINE_TOOL = {
   icon: Minus,
   label: 'Línea',
   shortcut: '⇧L',
+  grupo: 'dibujar' as const,
 };
 
 describe('notación de atajos en las superficies del dock', () => {
   it('normaliza el aria-label del dock', () => {
     render(
       <Dock
-        domainLabel="2D"
         tools={[LINE_TOOL]}
         activeToolId="line"
         onSelectTool={() => {}}
@@ -35,17 +35,19 @@ describe('notación de atajos en las superficies del dock', () => {
   });
 
   it('normaliza la columna de teclas del personalizador', () => {
-    const { container } = render(
+    render(
       <DockToolPicker
         catalog={[LINE_TOOL]}
         selectedIds={['line']}
         onAdd={() => {}}
         onRemove={() => {}}
         onReset={() => {}}
+        ancla={{ left: 0, bottom: 0 }}
       />,
     );
 
-    expect(container.querySelector('.dock-picker__kbd')?.textContent).toBe('Shift+L');
+    // El personalizador cuelga de <body>, no del contenedor del render.
+    expect(document.body.querySelector('.dock-picker__kbd')?.textContent).toBe('Shift+L');
   });
 
   it('normaliza el chip del tooltip', () => {

@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { toolRegistry } from '../index';
 import { TRIM_LIBRARY } from '../../utils/trim/trimLibrary';
 
@@ -56,26 +58,16 @@ const ESPERADO: Record<string, Record<string, string[]>> = {
     showAngle: ['Mostrar el ángulo'],
     cumulative: ['Distancia acumulada'],
   },
-  // #1110 (María audio 30-08): `stitchLength` era decorativo — ningún
-  // consumidor de `toolOptions.seam` lo lee (ni 2D, ni 3D, ni WASM), y
-  // `Seam` ni siquiera tiene el campo. Se quitó en vez de mudarlo a un
-  // sitio "por decidir" — ver docs/reports (#1110).
-  seam: {
-    seamType: ['Tipo de costura', 'Normal', 'Francesa', 'Flat-felled', 'Overlock'],
-  },
+  // Coser ya no declara opciones (P3c): `stitchLength` se fue con #1110 por
+  // decorativo, y «Tipo de costura» salió del pie a la etiqueta de la costura
+  // (spec 2026-10-02 § 5.3). Lo fija el test «Coser no declara opciones».
+  // En la línea al pie el nombre de la herramienta está al lado: «Forma» basta.
+  // La cantidad se lee «1 2 3» (spec 2026-10-02 § 5.3), y el ancho gana su sitio.
   notch: {
-    shape: [
-      'Forma del piquete',
-      'Recta',
-      'En T',
-      'V hacia adentro',
-      'V hacia afuera',
-      'En U',
-      'Almena',
-      'Rombo',
-    ],
+    shape: ['Forma', 'Recta', 'En T', 'V hacia adentro', 'V hacia afuera', 'En U', 'Almena', 'Rombo'],
+    count: ['Cantidad', '1', '2', '3'],
     length: ['Profundidad (mm)'],
-    count: ['Cantidad', 'Uno', 'Dos', 'Tres'],
+    width: ['Ancho (mm)'],
   },
 
   // ── Las que se alcanzan por atajo ───────────────────────────────────────
@@ -201,6 +193,29 @@ describe('idioma de las opciones de herramienta', () => {
     });
   }
 
+  it('Coser no declara opciones: el tipo de costura vive en su etiqueta (P3c)', () => {
+    // «Tipo de costura» fuera del gesto de coser (María 30-08 [22:47]): la
+    // costura nace Normal y su tipo se cambia con ella elegida.
+    expect(toolRegistry.getTool('seam')!.options ?? []).toEqual([]);
+  });
+
+  it('nadie lee la opción que Coser ya no declara, ni en 2D ni en 3D', () => {
+    // `Sew3DTool` la leía y ningún test lo monta (lente B, M15): sin esto, un
+    // `toolOptions.seam.seamType` que vuelva pasaría en verde y leería un
+    // valor que nada escribe.
+    const raiz = join(process.cwd(), 'src');
+    const lectores = (readdirSync(raiz, { recursive: true }) as string[])
+      .filter((f) => /\.(ts|tsx)$/.test(f) && !/__tests__/.test(f))
+      .filter((f) => /toolOptions\??\.seam\??\./.test(readFileSync(join(raiz, f), 'utf8')));
+    expect(lectores).toEqual([]);
+  });
+
+  it('Tijeras conserva su tipo de costura, con los nombres de siempre (spec § 5.3)', () => {
+    const opcion = toolRegistry.getTool('scissors')!.options!.find((o) => o.id === 'seamType')!;
+    expect([opcion.label, ...opcion.choices!.map((c) => c.label)])
+      .toEqual(['Tipo de costura', 'Normal', 'Francesa', 'Flat-felled', 'Overlock']);
+  });
+
   it('la pluma no declara opciones que no lee', () => {
     // smoothing / snapGrid / constrainAngles se pintaban y usePenTool nunca las
     // leía (§ 2 del spec 2026-08-29): se borran en vez de implementarse.
@@ -237,7 +252,7 @@ describe('idioma de las opciones de herramienta', () => {
       toolRegistry.getTool('point')!.options![0].choices!.map((c) => c.value),
     ).toEqual(['point', 'curvePoints', 'bezier']);
     expect(
-      toolRegistry.getTool('seam')!.options![0].choices!.map((c) => c.value),
+      toolRegistry.getTool('scissors')!.options!.find((o) => o.id === 'seamType')!.choices!.map((c) => c.value),
     ).toEqual(['standard', 'french', 'flat-felled', 'overlock']);
   });
 });

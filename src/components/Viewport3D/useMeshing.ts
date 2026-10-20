@@ -26,6 +26,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece } from '../../types/types';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
+import { mallasDePiezas } from './mallasDePiezas';
 import { classifyEdit } from '../../utils/cloth/editClassifier';
 import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
 import { setParticleCount, setIsWarmStarting } from '../../store/simulationSlice';
@@ -78,9 +79,17 @@ export function useMeshing({
   const [pieceMeshes, setPieceMeshes] = useState<MeshedPiece[]>([]);
   const prevPiecesRef = useRef<PatternPiece[]>([]);
   const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // El estado de la simulación se LEE, no se escucha: pasar de correr a pausa
+  // no es editar el patrón. Como dependencia, ese paso cancelaba un mallado en
+  // vuelo (y al volver se daba por «edición de cotas»: la simulación se quedaba
+  // sin mallas) y disparaba el arranque en caliente, que volvía a mallar todo y
+  // entregaba mallas nuevas: la cascada volvía a vestir desde cero (2026-10-11).
+  const simulationStateRef = useRef(simulationState);
+  simulationStateRef.current = simulationState;
 
   // Full async meshing (topology changes or initial mesh)
   useEffect(() => {
+    const simulationState = simulationStateRef.current;
     // Skip re-meshing for dimension-only edits when solver is active
     if (prevPiecesRef.current.length > 0 && (simulationState === 'running' || simulationState === 'paused')) {
       const editType = classifyEdit(prevPiecesRef.current, pieces);
@@ -114,15 +123,7 @@ export function useMeshing({
         }
       }
 
-      const result = meshed.map(m => {
-        const piece = pieces.find(p => p.id === m.pieceId);
-        return {
-          ...m,
-          outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
-          edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
-          meshMaxEdgeLength: pieceParticleDistances[m.pieceId] ?? globalParticleDistance,
-        };
-      });
+      const result = mallasDePiezas(meshed, pieces, pieceParticleDistances, globalParticleDistance);
 
       setPieceMeshes(result);
       const totalParticles = result.reduce((sum, p) => sum + p.vertices.length / 3, 0);
@@ -137,7 +138,7 @@ export function useMeshing({
       cancelled = true;
       client.dispose();
     };
-  }, [pieces, globalParticleDistance, pieceParticleDistances, simulationState, dispatch]);
+  }, [pieces, globalParticleDistance, pieceParticleDistances, dispatch]);
 
   // Warm-start on dimension-only edits
   useEffect(() => {
@@ -145,6 +146,11 @@ export function useMeshing({
     prevPiecesRef.current = pieces;
 
     if (prevPieces.length === 0) return;
+    // Las mismas piezas no son una edición: `classifyEdit` de dos listas
+    // iguales dice 'dimension', y un cambio de densidad ya lo malla el efecto
+    // de arriba.
+    if (prevPieces === pieces) return;
+    const simulationState = simulationStateRef.current;
     if (simulationState !== 'running' && simulationState !== 'paused') return;
 
     const editType = classifyEdit(prevPieces, pieces);
@@ -184,15 +190,7 @@ export function useMeshing({
           }
 
           // Update pieceMeshes for static rendering
-          setPieceMeshes(meshed.map(m => {
-            const piece = pieces.find(p => p.id === m.pieceId);
-            return {
-              ...m,
-              outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
-              edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
-              meshMaxEdgeLength: pieceParticleDistances[m.pieceId] ?? globalParticleDistance,
-            };
-          }));
+          setPieceMeshes(mallasDePiezas(meshed, pieces, pieceParticleDistances, globalParticleDistance));
 
           dispatch(setIsWarmStarting(false));
         })
@@ -211,7 +209,7 @@ export function useMeshing({
     };
     // clientsRef and stretchingIdsRef are stable refs — no need in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pieces, simulationState, pieceParticleDistances, globalParticleDistance, dispatch]);
+  }, [pieces, pieceParticleDistances, globalParticleDistance, dispatch]);
 
   return pieceMeshes;
 }

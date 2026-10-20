@@ -6,6 +6,16 @@
 
 ---
 
+> ## Enmienda 2026-10-09 — § 2.1 y § 2.2 quedan sustituidas por la spec «la interfaz en papel» § 6.1 (fase P4)
+>
+> Los paneles ya no van uno por lado ni como tarjeta con margen. Desde P4 (`docs/superpowers/plans/2026-10-09-interfaz-en-papel-p4.md`):
+>
+> - van **a la derecha y a ras**, entre la barra superior y la línea al pie, con el material `chrome` entero: sin margen, sin radio y sin sombra;
+> - por debajo de 1600 px de ventana hay **una ranura**, y el panel que se pide reemplaza al que estaba; a partir de 1600, dos, uno junto al otro, y el tercero reemplaza al último que se abrió;
+> - `usePanelHost` guarda una **lista** de paneles abiertos (`paneles`, `openPanel`, `togglePanel`, `closePanel`), y `panelSide.ts` / `getPanelSide` **se borraron**: ya no hay lado que decidir.
+>
+> Lo que sigue en § 2.1-2.2 (dos ranuras independientes, `getPanelSide` como fuente de verdad) se conserva como registro, no como instrucción. Lo vigila `tests/e2e/emplazamiento-paneles.spec.ts`.
+
 > ## ⚠️ Enmienda 2026-08-15 — el Grupo 2 (§ 2.3) y el aislamiento de `.canvas-area` (§ 2.4) quedan RETIRADOS
 >
 > Se implementaron y se sacaron del PR antes de mergear, tras un review adversarial. **La premisa era falsa y el documento contiene su propia refutación.**

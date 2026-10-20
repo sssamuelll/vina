@@ -9,6 +9,23 @@
     "paleta abierta": 0,
     "panel Propiedades": 0,
     "panel Capas": 0,
-    "3D en reposo": 0
+    "3D en reposo": 0,
+    "aviso": 0,
+    "diálogo de confirmación": 0,
+    "tooltip": 0,
+    "menú del dock": 0,
+    "menú del clic derecho": 0,
+    "submenú del clic derecho": 0,
+    "submenú del logo": 0,
+    "modal del piquete": 0,
+    "modal de conexión": 0,
+    "menú de superficie (3D)": 0,
+    "menú «Mostrar» (barra plegada)": 0,
+    "línea al pie con el piquete": 0,
+    "menú «Más» de la línea al pie": 0,
+    "barra de IA con una conversación": 0,
+    "panel IA y ratón": 0,
+    "cota del piquete": 0,
+    "etiqueta del piquete abierta": 0
   }
 }

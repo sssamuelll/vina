@@ -50,7 +50,22 @@ export type CotaUpdate =
    * su `path` ya está en patrón, así que el update lleva el trazo entero y no
    * un par pieza/línea.
    */
-  | { kind: 'trazo'; trazoId: string; path: PathCommand[] };
+  | { kind: 'trazo'; trazoId: string; path: PathCommand[] }
+  /**
+   * El piquete con su cota abierta (spec 2026-10-02 § 5.2). Lo escribe
+   * `useNotchTool.confirmRefine`, que ya regenera el path desde el ancla; la
+   * distancia y la profundidad viajan juntas porque el path sale de las dos.
+   */
+  | { kind: 'piquete'; distanciaMm: number; profundidadMm: number }
+  /**
+   * El piquete elegido con Seleccionar (P3c, la puerta de vuelta): su
+   * distancia, escrita por el ancla. A diferencia de `'piquete'` no hay sesión
+   * de herramienta detrás: lo escribe `PatternEditor` con `reescribirPiquete`,
+   * el mismo escritor que usa su etiqueta.
+   */
+  | { kind: 'piqueteElegido'; pieceId: string; lineId: string; distanciaMm: number }
+  /** El punto recién puesto: moverlo es volver a ponerlo, y eso lo hace `usePointTool`. */
+  | { kind: 'punto'; distanciaMm: number };
 
 /**
  * Una cota viva (spec 2026-08-30 § 3, § 5): la medida que el objeto enseña
@@ -68,7 +83,7 @@ export interface Cota {
    * No se agrupan por cercanía: dos tramos superpuestos siguen siendo distintos.
    */
   grupo?: string;
-  kind: 'ancho' | 'alto' | 'tramo-largo' | 'tramo-angulo' | 'borde' | 'margen';
+  kind: 'ancho' | 'alto' | 'tramo-largo' | 'tramo-angulo' | 'borde' | 'margen' | 'profundidad';
   /** Nombre accesible, en español: "Ancho de la pieza". */
   label: string;
   /** Visible beside the angle, including while editing the numeric field. */
@@ -93,6 +108,19 @@ export interface Cota {
   rotulo?: string;
   /** Ausente conserva el scrub; `false` deja el chip solo para teclado. */
   scrub?: boolean;
+  /**
+   * Lo que se pone (spec 2026-10-02 § 5.2): el piquete y el punto recién
+   * puestos —y el piquete de «Ajustar distancia…»— enseñan su cota abierta.
+   * Cada tecla llega aquí con el número, o `null` si el borrador no vale,
+   * para que el lienzo enseñe dónde quedará antes de Enter, como el modal.
+   */
+  alEscribir?(valueMm: number | null): void;
+  /**
+   * La edición se cerró: Enter, Esc, Tab al salir del último campo o el blur
+   * del siguiente clic. La cota de lo que se pone vive lo que dura su
+   * edición. En un grupo lo lleva la primera cota, que es la que monta el chip.
+   */
+  alCerrar?(): void;
   a: Point2D;
   b: Point2D;
   outward: Point2D;

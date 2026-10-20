@@ -79,6 +79,42 @@ export interface SeamPair {
   compliance: number;
   /** tension/100 — escala el target inicial (1 = distancia actual). */
   tensionFactor: number;
+  /**
+   * Los dos lados de la costura en orden de cosido (el B ya invertido si va al revés) y con el filtro de
+   * rango aplicado. El motor implícito cose cada vértice de un lado a un punto del otro
+   * (implicito/costuras.ts); el XPBD usa `vertexPairs`. `ta` y `tb` son el t de cada vértice renormalizado al
+   * tramo cosido: en una costura parcial, los vértices que quedan no llegan a las puntas del tramo.
+   */
+  lados?: LadosDeSeamPair;
+}
+
+/**
+ * El vértice del borde justo antes del tramo cosido y el justo después, con su t renormalizado (< 0 y > 1): en una
+ * costura parcial, un punto que cae entre una punta del tramo y el primer vértice de adentro se cose sobre ese segmento.
+ */
+export interface VecinosDeLado {
+  antes?: { v: LocalVertexIndex; t: number };
+  despues?: { v: LocalVertexIndex; t: number };
+}
+
+export interface LadosDeSeamPair {
+  a: LocalVertexIndex[];
+  b: LocalVertexIndex[];
+  ta?: number[];
+  tb?: number[];
+  vecinosA?: VecinosDeLado;
+  vecinosB?: VecinosDeLado;
+}
+
+/** Los vecinos de afuera del tramo [t0, t1] en un borde ordenado por t, con su t renormalizado al tramo. */
+function vecinosAfuera(edge: ReadonlyArray<{ index: number; t: number }>, t0: number, t1: number): VecinosDeLado {
+  const span = t1 - t0, vecinos: VecinosDeLado = {};
+  if (span <= 1e-9) return vecinos;
+  for (const v of edge) {
+    if (v.t < t0) vecinos.antes = { v: v.index as LocalVertexIndex, t: (v.t - t0) / span };
+    else if (v.t > t1 && !vecinos.despues) vecinos.despues = { v: v.index as LocalVertexIndex, t: (v.t - t0) / span };
+  }
+  return vecinos;
 }
 
 /**
@@ -192,6 +228,7 @@ export function seamInitDataToPairs(
       vertexPairs: resolved.vertexPairs,
       compliance: (baseCompliance / (seam.strength ?? 1.0)) * (seam.taped ? 0.1 : 1.0),
       tensionFactor: (seam.tension ?? 100) / 100,
+      lados: resolved.lados,
     });
   }
 
@@ -211,6 +248,7 @@ interface ResolvedSeamVertexPairs {
   vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]>;
   /** `null` when the seam resolved to ≥1 vertex pair. */
   failure: SeamResolutionFailure | null;
+  lados?: LadosDeSeamPair;
 }
 
 function buildPieceIndex(
@@ -285,7 +323,7 @@ function resolveSeamVertexPairs(
   let edgeA = pieceA.boundaryOrig && pieceA.vertices
     ? parameterizeEdgeFromBoundary(
         pieceA.boundaryOrig, pieceA.vertices, 0,
-        flattenPath(toPathCommands(pieceA.outline)).length, rangeA,
+        flattenPath(toPathCommands(pieceA.outline)), rangeA,
       )
     : parameterizeEdge(
         toPathCommands(pieceA.outline), rangeA[0], rangeA[1], 0,
@@ -296,7 +334,7 @@ function resolveSeamVertexPairs(
   let edgeB = pieceB.boundaryOrig && pieceB.vertices
     ? parameterizeEdgeFromBoundary(
         pieceB.boundaryOrig, pieceB.vertices, 0,
-        flattenPath(toPathCommands(pieceB.outline)).length, rangeB, reversedB,
+        flattenPath(toPathCommands(pieceB.outline)), rangeB, reversedB,
       )
     : parameterizeEdge(
         toPathCommands(pieceB.outline), rangeB[0], rangeB[1], 0,
@@ -306,12 +344,15 @@ function resolveSeamVertexPairs(
 
   // Filtro + RENORMALIZACIÓN de t al sub-rango (espejo exacto de
   // seamAssembly.ts — renormalizeFilteredT; los tiers no pueden divergir).
+  let vecinosA: VecinosDeLado | undefined, vecinosB: VecinosDeLado | undefined;
   if (seam.pieceARange) {
     const [t0, t1] = seam.pieceARange;
+    vecinosA = vecinosAfuera(edgeA, t0, t1);
     edgeA = renormalizeFilteredT(edgeA.filter(v => v.t >= t0 && v.t <= t1), t0, t1);
   }
   if (seam.pieceBRange) {
     const [t0, t1] = seam.pieceBRange;
+    vecinosB = vecinosAfuera(edgeB, t0, t1);
     edgeB = renormalizeFilteredT(edgeB.filter(v => v.t >= t0 && v.t <= t1), t0, t1);
   }
 
@@ -320,7 +361,18 @@ function resolveSeamVertexPairs(
     return fail('empty-match', 'empty match');
   }
 
-  return { vertexPairs, failure: null };
+  return {
+    vertexPairs,
+    failure: null,
+    lados: {
+      a: edgeA.map((v) => v.index as LocalVertexIndex),
+      b: edgeB.map((v) => v.index as LocalVertexIndex),
+      ta: edgeA.map((v) => v.t),
+      tb: edgeB.map((v) => v.t),
+      ...(vecinosA ? { vecinosA } : {}),
+      ...(vecinosB ? { vecinosB } : {}),
+    },
+  };
 }
 
 // ─── Observability (parity plan Fase 4) ──────────────────────────────────────
@@ -340,7 +392,7 @@ export interface SeamResolutionEntry {
  * constraints is their correct state, not a failure).
  *
  * Consumed by `useSimulationLifecycle` at sim start: total + zero-count
- * seams go to `simulation.seamResolution` (SimulationStatusOverlay),
+ * seams go to `simulation.seamResolution` (EstadoDeLaSimulacion),
  * zero-count seams additionally to `inspector.seamResolutionErrors` +
  * an error toast (E-async dual-surface convention).
  */

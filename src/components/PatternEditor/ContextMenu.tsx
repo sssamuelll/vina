@@ -22,6 +22,7 @@ import {
   GROUP_ORDER, resolveMenuActions, resolveTargetKind,
   type CurationCtx, type CurationCallbacks,
 } from './actionCuration';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -126,16 +127,13 @@ export default function ContextMenu(props: ContextMenuProps) {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onCloseRef.current();
     };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
     document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
+    return () => document.removeEventListener('mousedown', handleClick);
   }, [menu.visible]);
+
+  // Esc lo cierra antes que la selección: un peldaño de la escalera de lo que
+  // se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('contextual', 'menu', menu.visible, () => onCloseRef.current());
 
   if (!menu.visible) return null;
 
@@ -185,7 +183,7 @@ export default function ContextMenu(props: ContextMenuProps) {
     .filter(g => g.length > 0);
 
   return (
-    <div ref={ref} className="context-menu" data-superficie="menu" style={{ left: pos.x, top: pos.y }}>
+    <div ref={ref} className="context-menu" data-superficie="menu" data-material="papel" style={{ left: pos.x, top: pos.y }}>
       <div className="context-menu__scroll" ref={scrollRef}>
         {menu.seamId && (
           <div className="context-menu__header context-menu__header--seam">Costura</div>

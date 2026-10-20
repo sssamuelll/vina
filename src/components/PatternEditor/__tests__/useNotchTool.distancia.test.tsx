@@ -78,11 +78,17 @@ const ev = (x: number, y: number) =>
 
 function setup(internals: InternalLine[] = []) {
   const store = configureStore({ reducer: { tools: toolReducer } });
+  // Como Redux: lo que se añade está en el render siguiente. La cota del
+  // piquete se mide sobre la línea viva (P3b).
+  let piezas = [pieza(internals)];
   const onAddNotch = vi.fn();
+  onAddNotch.mockImplementation((_pieceId: string, line: InternalLine) => {
+    piezas = [pieza([...piezas[0].internals, line])];
+  });
   const wrapper = ({ children }: { children: React.ReactNode }) =>
     createElement(Provider, { store, children });
   const { result } = renderHook(
-    () => useNotchTool(1, { x: 0, y: 0 }, [pieza(internals)], onAddNotch),
+    () => useNotchTool(1, { x: 0, y: 0 }, piezas, onAddNotch),
     { wrapper },
   );
   return { result, onAddNotch };
@@ -127,7 +133,7 @@ describe('useNotchTool — el piquete entra en el gesto de borde', () => {
     expect(h.onAddNotch).not.toHaveBeenCalled();
   });
 
-  it('un clic sigue poniendo el piquete donde se clica, y sigue abriendo el modal', () => {
+  it('un clic sigue poniendo el piquete donde se clica, y abre su cota', () => {
     // Contrato de compatibilidad (spec § 5): la ruta de clic no cambia de
     // significado, solo de momento — ahora cierra en el mouseup.
     const h = setup();

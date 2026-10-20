@@ -46,6 +46,8 @@ export const SLICES_THAT_SURVIVE: readonly { slice: string; reason: string }[] =
   { slice: 'renderSettingsSlice', reason: 'Render/lighting/export preferences are user-level defaults (HDRI preset, tone mapping, exposure, format). Custom lights are user setups, not project-derived.' },
   { slice: 'dockSlice', reason: 'Kept auto-suggestion ids are a user UI preference, not project data — intentionally persists across projects.' },
   { slice: 'inputSchemeSlice', reason: 'Input device preference (mouse/trackpad) is user-level hardware config — survives project switches.' },
+  { slice: 'iaSlice', reason: 'La conversación con la IA es un hilo de la sesión, no un dato del proyecto: el loop del agente (copilot/conversacion.ts) conserva su historia entre proyectos, y antes de P2c la conversación vivía en un componente que tampoco se reiniciaba con «Proyecto nuevo».' },
+  { slice: 'puenteSlice', reason: 'La conexión con el agente de la usuaria (spec 2026-10-09) es un permiso de la sesión, no un dato del proyecto: con «Proyecto nuevo» el agente sigue conectado, y la revisión de la próxima respuesta le dice que el patrón cambió.' },
 ];
 
 /** All registered slice names (for completeness checking). */

@@ -1,35 +1,14 @@
-/* 3D floating controls */
-.floating-3d {
-  position: absolute;
-  z-index: 15;
-}
-.floating-3d--bottom-left {
-  /* Por encima del UnifiedBar en su posición default (58px alto + 24px de
-     offset, barPosition.ts) — a bottom:12 quedaba recortado DETRÁS del bar
-     (Fase1-S3). Si el usuario arrastra el bar, ese es su layout. El número
-     ahora sale del token `--band-bar`, compartido con la barra de instantáneas
-     y la fila de capas del lienzo 2D. */
-  bottom: var(--band-bar);
-  left: var(--sp-3);
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-}
-/* Context panel */
+/* Un panel del marco (spec 2026-10-02 § 6.1): a la derecha, de la barra
+   superior a la línea al pie, con el material chrome entero en su variante
+   a ras. Sin margen, sin radio y sin sombra; la línea de su izquierda lo
+   separa de la hoja. */
 .context-panel {
   flex: 0 0 300px;
-  max-height: calc(100vh - var(--top-bar-h) - var(--unified-bar-h) - var(--sp-8));
-  background: var(--surface-overlay-bg);
-  backdrop-filter: var(--surface-overlay-blur);
-  -webkit-backdrop-filter: var(--surface-overlay-blur);
-  border: var(--surface-overlay-border);
-  border-radius: var(--surface-overlay-radius);
-  box-shadow: var(--surface-overlay-shadow);
+  background: var(--surface-chrome-bg);
+  border-left: var(--surface-chrome-border);
+  border-radius: var(--surface-chrome-radius-flush);
+  box-shadow: var(--surface-chrome-shadow-flush);
   overflow-y: auto;
-  margin: var(--sp-3);
-  animation: slide-down var(--transition-normal) ease-out;
 }
 .context-panel__header {
   display: flex;
@@ -44,7 +23,7 @@
   padding: var(--sp-3) var(--sp-4);
 }
 
-/* ─── Logo Menu (Figma-style, same glassmorphic as floating capsule) ─── */
+/* ─── Logo Menu (Figma-style) ─── */
 
 .logo-menu__trigger {
   display: flex;
@@ -76,9 +55,9 @@
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  /* Same glassmorphic as the floating capsule bar */
-  /* Material `overlay`. El radio era 14px a mano — un quinto radio suelto
-   * que no correspondía a ningún rol. */
+  /* Material `overlay`, en papel: la raíz lleva data-material="papel" (spec
+   * 2026-10-02 § 6.3). El radio era 14px a mano — un quinto radio suelto que
+   * no correspondía a ningún rol. */
   background: var(--surface-overlay-bg);
   backdrop-filter: var(--surface-overlay-blur);
   -webkit-backdrop-filter: var(--surface-overlay-blur);
@@ -93,7 +72,7 @@
 
 .logo-menu__separator {
   height: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   margin: 4px 10px;
 }
 
@@ -208,7 +187,7 @@
   padding: 6px 12px 4px;
   font-size: var(--text-xs);
   color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
+  border-bottom: var(--hairline);
   margin-bottom: 2px;
 }
 .context-menu__header--seam {
@@ -253,7 +232,7 @@
 }
 .context-menu__separator {
   height: 1px;
-  background: var(--border);
+  background: var(--border-subtle);
   margin: 4px 10px;
 }
 .context-menu__fade,

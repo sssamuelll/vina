@@ -1,0 +1,72 @@
+/* Las opciones de una herramienta en la línea al pie (spec 2026-10-02 § 5.3):
+   rótulo y control en una fila. Se pintan en la línea al pie y en el menú
+   «Más», papel los dos desde el 2026-10-11 (el pie fue marco hasta entonces),
+   y solo usan tokens que valen en los dos materiales: ni un fondo del marco ni
+   un color a mano (lo vigila
+   tests/repo/lo-que-flota-es-papel.test.ts). El interruptor comparte las
+   reglas del grupo del patrón de la barra superior (layout.css). */
+.opcion-del-pie { flex: none; display: flex; align-items: center; gap: 6px; white-space: nowrap; font-size: var(--text-sm); }
+.opcion-del-pie__rotulo { color: var(--text-secondary); }
+
+.opcion-del-pie__botones { display: inline-flex; gap: 1px; padding: 2px; border: var(--hairline); border-radius: var(--radius-sm); }
+.opcion-del-pie__boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font: inherit;
+  cursor: pointer;
+}
+/* La elegida cambia RELLENO, no solo tono (ley de estado). */
+.opcion-del-pie__boton--activo { background: var(--bg-elevated); color: var(--text-primary); }
+
+.opcion-del-pie__numero { display: inline-flex; align-items: center; }
+.opcion-del-pie__campo {
+  width: 44px;
+  height: 24px;
+  padding: 0 6px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  appearance: textfield;
+}
+/* Los botones de menos y más ya están al lado: fuera las flechitas del navegador. */
+.opcion-del-pie__campo::-webkit-inner-spin-button,
+.opcion-del-pie__campo::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.opcion-del-pie__paso {
+  width: 20px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.opcion-del-pie__paso:disabled { color: var(--text-disabled); cursor: default; }
+
+.opcion-del-pie__lista {
+  height: 24px;
+  max-width: 180px;
+  padding: 0 6px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font: inherit;
+}
+.opcion-del-pie__color { width: 28px; height: 24px; padding: 0 2px; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; }
+
+/* hover y focus-visible en UNA línea cada uno: R5 los empareja línea a línea. */
+.opcion-del-pie__boton:hover, .opcion-del-pie__paso:hover { color: var(--text-primary); }
+.opcion-del-pie__boton:focus-visible, .opcion-del-pie__paso:focus-visible, .opcion-del-pie__campo:focus-visible, .opcion-del-pie__lista:focus-visible, .opcion-del-pie__color:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }

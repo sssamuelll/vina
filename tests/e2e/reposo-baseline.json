@@ -1,0 +1,10 @@
+{
+  "_doc": "Techos del trinquete de reposo (spec 2026-10-02 «la interfaz en papel» § 9): cuántas superficies visibles en reposo NO son ambiente, documento ni la frase de ayuda (ni, en la pantalla vacía, el estado vacío). La meta es 0 y el contador solo baja. Para fijar: REPOSO_UPDATE=1 npx playwright test tests/e2e/reposo-solo-lo-que-perdura.spec.ts --retries=0 --workers=1. Nunca se edita a mano.",
+  "meta": 0,
+  "estados": {
+    "vacía": 0,
+    "2D con patrón": 0,
+    "Split con patrón": 0,
+    "3D con patrón": 0
+  }
+}

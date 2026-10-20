@@ -1,9 +1,9 @@
 {
   "extends": "../tsconfig.app.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "../node_modules/.tmp/tsconfig.bench.tsbuildinfo",
-    "lib": ["ES2023"],
+    "tsBuildInfoFile": "../.tmp/tsconfig.bench.tsbuildinfo",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["./**/*.ts"]
+  "include": ["./**/*.ts", "../src/vite-env.d.ts", "../src/types/cdt2d.d.ts", "../src/types/clean-pslg.d.ts"]
 }

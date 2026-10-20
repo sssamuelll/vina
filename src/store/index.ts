@@ -12,6 +12,8 @@ import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
 import blueprintReducer from './blueprintSlice';
 import copilotUIReducer from './copilotUISlice';
+import iaReducer from './iaSlice';
+import puenteReducer from './puenteSlice';
 import cameraReducer from './cameraSlice';
 import collisionBodyReducer from './collisionBodySlice';
 import renderSettingsReducer from './renderSettingsSlice';
@@ -24,6 +26,7 @@ import nestingReducer from './nestingSlice';
 import gradingReducer from './gradingSlice';
 import inputSchemeReducer, { hydrateInputScheme, rehydrateInputScheme, persistInputScheme } from './inputSchemeSlice';
 import { initProjectPersistence } from './projectAutosave';
+import { seguirLaRevision } from './revisionDelProyecto';
 import { initLineLengthPreference } from './lineLengthPreference';
 import { confirmationMiddleware } from './confirmationMiddleware';
 import { journalMiddleware } from './journalMiddleware';
@@ -32,6 +35,7 @@ import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { reactiveSolverMiddleware } from './reactiveSolverMiddleware';
 import { gradingStalenessMiddleware } from './gradingStalenessMiddleware';
 import { resewBridgeMiddleware } from './resewBridgeMiddleware';
+import { deshacerDelAgenteMiddleware } from './deshacerDelAgenteMiddleware';
 import { initHistoryTimelinePersistence } from './historyTimeline';
 
 export const store = configureStore({
@@ -49,6 +53,8 @@ export const store = configureStore({
     construction: constructionReducer,
     blueprints: blueprintReducer,
     copilotUI: copilotUIReducer,
+    ia: iaReducer,
+    puente: puenteReducer,
     camera: cameraReducer,
     collisionBody: collisionBodyReducer,
     renderSettings: renderSettingsReducer,
@@ -80,7 +86,7 @@ export const store = configureStore({
         ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
         ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
       },
-    }).concat(journalMiddleware, confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware),
+    }).concat(journalMiddleware, confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware, resewBridgeMiddleware, deshacerDelAgenteMiddleware),
 });
 
 void initHistoryTimelinePersistence();
@@ -126,6 +132,9 @@ store.subscribe(() => {
 // can never clobber the autosave with the boot-empty project. The user's
 // actual work must survive a reload (browsers are volatile).
 void initProjectPersistence(store);
+
+// La revisión del proyecto para los agentes (spec 2026-10-05 § 5.2).
+seguirLaRevision(store);
 
 // Expose store for debugging (remove in production)
 (window as unknown as Record<string, unknown>).__VINA_STORE__ = store;

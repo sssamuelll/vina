@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DEFAULT_SHORTCUTS, ATAJOS_2D_SIN_GESTO } from '../../../shortcuts/defaults';
 import { toolRegistry } from '../../../tools';
 import { DOCK_2D_CATALOG } from '../../shell/dock2dTools';
+import { fraseDeLaFase } from '../fraseDeLaFase';
 
 /**
  * #1111 — María, en el audio del 30-08: «círculo es indispensable».
@@ -110,16 +111,14 @@ describe('el círculo se comporta como su hermano el rectángulo', () => {
     expect(conjunto, 'el círculo no entra en CON_COTAS_DE_PIEZA').toContain("'circle'");
   });
 
-  it('tiene su línea de ayuda en la pista', () => {
-    const hint = lee('src/components/PatternEditor/renderers/HintText.tsx');
-    expect(hint, 'el círculo no instruye a nadie').toMatch(/circle/);
+  it('tiene su frase en la línea al pie', () => {
+    expect(fraseDeLaFase({ activeTool: 'circle', penNodesLength: 0, nodeEditorIsEditing: false }), 'el círculo no instruye a nadie').toBeTruthy();
   });
 
-  it('la pista está en español y no promete lo que no hace', () => {
-    const hint = lee('src/components/PatternEditor/renderers/HintText.tsx');
-    const bloque = hint.match(/circle[^}]{0,400}/s)?.[0] ?? '';
-    expect(bloque).not.toMatch(/\b(drag|click|draw|shape)\b/i);
-    expect(bloque, 'promete el arco, que ya no existe').not.toMatch(/arco/i);
+  it('la frase está en español y no promete lo que no hace', () => {
+    const frase = fraseDeLaFase({ activeTool: 'circle', penNodesLength: 0, nodeEditorIsEditing: false }) ?? '';
+    expect(frase).not.toMatch(/\b(drag|click|draw|shape)\b/i);
+    expect(frase, 'promete el arco, que ya no existe').not.toMatch(/arco/i);
   });
 
   it("'circle' es miembro de la unión Tool2D, no un cast suelto", () => {

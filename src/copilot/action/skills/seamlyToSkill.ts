@@ -190,7 +190,8 @@ function convertPattern(
     author: 'imported',
     description: `Pattern imported from Seamly2D: ${humanize(patternName)}`,
     tags: inferTags(patternName),
-    license: 'MIT',
+    // SPDX "no assertion": an imported pattern keeps its author's license, which the file doesn't state.
+    license: 'NOASSERTION',
   };
 
   // Generate triggers

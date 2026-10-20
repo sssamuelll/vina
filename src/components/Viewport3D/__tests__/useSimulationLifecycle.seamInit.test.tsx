@@ -130,7 +130,7 @@ vi.mock('../../../utils/cloth/gpu/webgpuDetect', async (importOriginal) => {
     isWebGPUAvailable: webgpuMocks.isWebGPUAvailable,
   };
 });
-// Colisión de avatar: projectSlice arranca con '/default-avatar.glb' — null
+// Colisión de avatar: projectSlice arranca con '/avatares/mujer-eu38.glb' — null
 // evita red/three en el test sin tocar el flujo del cascade.
 vi.mock('../../../utils/cloth/avatarCollisionMesh', () => ({
   extractAvatarCollisionMesh: vi.fn().mockResolvedValue(null),
@@ -143,7 +143,7 @@ import { useSimulationLifecycle, type PlacedMesh } from '../useSimulationLifecyc
 import type { SeamInitData } from '../../../utils/cloth/clothWorker';
 import { WEBGPU_FEATURE_FLAG_KEY } from '../../../utils/cloth/gpu/webgpuDetect';
 import projectReducer from '../../../store/projectSlice';
-import simulationReducer, { pauseSimulation, startSimulation } from '../../../store/simulationSlice';
+import simulationReducer, { resetSimulation, startSimulation } from '../../../store/simulationSlice';
 import avatarReducer from '../../../store/avatarSlice';
 import collisionBodyReducer from '../../../store/collisionBodySlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
@@ -577,8 +577,10 @@ describe('useSimulationLifecycle — caja negra 3D: la cascada contada', () => {
     renderLifecycle(store, seamInitData);
     await waitFor(() => expect(gpuMocks.initMultiPieceTsl).toHaveBeenCalledTimes(1));
 
-    // Stop→Play: el efecto se limpia (cancelled=true) y arranca una generación nueva.
-    act(() => { store.dispatch(pauseSimulation()); });
+    // Stop→Play: el efecto se limpia (cancelled=true) y arranca una generación
+    // nueva. Stop es «Restablecer» (idle): pausar ya no suelta el solver
+    // (pausar-no-vuelve-a-vestir.test.tsx).
+    act(() => { store.dispatch(resetSimulation()); });
     act(() => { store.dispatch(startSimulation()); });
     await waitFor(() => expect(gpuMocks.initMultiPieceTsl).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(getActiveSolverTier()).toBe('webgpu'));

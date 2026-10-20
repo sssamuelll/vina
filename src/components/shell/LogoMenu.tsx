@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNo
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
-  setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
+  setViewMode, undo, redo, toggleSeamAllowance,
   toggleGrainlines, toggleNotches, togglePieceNames, toggleSewingLines,
   toggleReferenceImages, setLineLengthMode, toggleTrazos, setRenderMode2D,
   clearSelection, setZoom2D, setUnits, requestFitView,
@@ -11,7 +11,6 @@ import {
   startSimulation, pauseSimulation, resetSimulation, setViewMode3D,
   toggleGarment, toggleSeamlines3D, toggleSimSeamLines, toggleInternalLines3D,
 } from '../../store/simulationSlice';
-import { toggleDockSignaling } from '../../store/dockSlice';
 import { requestConfirmation } from '../../hooks/useGuardedAction';
 import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
 import { duplicatePiece, removePieces, removeSeam, removeInternalLine, removeTramosDeInterna, removePOM, removeTramoDeTrazo } from '../../store/projectSlice';
@@ -21,6 +20,7 @@ import { parteElTrazo } from '../PatternEditor/trazos/trazoPath';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
+import { capturarVisor3D } from '../Viewport3D/visorBridge';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
@@ -29,6 +29,7 @@ import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import { shortcutLabelFor } from './shortcutDisplay';
 import { computeScrollFade, encajarSubmenu, type Encaje, type ScrollFade } from '../PatternEditor/menuOverflow';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,9 @@ interface MenuItem {
    * declara ninguno: se sigue clicando igual.
    */
   shortcutId?: string;
+  /** El panel que abre (clave de `renderPanelContent`). Va por `onOpenPanel`,
+   *  que alterna: por eso estos rótulos nombran el panel, no una acción. */
+  panel?: string;
   action?: (dispatch: AppDispatch) => void;
   checked?: (state: RootState) => boolean;
   disabled?: (state: RootState) => boolean;
@@ -90,7 +94,7 @@ const FILE_MENU: MenuItem[] = [
   // referencia», que es la casilla de mostrar u ocultar. Es UN término para UN
   // concepto asomado dos veces —gestionar y ver—, no dos términos: eso sí
   // rompería la § 5.
-  { label: 'Imágenes de referencia...', action: () => {} }, // wired via onOpenPanel('ReferenceImages')
+  { label: 'Imágenes de referencia...', panel: 'ReferenceImages' },
   { separator: true, label: '' },
   // Fase1-S2: solo exports que EXISTEN. Tech Pack / 3D / Reference Image /
   // Project Settings eran noops o abrían el placeholder circular — un item
@@ -99,6 +103,9 @@ const FILE_MENU: MenuItem[] = [
   { label: 'Exportar PDF (1:1)', action: (d) => runUiExport('pdf', store.getState().project, d) },
   { label: 'Exportar BOM (CSV)', action: (d) => runUiExport('bom', store.getState().project, d) },
   { label: 'Exportar 3D / Vuelta 360°...', action: (d) => d(openRenderSettings()) },
+  // Salió de la pantalla (era un botón de la barra de mapas): es una acción, no
+  // algo que se ve (spec 2026-10-02 § 4.2). Sin visor a la vista no hay qué capturar.
+  { label: 'Capturar visor 3D', shortcutId: 'tool3d.snapshot', action: () => { capturarVisor3D(); }, disabled: (s) => s.editor.viewMode === '2d' },
   { separator: true, label: '' },
   {
     label: 'Exportar diagnóstico',
@@ -202,7 +209,6 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Ajustar zoom al patrón', shortcutId: 'view.fitPattern', action: (d) => d(requestFitView()) },
   { label: 'Zoom 100%', action: (d) => d(setZoom2D(1)) },
   { separator: true, label: '' },
-  { label: 'Cuadrícula', action: (d) => d(toggleSnapToGrid()), checked: (s) => s.editor.snapToGrid },
   { label: 'Margen de costura', shortcutId: 'view.toggleSeamAllowance', action: (d) => d(toggleSeamAllowance()), checked: (s) => s.editor.showSeamAllowance },
   { label: 'Hilos', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
   { label: 'Piquetes', action: (d) => d(toggleNotches()), checked: (s) => s.editor.showNotches },
@@ -224,17 +230,21 @@ const VIEW_MENU: MenuItem[] = [
   { label: '3D: costuras en simulación', action: (d) => d(toggleSimSeamLines()), checked: (s) => s.simulation.showSimSeamLines },
   { label: '3D: líneas internas', action: (d) => d(toggleInternalLines3D()), checked: (s) => s.simulation.showInternalLines3D },
   { separator: true, label: '' },
-  { label: 'Sugerencias del dock', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
-  { separator: true, label: '' },
-  { label: 'Regla: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
-  { label: 'Regla: pulgadas', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
-  { label: 'Regla: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
+  { label: 'Unidades: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
+  { label: 'Unidades: pulgadas', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
+  { label: 'Unidades: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
 ];
 
 // Fase1-S2: Detect All Edges / Validate Pattern / Grade All Sizes / Nesting
 // Layout eran noops; Auto-Sew es el único con implementación real.
 const PATTERN_MENU: MenuItem[] = [
   { label: 'Coser piezas automáticamente', action: (d) => d(runAutoSew()) },
+  { separator: true, label: '' },
+  // Las dos sugerencias de la zona AUTO que no tenían otra puerta en el menú
+  // (spec 2026-10-02 § 8). Exportar DXF ya estaba en Archivo; el mapa de
+  // ajuste conserva la suya en el visor 3D hasta P5.
+  { label: 'Escalado...', panel: 'Grading' },
+  { label: 'Lista de materiales...', panel: 'BOM' },
 ];
 
 const SIMULATION_MENU: MenuItem[] = [
@@ -244,10 +254,12 @@ const SIMULATION_MENU: MenuItem[] = [
   { label: 'Restablecer', action: (d) => d(resetSimulation()) },
 ];
 
-// Fase1-S2: AI Provider abría el placeholder circular (la superficie real es
-// el modo settings del UnifiedBar); Keyboard Shortcuts era un noop.
-const PREFERENCES_MENU: MenuItem[] = [
-  { label: 'Avatar y medidas...', action: () => {} }, // wired via onOpenPanel('Avatar')
+// Las conexiones de IA y el ratón son el panel Preferencias desde P2c (spec
+// 2026-10-02 § 6.1). Se exporta para que su test lea la lista que pinta el menú.
+// eslint-disable-next-line react-refresh/only-export-components
+export const PREFERENCES_MENU: MenuItem[] = [
+  { label: 'Avatar y medidas...', panel: 'Avatar' },
+  { label: 'IA y ratón...', panel: 'Preferences' },
 ];
 
 const HELP_MENU: MenuItem[] = [
@@ -367,14 +379,9 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
     return () => window.removeEventListener('mousedown', handler);
   }, [open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setOpen(false); setHoveredTop(null); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [open]);
+  // Esc lo cierra antes que la selección: un peldaño de la escalera de lo que
+  // se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('vina', 'menu', open, () => { setOpen(false); setHoveredTop(null); });
 
   const handleItemClick = useCallback((item: MenuItem) => {
     if (item.separator || item.submenu) return;
@@ -382,10 +389,8 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
 
     if (item.label === 'Importar DXF...') {
       onImportDXF();
-    } else if (item.label === 'Avatar y medidas...') {
-      onOpenPanel('Avatar');
-    } else if (item.label === 'Imágenes de referencia...') {
-      onOpenPanel('ReferenceImages');
+    } else if (item.panel) {
+      onOpenPanel(item.panel);
     } else if (item.action) {
       item.action(dispatch);
     }
@@ -442,6 +447,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
         <div
           className="logo-menu"
           data-superficie="menu"
+          data-material="papel"
           onMouseLeave={() => { setHoveredTop(null); setHoveredSub(null); }}
         >
           {/* Top-level menu items with submenus */}

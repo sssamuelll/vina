@@ -25,7 +25,10 @@ export default function BackgroundSection({ open, onToggle }: SectionProps) {
             {([
               ['hdri', 'HDRI'],
               ['solid', 'Sólido'],
-              ['transparent', 'Transparente'],
+              // El papel de la hoja, puesto por CSS detrás del lienzo (spec
+              // 2026-10-02 § 4.5). «Fondo transparente» al exportar sigue
+              // siendo otra cosa: el PNG sin papel debajo.
+              ['transparent', 'Papel'],
             ] as [BackgroundMode, string][]).map(([mode, label]) => (
               <button
                 key={mode}

@@ -404,16 +404,58 @@ describe('CotaChip - scrub', () => {
     pointer(b, 'pointerup', 4);
   });
 
-  it('Tab desde el último chip sale del grupo hacia la tira de herramienta', () => {
+  it('Tab desde el último chip sale del grupo hacia la línea al pie', () => {
     const noop = { onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn() };
     render(
       <div>
         <div className="cotas"><CotaChip cota={cota()} left={0} top={0} zoom2D={1} {...noop} /></div>
-        <div className="tool-strip"><select aria-label="Tipo"><option>a</option></select></div>
+        <div className="seccion-del-patron"><select aria-label="Tipo"><option>a</option></select></div>
       </div>,
     );
     fireEvent.click(screen.getByRole('button'));
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' });
     expect(document.activeElement).toBe(screen.getByRole('combobox', { name: 'Tipo' }));
+  });
+});
+
+describe('CotaChip - una cota a la vez (spec 2026-10-02 § 5.5)', () => {
+  it('Tab en edición confirma y le pregunta a la capa si hay otra cota del objeto', () => {
+    const onSalir = vi.fn(() => true);
+    const props = monta({ onSalir });
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '150' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' });
+    expect(props.onCommit).toHaveBeenCalledWith(expect.objectContaining({ id: 'ancho' }), 150, 'tab');
+    expect(onSalir).toHaveBeenCalledWith('siguiente');
+  });
+  it('si la capa dice que no, el Tab sigue su camino de siempre, a la línea al pie', () => {
+    const noop = { onCommit: vi.fn(), onScrubStart: vi.fn(), onScrub: vi.fn(), onScrubEnd: vi.fn(), onScrubCancel: vi.fn() };
+    const onSalir = vi.fn(() => false);
+    render(
+      <div>
+        <div className="cotas"><CotaChip cota={cota()} left={0} top={0} zoom2D={1} onSalir={onSalir} {...noop} /></div>
+        <div className="seccion-del-patron"><select aria-label="Tipo"><option>a</option></select></div>
+      </div>,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Tab' });
+    expect(onSalir).toHaveBeenCalledWith('siguiente');
+    expect(document.activeElement).toBe(screen.getByRole('combobox', { name: 'Tipo' }));
+  });
+  it('en reposo, Tab sobre el chip también pasa de turno, y el Tab nativo no se va', () => {
+    const onSalir = vi.fn(() => true);
+    monta({ onSalir });
+    expect(fireEvent.keyDown(screen.getByRole('button'), { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(onSalir).toHaveBeenCalledWith('anterior');
+  });
+  it('en reposo, Tab hacia delante sobre el chip pasa de turno, y el Tab nativo no se va', () => {
+    const onSalir = vi.fn(() => true);
+    monta({ onSalir });
+    expect(fireEvent.keyDown(screen.getByRole('button'), { key: 'Tab' })).toBe(false);
+    expect(onSalir).toHaveBeenCalledWith('siguiente');
+  });
+  it('en reposo, si la capa dice que no, el Tab nativo sigue', () => {
+    monta({ onSalir: () => false });
+    expect(fireEvent.keyDown(screen.getByRole('button'), { key: 'Tab' })).toBe(true);
   });
 });

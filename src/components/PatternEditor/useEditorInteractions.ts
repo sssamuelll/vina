@@ -2,9 +2,10 @@ import type { CotasLayerHandle } from './cotas/CotasLayer';
 import { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, selectTrazo, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, selectTrazo, selectSaVertices, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { esquinaDelMargenEn } from '../../utils/seam/esquinaDelMargen';
 import { movePiece, updateInternalLine, updateTrazo } from '../../store/projectSlice';
-import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, seSeleccionaPorTramo } from '../../types/types';
+import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine, esInternaEditable, seSeleccionaPorTramo } from '../../types/types';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
 import { isPinnedAtZoomCeiling, zoomAtPoint } from '../../input/zoom2d';
 import { showInfoToast } from '../../store/copilotUISlice';
@@ -44,12 +45,15 @@ import { DRAG_THRESHOLD_PX, isDrag } from './gestureConstants';
 import { pushJournal } from '../../utils/telemetry/journal';
 import { MEASURE_TOOL_IDS } from '../../store/toolActivation';
 import { hayModalDelante } from '../../utils/superficieModal';
+import { esTeclaDeBotonera } from '../../shortcuts/teclaDeBotonera';
 import { isEditableTarget } from '../../utils/editableTarget';
 
 /** Los tres modos de Pespunte que DIBUJAN. `topstitchEdit` queda fuera a
  *  propósito: no tiene gesto a medias que cancelar, así que sus teclas no son
  *  suyas y deben seguir su camino al atajo global (#1115). */
 const TOPSTITCH_TOOL_IDS = new Set(['topstitchSeamline', 'topstitchSegment', 'topstitchFree']);
+/** Referencia estable: un `?? []` dentro del selector re-renderiza en bucle. */
+const NO_HIDDEN_LAYER_IDS: number[] = [];
 const zoomCeilingToastLimiter = createTimeWindowLimiter(3000);
 
 // ─── Sondas de la bitácora (spec caja-negra-bitacora § 3.2) ─────────────────
@@ -116,7 +120,7 @@ interface ToolHooks {
   /** La puerta de Tab al largo de un lado (#1167, spec 2026-09-18 § 3.1). */
   lados?: { enfocar: () => boolean; soltar: () => boolean };
   /** `handleKeyDown` devuelve si consumió la tecla (la captura CF-1 detiene la propagación solo entonces). */
-  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; handleDoubleClick: () => void; reset: () => void };
+  pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => boolean; handleDoubleClick: () => void; reset: () => void; limpiarHover: () => void };
   rectTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -154,14 +158,18 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     cancel: () => void;
     isArmed: () => boolean;
+    limpiarHover: () => void;
   };
   pointTool: {
     armed: boolean;
+    /** El punto recién puesto con su cota a la vista (P3b): Esc la cierra. */
+    puesto?: unknown;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleMouseUp: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
+    limpiarHover: () => void;
   };
   seamAllowanceTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -172,7 +180,7 @@ interface ToolHooks {
     isArmed: () => boolean;
     limpiarHover: () => void;
   };
-  trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
+  trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; limpiarHover: () => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: (e?: React.MouseEvent<SVGSVGElement>) => void; cancel: () => void };
   measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void; limpiarHover?: () => void };
   nodeEditor: {
@@ -222,6 +230,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   slashAndSpreadTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -230,6 +239,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   mergeTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -251,6 +261,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => boolean;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   walkSeamTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -258,6 +269,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   offsetTool: {
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
@@ -274,6 +286,7 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     getCursor: () => string;
     reset: () => void;
+    limpiarHover: () => void;
   };
   /** El motor de "Línea interna" (`usePolyPenTool`). */
   internalShapeTool: {
@@ -325,6 +338,15 @@ export function shouldShowTransformBox(opts: {
     && opts.selectedCount > 0;
 }
 
+/**
+ * La barrita de la pieza (spec 2026-10-02 § 5.5) sigue a la caja, con una
+ * excepción: con la selección bloqueada la caja no está y la barrita sí, para
+ * que «Desbloquear» nunca quede detrás de un menú.
+ */
+export function shouldShowActionBar(opts: Parameters<typeof shouldShowTransformBox>[0]): boolean {
+  return shouldShowTransformBox({ ...opts, selectionHasLocked: false });
+}
+
 export function useEditorInteractions(
   activeTool: Tool2D,
   zoom2D: number,
@@ -337,6 +359,10 @@ export function useEditorInteractions(
   const selectedTrazo = useSelector((s: RootState) => s.editor.selectedTrazo);
   const trazos = useSelector((s: RootState) => s.project.trazos);
   const showTrazos = useSelector((s: RootState) => s.editor.showTrazos);
+  // La esquina del margen se elige en su punta (P3c): solo donde el margen se
+  // ve, y solo en piezas cuya capa se ve.
+  const showSeamAllowance = useSelector((s: RootState) => s.editor.showSeamAllowance);
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation?.hiddenLayerIds ?? NO_HIDDEN_LAYER_IDS);
   const svgRef = useRef<SVGSVGElement>(null);
   /** Posición de pantalla del último press, para que la bitácora mida `drag` en el release. */
   const pressRef = useRef<{ x: number; y: number } | null>(null);
@@ -393,6 +419,13 @@ export function useEditorInteractions(
       && p.internals.some(l => l.id === selectedInternalLine.lineId),
   );
   const showTransformBox = shouldShowTransformBox({
+    activeTool,
+    isNodeEditing,
+    selectedCount: selectedPieceIds.length,
+    selectionHasLocked,
+    hasSelectedInternalLine: selectedInternalLineIsLive,
+  }) && !isDraggingPiece;
+  const showActionBar = shouldShowActionBar({
     activeTool,
     isNodeEditing,
     selectedCount: selectedPieceIds.length,
@@ -513,6 +546,14 @@ export function useEditorInteractions(
       // hasta aquí. Medido sin esto: el nodo agarrado se borraba igual
       // detrás del diálogo, 5 nodos a 4.
       if (hayModalDelante()) return;
+      // Las teclas que nacen en un campo son del campo, como en la captura:
+      // Retroceso en el nombre de una pieza borraba nodos con Editar patrón,
+      // y Enter en una medida del Avatar corría el desfase (revisión final de
+      // P4). La captura ya se retiraba; la tecla seguía viajando hasta aquí.
+      if (isEditableTarget(e.target)) return;
+      // Enter y Espacio sobre un botón de la línea al pie son del botón: con el
+      // foco en «Más», Enter desplazaba además la pieza.
+      if (esTeclaDeBotonera(e)) return;
       handlers.forEach(h => h(e));
     };
     window.addEventListener('keydown', handler);
@@ -669,8 +710,9 @@ export function useEditorInteractions(
       }
       if (e.key !== 'Escape') return null;
       // Tool Punto armado: cancelar SOLO la colocación pendiente (el hook hace
-      // preventDefault + stopPropagation). Sin armar, el Esc fluye normal.
-      if (activeTool === 'point' && pointTool.armed) {
+      // preventDefault + stopPropagation). Con la cota del punto recién puesto
+      // a la vista, Esc la cierra (P3b). Si no, el Esc fluye normal.
+      if (activeTool === 'point' && (pointTool.armed || pointTool.puesto)) {
         pointTool.handleKeyDown(e);
         return 'point';
       }
@@ -1013,7 +1055,10 @@ export function useEditorInteractions(
         const ilPiece = pieces.find(p => p.id === selectedInternalLine.pieceId);
         if (ilPiece) {
           const ilLine = ilPiece.internals.find(l => l.id === selectedInternalLine.lineId);
-          if (ilLine) {
+          // Un piquete o un doblez de pliegue no se agarra por sus puntas: su
+          // path sale de un ancla o de una entidad, y arrastrarlo dejaba el
+          // ancla desfasada (P3b). La misma lista que Q (`esInternaEditable`).
+          if (ilLine && esInternaEditable(ilLine)) {
             const endpoints = getInternalLineEndpoints(ilLine);
             if (endpoints) {
               const { x: localX, y: localY } = patternToPieceLocal({ x: clickX, y: clickY }, ilPiece);
@@ -1132,6 +1177,19 @@ export function useEditorInteractions(
         }
       } else {
         if (trazoHit) { seleccionarTrazo(); return; }
+        // La esquina del margen se elige con un clic en su punta (spec
+        // 2026-10-02 § 5.2, P3c, la puerta de vuelta): ahí el clic caía en el
+        // vacío y deseleccionaba. Solo el izquierdo y sin Shift: con el
+        // derecho el vacío sigue soltando la selección, y Shift suma piezas.
+        if (e.button === 0 && !e.shiftKey) {
+          const visibles = pieces.filter(p => !hiddenLayerIds.includes(p.layer ?? 1));
+          const esquina = esquinaDelMargenEn(visibles, { x: clickX, y: clickY }, zoom2D, showSeamAllowance);
+          if (esquina) {
+            pushJournal('gesture', 'esquina:select', esquina);
+            dispatch(selectSaVertices(esquina));
+            return;
+          }
+        }
         // Empty area: start marquee selection
         if (!e.shiftKey) {
           dispatch(clearSelection());
@@ -1152,7 +1210,7 @@ export function useEditorInteractions(
         }
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox, selectedTrazo, trazos, showTrazos]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, circleTool, triangleTool, seamTool, notchTool, pointTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, seamEditTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, internalShapeTool, pleatTool, elasticTool, showTransformBox, selectedTrazo, trazos, showTrazos, showSeamAllowance, hiddenLayerIds]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -1473,9 +1531,11 @@ export function useEditorInteractions(
    * El ratón salió del lienzo. Todo resalte de hover se va con él (#1132).
    *
    * Cubría solo Margen. El censo del 06-09 encontró 14 hooks con estado de
-   * hover y uno cableado; estos tres son los que María nombró. Los que faltan
-   * están declarados en `1132-el-resalte-se-va-al-salir.test.ts`, que falla si
-   * el número sube — el mismo trinquete que ya guarda el espacio de pieza.
+   * hover y uno cableado; el 13-10 se cablearon las nueve que faltaban. Lo
+   * guarda `1132-el-resalte-se-va-al-salir.test.ts`: cada hook con hover
+   * expone `limpiarHover` y aquí se llama a todos. Cada uno deja su estado
+   * como lo dejaría un mousemove sobre la hoja vacía, y nada más: el trabajo
+   * en curso (los nodos de la Pluma, el inicio del corte) se queda.
    *
    * No se filtra por `activeTool`: un resalte encendido por la herramienta
    * anterior también se quedaba pegado, y limpiar de más no cuesta nada.
@@ -1487,7 +1547,16 @@ export function useEditorInteractions(
     measureTool.limpiarHover?.();
     editPattern.limpiarHover();
     nodeEditor.limpiarHover();
-  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool, editPattern, nodeEditor]);
+    pen.limpiarHover();
+    notchTool.limpiarHover();
+    pointTool.limpiarHover();
+    scissorsTool.limpiarHover();
+    topstitchTool.limpiarHover();
+    extendTrimTool.limpiarHover();
+    slashAndSpreadTool.limpiarHover();
+    walkSeamTool.limpiarHover();
+    trimTool.limpiarHover();
+  }, [seamAllowanceTool, seamEditTool, seamTool, measureTool, editPattern, nodeEditor, pen, notchTool, pointTool, scissorsTool, topstitchTool, extendTrimTool, slashAndSpreadTool, walkSeamTool, trimTool]);
 
   const getCursor = () => {
     switch (activeTool) {
@@ -1523,5 +1592,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, isDraggingPiece, isDraggingEndpoint };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handlePointerCancel, getCursor, selectMarquee, showTransformBox, showActionBar, isDraggingPiece, isDraggingEndpoint };
 }

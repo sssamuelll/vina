@@ -34,7 +34,7 @@ Estas cuatro preguntas cubren el 90% de la deriva medida:
    `src/styles/tokens.css`. Si no existe el token, **defínelo ahí**, no en tu
    componente.
 2. **¿Es una superficie que flota sobre el lienzo?** → usa un material entero
-   (§2). No inventes el tuyo.
+   (§2), y su raíz lleva `data-material="papel"`. No inventes el tuyo.
 3. **¿Es texto que ve la usuaria?** → español, y el término sale del glosario
    `docs/specs/2026-07-16-ui-copy-es-glosario.md`.
 4. **¿Es una función nueva?** → ¿por dónde entra? Si solo se llega por la
@@ -59,39 +59,100 @@ Estas cuatro preguntas cubren el 90% de la deriva medida:
 
 No se mezclan piezas de dos materiales. Se usa uno completo.
 
-| Material | Cuándo | Tokens |
+| Material | Qué es | Tokens |
 |---|---|---|
-| **`chrome`** | acoplado a una canaleta; opaco; **sin sombra** | `--surface-chrome-bg`, `-border`, `-radius`, `-shadow` (= none) |
-| **`overlay`** | flota de verdad sobre el documento y se va; casi opaco (0,96), línea de pelo, sombra corta en dos capas; **sin blur** | `--surface-overlay-bg`, `-border` (= `--hairline`), `-radius`, `-shadow`, `-blur` (= none) |
+| **`chrome`**, el marco | la barra superior y los paneles: atracado a un borde, opaco, **sin sombra** | `--surface-chrome-bg`, `-border`, `-radius`, `-shadow` (= none) |
+| **`overlay`**, lo que flota | menús, avisos, tooltips, modales y la barrita de la pieza: flota sobre la hoja y se va. **Es papel:** blanco, línea de pelo, sombra corta en dos capas, **sin blur** | `--surface-overlay-bg`, `-border` (= `--hairline`), `-radius`, `-shadow`, `-blur` (= none) |
 
-> **Enmienda 2026-09-26 (cromo callado, spec 2026-09-24 § 4.4):** los dos
-> roles siguen existiendo y se usan enteros, pero están hechos del MISMO
-> material y solo los distingue la sombra. El blur se retiró: con un fondo al
-> 92 % solo desenfocaba el 8 % que se transparentaba, y a cambio creaba los
-> contextos de apilamiento que recortaron `ConnectionModal` (párrafo de abajo).
-> `--surface-overlay-blur` sigue existiendo como token y vale `none`, para que
-> nadie lo reponga a mano. Se dice aquí para que no parezca fusión por descuido.
+> **Enmienda 2026-10-02 (spec «la interfaz en papel» § 7.1, § 7.2 y § 10):**
+> vuelven a ser dos materiales distintos, el marco oscuro y lo que flota en
+> claro. Deroga la del 26-09 («un solo material, solo los distingue la
+> sombra»). El blur sigue fuera: con un fondo al 92 % solo desenfocaba el 8 %
+> que se transparentaba, y creaba los contextos de apilamiento que recortaron
+> `ConnectionModal` (párrafo de abajo). `--surface-overlay-blur` vale `none`.
+
+**El ámbito de papel.** Lo que flota se vuelve papel con un atributo en su
+raíz: `data-material="papel"`. El bloque de `tokens.css` con ese selector
+redefine, para lo que está dentro, los mismos nombres que usa el marco: un
+componente escribe `--text-primary`, `--border` o `--surface-overlay-bg` y
+recibe tinta clara y fondo oscuro en el marco, tinta oscura y fondo blanco
+sobre el papel. No sabe dónde está. Cinco reglas:
+
+- **Todo portal nace papel.** Un portal cuelga de `<body>` y hereda la tinta
+  clara ya calculada ahí: su raíz lleva el atributo. Lo vigila
+  `tests/repo/lo-que-flota-es-papel.test.ts`, que además pide la marca,
+  archivo por archivo, en cada cosa que flota.
+- **Dentro del papel no hay `--bg-surface`, `--bg-base` ni `--bg-deeper`** (ni
+  sus alias `--bg-primary` y `--panel-bg`): el ámbito no los redefine, y un
+  campo pintado así queda negro con tinta negra encima. El trinquete de
+  contraste no lo ve, porque el valor de un campo no es un nodo de texto. Un
+  campo usa `--field-bg`; un botón secundario, `transparent` con
+  `1px solid var(--border)`; el hover y las teclas, `--bg-elevated` (papel
+  hundido).
+- **Lo que separa es línea de pelo** (`--border-subtle`, o `--hairline` si es
+  un borde). Dentro del papel, `--border` es el borde de un campo, a 3:1.
+- **Un alias de `:root` se resuelve en `:root`.** Si un token nuevo lee un
+  nombre que el ámbito redefine (`--text-muted: var(--text-tertiary)`), el
+  ámbito lo vuelve a declarar; si no, baja con el valor del marco. Lo vigila
+  `src/styles/__tests__/ambito-de-papel.test.ts`.
+- **El 3D ya no es «hasta su fase» (P5).** El escenario es el papel de la hoja:
+  el lienzo es transparente de fábrica y `.canvas-area__3d` pinta `--canvas-2d`
+  (`scene.background` pasa por el mapeo de tonos y un `#faf4e3` sale `#e1e0da`),
+  el suelo es solo sombra, y entre la hoja y el escenario de Split hay una línea
+  de pelo (`.canvas-area__divider`, con el ámbito). Lo que se leía sobre la
+  escena bajó al marco o se hizo papel: los mapas son un menú de papel en la
+  barra superior («Mapa ▾», con «Texturizado ▾» y el interruptor del avatar en el
+  grupo de la prenda) y su escala y su tabla son papel (`LeyendaDeMapas`); la
+  voz de la vista vive en la sección del 3D de la línea al pie (`SeccionDel3D`),
+  y el estado de la simulación, desde el 2026-10-11, es un icono al pie del
+  margen del 3D (`EstadoDeLaSimulacion`) que despliega su detalle a la izquierda
+  del margen (en P5 fue una línea de texto en el pie). Desde P4 los paneles son
+  `chrome` a ras, entre la barra superior y la línea al pie (`.context-panel`,
+  `floating.css`). La fila dejó el lienzo en P2a: sus seis interruptores viven en
+  la barra superior, que es marco, y solo su menú plegado («Mostrar») flota y es
+  papel. La tira murió en P2b: sus opciones viven en la línea al pie, que es
+  papel desde el 2026-10-11 (hasta entonces fue marco), y su menú «Más» flota.
+  La barra de IA es papel desde P2c, y solo
+  existe convocada. El margen de herramientas lleva el ámbito desde P2a y la
+  hoja desde P2b; el margen del 3D y el escenario, desde P5. **Lo único que
+  sigue en el overlay oscuro de `:root` dentro del visor** son dos paneles y la
+  barra de instantáneas, hasta su fase: `RenderSettingsPanel` (se abre desde
+  Archivo ▸ Exportar 3D, la paleta y «Ajustes del mapa…») y `CollisionBodyPanel`,
+  que hoy NO tiene puerta en el shell —su botón «CC» solo se pinta con
+  `!hideChrome` y `AppShell` monta el visor con `hideChrome`—: es previo a P5 y
+  rompe la ley de puertas (§ 6); P6 tiene que darle una o retirarlo.
 
 Más una familia de **tinta**, que no es superficie: `--ink-*` es lo que se
 dibuja **sobre el papel** del lienzo 2D.
 
-> **La trampa que ya nos costó una vez:** los `--text-*` son la tinta del cromo
-> **oscuro**. Aplicados sobre el crema del lienzo dan 1.05:1 de contraste — o
-> sea, invisibles. Si tu texto va dentro del `<svg>` del lienzo, usa `--ink-*`.
+> **La trampa que ya nos costó una vez, cerrada en P2b:** los `--text-*`
+> cambian con el material. Dentro de `data-material="papel"` son tinta
+> oscura; fuera, la del marco. La hoja lleva el ámbito desde P2b, así que lo
+> que vive sobre ella puede usar `--text-*`; lo que está en el marco (la barra
+> superior y los paneles) recibe la tinta clara. La línea al pie es papel desde
+> el 2026-10-11: su raíz lleva el ámbito, como el margen. Lo que se
+> dibuja del patrón, dentro del `<svg>`, sigue con `--ink-*`, que no cambia
+> con el material.
 
 Variantes declaradas (no inventes más): `--surface-overlay-radius-pill` para
-barras con forma de cápsula, y `--surface-overlay-bg-recessed` para el reposo de
-la barra de IA.
+barras con forma de cápsula. Las `-recessed` ya no las usa la barra de IA, que
+desde P2c no tiene reposo; siguen la cota y el avatar hasta P6 (spec § 7.5).
 
-> **Y `--surface-overlay-border-flush`** (bordes → tono: la sombra en capas
-> `--surface-overlay-shadow-sheet` separa, el borde queda para los campos). La
-> usan la tira de herramienta del lienzo 2D y los chips de cota
-> (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10).
-> **Excepción dicha:** la tira es un `overlay` que NO se va — está mientras hay
-> herramienta 2D activa, bajo la regla (28 px) y nunca sobre ella. Y las cotas
-> van sobre el patrón por definición: son parte del objeto, como los tiradores
-> del transform box, no un panel. Lo pidió Samuel el 2026-08-30; queda escrito
-> para que no se vuelva regla tácita.
+**La etiqueta de opción** (`PatternEditor/etiquetas/EtiquetaDeOpcion.tsx`, P3c)
+es la única pastilla de opciones sobre la hoja: es `cabina`, es papel, y su
+menú lleva los controles de la línea al pie (`Control`), no una lista nueva.
+Lo elegido que tenga opciones las enseña ahí: un objeto nuevo suma su rama a
+`etiquetas.ts` y no inventa otra pastilla. Los nombres de las alternativas salen
+de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
+`TIPOS_DE_ESQUINA`), que comparten el pie, la etiqueta y Propiedades.
+
+> **Las cotas van sobre el patrón por definición:** son parte del objeto,
+> como los tiradores del transform box, no un panel
+> (`docs/superpowers/specs/2026-08-30-cotas-vivas-design.md` § 9-10). La
+> tira de herramienta, el otro `overlay` que no se iba, murió en P2b con su
+> borde `-flush` y su sombra `-sheet`: su sitio es la línea al pie, que es
+> una fila de la ventana y no una excepción (spec 2026-10-02 § 10), papel
+> como los márgenes desde el 2026-10-11.
 
 > **Nota 2026-09-26:** ya no hay blur, así que un overlay ya NO establece
 > contexto de apilamiento por sí mismo; lo que sigue vale para cualquier
@@ -128,8 +189,40 @@ la barra de IA.
 ## 3. Ley de emplazamiento
 
 - El cromo se **acopla en canaletas**; el documento tiene área segura.
+- **En reposo, solo lo que perdura** (spec 2026-10-02 «la interfaz en papel»
+  § 3, ley 2): la barra superior, los márgenes de herramientas, la línea al
+  pie y la marca de escala. Nada más está montado. Lo mide
+  `reposo-solo-lo-que-perdura.spec.ts`, con una línea base que solo baja.
+- **El selector de vista y los márgenes no se mueven.** El selector está en el
+  centro de la ventana en las tres vistas, porque la barra superior reparte
+  sus dos lados a partes iguales (lo mide `barra-superior.spec.ts`). Los
+  márgenes de herramientas son columnas pegadas al borde que no tapan la hoja
+  (lo mide `margen-de-herramientas.spec.ts`). Van en el flujo, al lado de la
+  hoja: lo que flota encima no comparte caja con ellos y no los empuja. Con
+  barras clásicas el margen crece de 44 a 47 px mientras sus herramientas no
+  caben, y la hoja se corre esos 3 px. Al abrir un panel tampoco se mueven,
+  en 2D desde P4 y en Split y 3D desde P5: el panel va a la derecha, a ras, y la
+  hoja se estrecha por ese lado (`emplazamiento-paneles.spec.ts`). El margen del
+  3D es la última columna de la ventana, DETRÁS de los paneles: un panel se abre
+  entre el escenario y el margen, nunca tapa ni empuja al margen
+  (`el-3d-en-papel.spec.ts`).
+- **La línea al pie es una fila de la ventana.** Papel, con los colores del
+  margen de herramientas (enmienda 2026-10-11; hasta entonces fue marco), de
+  lado a lado y siempre, con el alto de la barra superior; la hoja termina
+  encima y nada la empuja. Las opciones de la herramienta viven ahí, como
+  botones; lo que no cabe pasa a «Más». Con el visor a la vista lleva también
+  la sección del 3D (la voz de la vista, P5): el patrón no baja de 320 px y la
+  voz del 3D es lo primero que se recorta; con la vista 3D sola el 3D se lleva
+  todo el pie. El estado de la simulación no va aquí: es un icono al pie del
+  margen del 3D (`EstadoDeLaSimulacion`). Lo miden `linea-al-pie.spec.ts` (el
+  patrón) y `el-3d-en-papel.spec.ts` (el reparto, el papel y el estado).
+- **La IA no existe en reposo.** Se llama con «IA», `Ctrl+/`, `Ctrl+K` o desde
+  la pantalla vacía, y aparece sobre la línea al pie, en papel. Ocultarla no
+  pierde la conversación ni corta al agente: viven en el store
+  (`store/iaSlice.ts`, `copilot/conversacion.ts`). Lo mide
+  `ia-convocada.spec.ts`.
 - Solo tres cosas pueden taparlo: menús transitorios, toasts y la paleta.
-- Un panel nuevo NO se abre encima de la regla ni del patrón.
+- Un panel nuevo NO se abre encima del patrón.
 - Nada de `z-index` literal. Si necesitas una capa, es que falta un rol.
 - **`isolation: isolate` no hace lo que parece.** Un elemento con `position` (no
   `static`) y `z-index` numérico **ya es** contexto de apilamiento; agregarle
@@ -160,6 +253,20 @@ la barra de IA.
 - **Todo lo que tenga `:hover` tiene `:focus-visible`.** El repo llegó a tener
   76 contra 6.
 - `outline: none` solo es legal si la misma regla pone otra señal en su lugar.
+- **Enter y Espacio son del botón que tiene el foco del teclado.** Una
+  botonera que convive con el lienzo (la línea al pie y su menú «Más») lo
+  declara con `data-botonera`: sus botones no se quedan con el foco por un
+  clic, un clic en cualquier sitio suelta el que dejó el teclado, y con el
+  foco de teclado su Enter y su Espacio no pasan a los atajos ni a la
+  herramienta (`src/shortcuts/teclaDeBotonera.ts`). Sin eso, Espacio sobre una
+  alternativa arrancaba la simulación y Enter sobre «Más» desplazaba la pieza
+  (revisión de P2b). La barra superior y «Mostrar» todavía no lo cumplen.
+- **Esc cierra lo que se llama antes que la selección:** menú, barra de IA,
+  panel, en ese orden y de uno en uno (spec 2026-10-02 § 6.2). Una superficie
+  nueva que se cierra con Esc sube su peldaño con `usePeldanoDeEscape`
+  (`src/shortcuts/escaleraDeLoLlamado.ts`) y no escucha Escape por su cuenta:
+  un oyente propio corre después del atajo de deseleccionar y suelta la pieza
+  al cerrar.
 - Nada de `confirm()` / `alert()` / `prompt()`. Existe el sistema de Toast
   (`showToast`, `showErrorToast`, `showUndoToast` en `copilotUISlice`). Para algo
   destructivo, prefiere **actuar y ofrecer deshacer** antes que preguntar.
@@ -176,7 +283,7 @@ la barra de IA.
   igual: `notch` tenía Shift+N registrado y el dock no lo mostraba, así que para
   la usuaria no existía.
 - **Mono = un dato cuya alineación carácter a carácter significa algo**
-  (regla, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
+  (marca de escala, cotas, píldora de medida, `kbd`). Toda la prosa del cromo va en
   `--font-sans`: el estado, los rótulos del dock, el estado vacío, el valor de
   una opción. Una sola familia de cada: Inter y JetBrains Mono, nada más se
   carga (`app/index.html`). Lo fija `tipografia-del-cromo.test.ts`, selector por
@@ -213,24 +320,27 @@ cuántos materiales hay de verdad en pantalla— existe el censo contra la app v
 npm run audit:ui        # requiere el server de dev corriendo
 ```
 
-Y dos trinquetes más, en navegador, con su línea base en JSON que **solo baja**
-(spec 2026-09-24 § 3.4 y § 7). El techo efectivo de un estado es el mayor de
-la meta y la línea base: por debajo de la meta el diseño puede mover
-superficies; por encima, solo se baja. Con reintentos, un fallo a mitad de un
-grupo serial escribe medidas parciales: por eso `--retries=0`.
+Y tres trinquetes más, en navegador, con su línea base en JSON que **solo baja**
+(spec 2026-09-24 § 3.4 y § 7; spec 2026-10-02 § 9). El techo efectivo de un
+estado es el mayor de la meta y la línea base: por debajo de la meta el diseño
+puede mover superficies; por encima, solo se baja. Con reintentos, un fallo a
+mitad de un grupo serial escribe medidas parciales: por eso `--retries=0`.
 
 ```bash
-npx playwright test tests/e2e/superficies-por-accion.spec.ts   # ≤ 4 componentes que aparecen o cambian por acción
-npx playwright test tests/e2e/contraste-del-cromo.spec.ts      # ningún texto del cromo bajo AA sobre su fondo real
+npx playwright test tests/e2e/reposo-solo-lo-que-perdura.spec.ts   # en reposo, solo lo que perdura (meta: 0 de sobra)
+npx playwright test tests/e2e/superficies-por-accion.spec.ts       # ≤ 4 componentes que aparecen o cambian por acción
+npx playwright test tests/e2e/contraste-del-cromo.spec.ts          # ningún texto del cromo bajo AA sobre su fondo real
 ```
 
 Una superficie nueva **declara** qué es con `data-superficie` (vocabulario en
 `tests/repo/superficies-declaradas.test.ts`); sin marca, el trinquete no la ve.
-Los dos trinquetes en navegador corren en local y antes de cada PR; en CI el trabajo de e2e sigue en
-`continue-on-error` (#506), así que hoy no bloquean el merge por sí solos.
+Los tres corren en local, antes de cada PR y, desde el 2026-10-02, en el gate
+del deploy (`scripts/deploy-prod.sh`); en CI el trabajo de e2e sigue en
+`continue-on-error` (#506), así que ahí no bloquean el merge por sí solos.
 Para bajar un techo:
 
 ```bash
+REPOSO_UPDATE=1 npx playwright test tests/e2e/reposo-solo-lo-que-perdura.spec.ts --retries=0 --workers=1
 SUPERFICIES_UPDATE=1 npx playwright test tests/e2e/superficies-por-accion.spec.ts --retries=0 --workers=1
 CONTRASTE_UPDATE=1 npx playwright test tests/e2e/contraste-del-cromo.spec.ts --retries=0 --workers=1
 ```

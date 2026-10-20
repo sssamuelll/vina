@@ -8,7 +8,6 @@
  */
 
 import * as THREE from 'three';
-import { POSE_PRESETS } from '../../store/avatarSlice';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../avatar/morphTargets';
 
 const DEG2RAD = Math.PI / 180;
@@ -265,11 +264,6 @@ export function applyPose(
   });
 }
 
-/** Back-compat: A-pose from the static preset. */
-export function applyAPose(scene: THREE.Object3D): void {
-  applyPose(scene, POSE_PRESETS['A-pose']);
-}
-
 /**
  * Apply the SAME measurement morph the render does (AvatarModel.tsx:523-550) to a
  * freshly-loaded avatar scene, so the EXTRACTED collision mesh matches the RENDERED
@@ -283,8 +277,9 @@ export function applyMorph(
   scene: THREE.Object3D,
   measurements: MorphConfig,
   morphTargets: Record<string, number>,
+  referencia: MorphConfig,
 ): void {
-  const w = computeMorphWeights(measurements);
+  const w = computeMorphWeights(measurements, referencia);
   scene.traverse((obj) => {
     if ((obj as THREE.Bone).isBone) {
       const bone = obj as THREE.Bone;

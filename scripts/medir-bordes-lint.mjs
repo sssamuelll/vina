@@ -51,7 +51,7 @@ const iRoot = process.argv.indexOf('--root');
 const ROOT = iRoot !== -1 && process.argv[iRoot + 1] ? process.argv[iRoot + 1] : RAIZ_PROPIA;
 const LISTAR = process.argv.includes('--list');
 
-const FAMILIA_QUE_MIDE = 'computePathArcLength|pointAtPathDistance|samplePathAtIntervals|distanceAlongPath|samplePathDense';
+const FAMILIA_QUE_MIDE = 'computePathArcLength|pointAtPathDistance|samplePathAtIntervals|distanceAlongPath|projectOntoPath|samplePathDense';
 
 /** Una llamada a la familia que mide a lo largo de un rango de comandos. */
 const MIDEN = new RegExp(`\\b(${FAMILIA_QUE_MIDE})\\s*\\(`);

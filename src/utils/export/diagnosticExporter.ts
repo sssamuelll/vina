@@ -68,12 +68,12 @@ function snapshotOf(record: ClothGeometryRecord | null): ClothSnapshot | null {
   };
 }
 
-/** Los 20 slices del store fuera de `project`/`avatar`/`simulation`/`inspector` (exportados aparte). Trinquete: `exportedSlices.ratchet.test.ts`. */
+/** Los 22 slices del store fuera de `project`/`avatar`/`simulation`/`inspector` (exportados aparte). Trinquete: `exportedSlices.ratchet.test.ts`. */
 export const EXPORTED_SLICES = [
   'editor', 'tools', 'dock', 'inputScheme', 'layout', 'workflow',
   'renderSettings', 'camera', 'copilotUI', 'collisionBody', 'plugins',
   'blueprints', 'marker', 'nesting', 'grading', 'bom', 'parametric',
-  'construction', 'animation', 'avatarTape',
+  'construction', 'animation', 'avatarTape', 'ia', 'puente',
 ] as const;
 
 export interface DiagnosticSources {
@@ -119,7 +119,7 @@ export interface DiagnosticBundle {
   /** La bitácora completa (spec § 2). Un ciclo en algún `data` nombra al culpable en vez de tumbar el bundle entero. */
   journal: { events: JournalEvent[]; dropped: number } | { unserializable: string };
   environment: Environment;
-  /** Los 20 slices de `EXPORTED_SLICES`, cada uno pasado por `safeJson`. */
+  /** Los 21 slices de `EXPORTED_SLICES`, cada uno pasado por `safeJson`. */
   slices: Record<(typeof EXPORTED_SLICES)[number], unknown>;
   storage: StorageParseFailureSnapshot;
 }

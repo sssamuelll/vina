@@ -128,6 +128,21 @@ test.describe('las siete puertas se alcanzan', () => {
       `el personalizador se sale (${medida!.top}→${medida!.bottom} de ${medida!.vh}) y no scrollea`,
     ).toBe(true);
   });
+
+  test('el personalizador se ve: lo que hay en su caja es él, no el lienzo', async ({ page }) => {
+    // #1149 le puso scroll al dock, y un scroll recorta todo lo que se sale de
+    // su caja: el personalizador existía, con su tamaño, a la derecha del dock
+    // y fuera de la vista. Los clics de este archivo lo alcanzaban porque
+    // Playwright desplaza el dock a lo ancho hasta encontrarlo; una persona no.
+    await abrirApp(page);
+    await abrirPersonalizador(page);
+    const tapados = await page.evaluate(() => {
+      const r = document.querySelector('.dock-picker')!.getBoundingClientRect();
+      return [[r.left + 20, r.top + 20], [r.left + r.width / 2, r.top + r.height / 2], [r.right - 20, r.bottom - 20]]
+        .filter(([x, y]) => !document.elementFromPoint(x, y)?.closest('.dock-picker')).length;
+    });
+    expect(tapados, 'el personalizador está recortado o tapado: de tres puntos de su caja, estos no son él').toBe(0);
+  });
 });
 
 test.describe('«Abrir la pieza» — el gesto más largo del lienzo, dicho y hecho', () => {
@@ -188,7 +203,8 @@ test.describe('«Abrir la pieza» — el gesto más largo del lienzo, dicho y he
 
   test('y la pista cabe en la pantalla en TODAS sus fases', async ({ page }) => {
     // La primera redacción metía los cinco pasos en una línea: 883 px de ancho
-    // arrancando en x = −101. Con la pista por fases, cada una tiene que caber.
+    // arrancando en x = −101. Desde P2b la frase vive en la línea al pie: tiene
+    // que estar, y caber entera, en todas las fases.
     const pieza = await unaTira(page);
     await dispatch(page, 'editor/selectPiece', pieza.id);
     await dispatch(page, 'editor/setActiveTool', 'slashAndSpread');
@@ -196,20 +212,22 @@ test.describe('«Abrir la pieza» — el gesto más largo del lienzo, dicho y he
     await page.waitForTimeout(400);
 
     const medirPista = () => page.evaluate(() => {
-      const t = [...document.querySelectorAll('svg.pattern-svg text')]
-        .map((e) => ({ txt: e.textContent ?? '', r: (e as SVGGraphicsElement).getBoundingClientRect() }))
-        .filter((x) => x.txt.length > 25)
-        .sort((a, b) => b.txt.length - a.txt.length)[0];
+      const t = document.querySelector<HTMLElement>('.seccion-del-patron__texto');
       if (!t) return null;
-      return { txt: t.txt, left: Math.round(t.r.left), right: Math.round(t.r.right), vw: window.innerWidth };
+      const r = t.getBoundingClientRect();
+      return {
+        txt: t.textContent ?? '', left: Math.round(r.left), right: Math.round(r.right),
+        vw: window.innerWidth, recortada: t.scrollWidth > t.clientWidth + 1,
+      };
     });
 
     const fuera: string[] = [];
     const pasos: Array<[number, number]> = [[220, 140], [220, 290], [170, 215], [170, 215], [220, 290]];
     for (let i = 0; i <= pasos.length; i++) {
       const p = await medirPista();
-      if (p && (p.left < 0 || p.right > p.vw)) {
-        fuera.push(`paso ${i}: "${p.txt.slice(0, 45)}…" ${p.left}→${p.right} de ${p.vw}`);
+      if (!p) fuera.push(`paso ${i}: sin frase`);
+      else if (p.left < 0 || p.right > p.vw || p.recortada) {
+        fuera.push(`paso ${i}: "${p.txt.slice(0, 45)}…" ${p.left}→${p.right} de ${p.vw}${p.recortada ? ', recortada' : ''}`);
       }
       if (i < pasos.length) await clic(page, pasos[i][0], pasos[i][1]);
     }
@@ -305,7 +323,7 @@ test.describe('un catálogo de veintiuna no puede empujar el dock fuera de la pa
     await page.waitForTimeout(600);
 
     const medida = await page.evaluate(() => {
-      const d = document.querySelector('.dock--left') as HTMLElement | null;
+      const d = document.querySelector('nav.margen') as HTMLElement | null;
       if (!d) return null;
       const r = d.getBoundingClientRect();
       const scrollea = d.scrollHeight > d.clientHeight + 1;

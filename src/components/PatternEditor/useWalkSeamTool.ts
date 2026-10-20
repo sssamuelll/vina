@@ -26,6 +26,7 @@ import { snapToOutline, findEdgeForSegment, buildEdgeInfo, buildOutlineInfo } fr
 import { formatDimension } from '../../utils/units';
 import { screenToPattern } from './sewingUtils';
 import { noPasoNada } from './noPasoNada';
+import { bandaDeDesajuste, metricasDeCaminar, TOLERANCIA_CAMINAR_MM } from '../../utils/seam/caminarCostura';
 
 // ─── Exported Types ─────────────────────────────────────────────────────────
 
@@ -260,14 +261,7 @@ export function sampleMismatch(
 
     if (!ptA || !ptB) continue;
 
-    let color: 'green' | 'yellow' | 'red';
-    if (delta < tolerance) {
-      color = 'green';
-    } else if (delta < 2 * tolerance) {
-      color = 'yellow';
-    } else {
-      color = 'red';
-    }
+    const color = bandaDeDesajuste(delta, tolerance);
 
     samples.push({
       distance: dA,
@@ -288,14 +282,7 @@ export function sampleMismatch(
     const ptB = pointAtPathDistance(outlineB, dB, b0, b1);
 
     if (ptA && ptB) {
-      let color: 'green' | 'yellow' | 'red';
-      if (delta < tolerance) {
-        color = 'green';
-      } else if (delta < 2 * tolerance) {
-        color = 'yellow';
-      } else {
-        color = 'red';
-      }
+      const color = bandaDeDesajuste(delta, tolerance);
 
       samples.push({
         distance: lenA,
@@ -341,7 +328,7 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
   const seams = useSelector((s: RootState) => s.project.seams);
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
   const tolerance = useSelector(
-    (s: RootState) => Number(s.tools.toolOptions[activeTool2D]?.tolerance ?? '3'),
+    (s: RootState) => Number(s.tools.toolOptions[activeTool2D]?.tolerance ?? String(TOLERANCIA_CAMINAR_MM)),
   );
   const ghostOpacity = useSelector(
     (s: RootState) => Number(s.tools.toolOptions[activeTool2D]?.ghostOpacity ?? '30'),
@@ -390,18 +377,8 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
     );
     setMismatchSamples(samples);
 
-    const lenA = stationaryEdge.arcLength;
-    const lenB = mobileEdge.arcLength;
-    const delta = lenB - lenA;
-    const easePercent = lenA > 0 ? (delta / lenA) * 100 : 0;
-
-    setMetrics({
-      lengthA: lenA,
-      lengthB: lenB,
-      delta,
-      easePercent,
-      walkPosition: 0,
-    });
+    const { lengthA, lengthB, delta, easePercent } = metricasDeCaminar(stationaryEdge.arcLength, mobileEdge.arcLength, tolerance);
+    setMetrics({ lengthA, lengthB, delta, easePercent, walkPosition: 0 });
   }, [stationaryEdge, mobileEdge, tolerance]);
 
   const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
@@ -562,6 +539,10 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
 
   const clear = reset;
 
+  /** Al salir del lienzo de golpe no llega mousemove que lo apague (#1132).
+   *  Solo el enganche: los bordes elegidos y el fantasma se quedan. */
+  const limpiarHover = useCallback(() => setHoveredSnapPoint(null), []);
+
   const formatDistance = useCallback((mm: number): string => {
     return formatDimension(mm, units);
   }, [units]);
@@ -587,5 +568,6 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
     getCursor,
     reset,
     clear,
+    limpiarHover,
   };
 }

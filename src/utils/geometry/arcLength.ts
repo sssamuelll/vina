@@ -332,8 +332,23 @@ export function samplePathDense(
 export function distanceAlongPath(
   commands: PathCommand[], point: Point2D, startIdx?: number, endIdx?: number,
 ): number {
+  return projectOntoPath(commands, point, startIdx, endIdx).distance;
+}
+
+/**
+ * La proyección de un punto sobre el camino: la distancia a lo largo de él
+ * hasta el pie, y el desvío del punto a ese pie. Las dos salen de la MISMA
+ * proyección. Medir el desvío con una ida y vuelta —`distanceAlongPath` y
+ * luego `pointAtPathDistance`— mentía en las curvas: `pointAtDistance` usa
+ * t = d / largo, lineal en el parámetro y no en el arco, y sobre un `C` la
+ * vuelta caía en otro punto de la misma curva, a hasta 20 mm (revisión de la
+ * entrega 1a de la superficie, 2026-10-05).
+ */
+export function projectOntoPath(
+  commands: PathCommand[], point: Point2D, startIdx?: number, endIdx?: number,
+): { distance: number; offset: number } {
   const segments = parseSegments(commands, startIdx, endIdx);
-  if (segments.length === 0) return 0;
+  if (segments.length === 0) return { distance: 0, offset: Infinity };
 
   let bestTotalDist = 0;
   let bestPerpDist = Infinity;
@@ -369,5 +384,5 @@ export function distanceAlongPath(
     }
   }
 
-  return bestTotalDist;
+  return { distance: bestTotalDist, offset: bestPerpDist };
 }

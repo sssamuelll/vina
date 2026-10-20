@@ -87,6 +87,11 @@ export const DEFAULT_FIT_MAP_CONFIG: FitMapConfig = {
   pressureDistance: 0.002,
 };
 
+/** Los parámetros de ajuste cuando la tela de la simulación no está en la biblioteca. */
+export const DEFAULT_FIT_PARAMS: FabricFitParams = {
+  maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
+};
+
 // ─── Color Scales ───────────────────────────────────────────────────────────
 
 /**
@@ -562,20 +567,20 @@ export function fabricToFitParams(fabric: {
  * el solver todavía no existe (`wasmSolverWorker.ts:845`), y dejaría el fit
  * map computando sobre cero aristas para siempre.
  *
- * @param fitMapMode  modo activo; con 'none' no hace falta edge data
+ * Se pide haya o no mapa en pantalla: la superficie lo lee por pieza
+ * (`fit_map`, IA 1b-2). Antes, con el modo en 'none', no se pedía nunca más.
+ *
  * @param edgeData    el edge data disponible, o null si aún no llegó
  * @param nowMs       reloj actual (performance.now())
  * @param lastRequestMs  cuándo se pidió por última vez (-Infinity si nunca)
  * @param intervalMs  espera mínima entre peticiones
  */
 export function shouldRequestEdgeData(
-  fitMapMode: FitMapMode,
   edgeData: SolverEdgeData | null,
   nowMs: number,
   lastRequestMs: number,
   intervalMs = 1000,
 ): boolean {
-  if (fitMapMode === 'none') return false;
   if (edgeData && edgeData.stretchingIds.length > 0) return false;
   return nowMs - lastRequestMs >= intervalMs;
 }

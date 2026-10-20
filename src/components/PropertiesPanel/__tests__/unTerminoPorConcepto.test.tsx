@@ -1,0 +1,63 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Un término por concepto (contrato de interfaz § 5): Propiedades nombra los
+ * tipos de costura igual que la línea al pie y la etiqueta de opción (P3c).
+ * Antes decía «Estándar» y «Sobrecargada» donde el pie decía otra cosa. Las
+ * formas del piquete y los preajustes de margen salieron de Propiedades en P4.
+ */
+import { describe, it, expect, afterEach } from 'vitest';
+import { act, render, cleanup } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import projectReducer, { addPiece, addSeam } from '../../../store/projectSlice';
+import editorReducer, { selectPiece, selectSeam } from '../../../store/editorSlice';
+import simulationReducer from '../../../store/simulationSlice';
+import toolReducer from '../../../store/toolSlice';
+import PropertiesPanel from '../PropertiesPanel';
+import type { AppDispatch } from '../../../store';
+import type { PatternPiece, Seam } from '../../../types/types';
+import { TIPOS_DE_COSTURA } from '../../../utils/seam/tiposDeCostura';
+
+afterEach(cleanup);
+
+function pieza(): PatternPiece {
+  return {
+    id: 'p1', name: 'Delantero',
+    outline: [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] }, { type: 'L', values: [0, 100] }, { type: 'Z', values: [] },
+    ],
+    position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: true,
+  } as unknown as PatternPiece;
+}
+
+function panel() {
+  const store = configureStore({
+    reducer: { project: projectReducer, editor: editorReducer, simulation: simulationReducer, tools: toolReducer },
+  });
+  (store.dispatch as AppDispatch)(addPiece(pieza()));
+  (store.dispatch as AppDispatch)(selectPiece('p1'));
+  render(<Provider store={store}><PropertiesPanel /></Provider>);
+  return store;
+}
+
+describe('Propiedades nombra como la línea al pie', () => {
+  it('los tipos de costura, en su desplegable y en la insignia de la lista', () => {
+    const store = panel();
+    const costura: Seam = {
+      id: 's1', type: 'flat-felled', tension: 1, strength: 1, active: true, taped: false, tapeWidth: 0,
+      pieceA: { pieceId: 'p1', edgeName: 'edge-1' }, pieceB: { pieceId: 'p1', edgeName: 'edge-3' },
+    } as Seam;
+    act(() => { (store.dispatch as AppDispatch)(addSeam(costura)); });
+    // Con la costura elegida: con una pieza, la lista del proyecto no sale (P4).
+    act(() => { (store.dispatch as AppDispatch)(selectSeam('s1')); });
+    // La lista de costuras: la insignia ya no dice «sobrecargada».
+    expect(document.querySelector('.seam-type')?.textContent).toBe('flat-felled');
+    const tipo = Array.from(document.querySelectorAll('select'))
+      .find((s) => Array.from(s.options).some((o) => o.value === 'flat-felled'))!;
+    expect(Array.from(tipo.options).map((o) => [o.value, o.textContent]))
+      .toEqual(TIPOS_DE_COSTURA.map((t) => [t.value, t.label]));
+  });
+});

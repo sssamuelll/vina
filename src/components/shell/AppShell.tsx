@@ -14,11 +14,13 @@ import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
 import LeftDock from './LeftDock';
 import RightDock from './RightDock';
+import SeccionDel3D from './SeccionDel3D';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import ReferenceImageSettings from '../PatternEditor/ReferenceImageSettings';
 import { useReferenceImages } from '../PatternEditor/useReferenceImages';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import ContextPanel from './ContextPanel';
+import PreferenciasPanel from './PreferenciasPanel';
 import ToastContainer from './ToastContainer';
 import ConfirmDialog from './ConfirmDialog';
 import { usePanelHost } from '../../hooks/usePanelHost';
@@ -74,7 +76,7 @@ const PanelLoading = () => (
 );
 
 /** Nombre visible del panel. Las CLAVES (Properties, BOM...) no se tocan:
- * indexan renderPanelContent y getPanelSide; solo cambia el display. */
+ * indexan renderPanelContent; solo cambia el display. */
 const PANEL_LABELS: Record<string, string> = {
   Avatar: 'Avatar',
   BOM: 'Lista de materiales',
@@ -83,14 +85,15 @@ const PANEL_LABELS: Record<string, string> = {
   Nesting: 'Marcada',
   Layers: 'Capas',
   Properties: 'Propiedades',
+  Preferences: 'IA y ratón',
   ReferenceImages: 'Imágenes de referencia',
 };
 
-function renderPanelContent(name: string) {
+function renderPanelContent(name: string, cerrar: () => void) {
   const fallback = <PanelLoading />;
   switch (name) {
     case 'Avatar':
-      return <Suspense fallback={fallback}><AvatarPanel open /></Suspense>;
+      return <Suspense fallback={fallback}><AvatarPanel /></Suspense>;
     case 'BOM':
       return <Suspense fallback={fallback}><BOMTab /></Suspense>;
     case 'Grading':
@@ -103,6 +106,8 @@ function renderPanelContent(name: string) {
       return <Suspense fallback={fallback}><LayerPanel /></Suspense>;
     case 'Properties':
       return <Suspense fallback={fallback}><PropertiesPanel /></Suspense>;
+    case 'Preferences':
+      return <PreferenciasPanel alCerrar={cerrar} />;
     case 'ReferenceImages':
       return <ReferenceImagesPanel />;
     default:
@@ -116,12 +121,17 @@ function renderPanelContent(name: string) {
 export default function AppShell() {
   const dispatch = useDispatch();
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
+  // La IA no existe en reposo: la barra se monta cuando se la llama (spec 2026-10-02 § 6.2).
+  const iaAbierta = useSelector((s: RootState) => s.ia.abierta);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const { leftPanel, rightPanel, openPanel, togglePanel, closeLeft, closeRight } = usePanelHost();
+  const { paneles, openPanel, togglePanel, closePanel } = usePanelHost();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const [dxfDragActive, setDxfDragActive] = useState(false);
+  // La ranura de la línea al pie donde PatternEditor pinta la sección del
+  // patrón. Por estado y no por ref: el portal necesita el nodo ya montado.
+  const [ranuraDelPie, setRanuraDelPie] = useState<HTMLDivElement | null>(null);
   const dxfDragCounter = useRef(0);
   const dxfInputRef = useRef<HTMLInputElement>(null);
 
@@ -210,11 +220,11 @@ export default function AppShell() {
   }, [importDXFFile]);
 
   // ─── Divider drag ───────────────────────────────────────────────────
-  // H-1: `canvasRef` (.canvas-area) ya no es la región repartible — desde que
-  // los paneles pasaron a ser hijos flex reales, puede tener hasta dos
-  // paneles de 324px de cada lado ocupando ese mismo rect. La región real va
+  // H-1: `canvasRef` (.canvas-area) ya no es la región repartible — los
+  // paneles son hijos flex reales, y desde P4 puede haber hasta dos de 300 px
+  // a la derecha ocupando ese mismo rect. La región real va
   // del borde izquierdo de .canvas-area__2d al borde derecho de
-  // .canvas-area__3d, midiendo los elementos (nunca 300/324 a mano, eso es
+  // .canvas-area__3d, midiendo los elementos (nunca 300 a mano, eso es
   // lo que sobrevive a que cambie el ancho del panel), y hay que descontar
   // el ancho del propio divisor del espacio repartible. Se captura todo UNA
   // vez al empezar el arrastre, no en cada mousemove.
@@ -290,6 +300,7 @@ export default function AppShell() {
         {dxfDragActive && (
           <div
             data-superficie="velo"
+            data-material="papel"
             style={{
               position: 'absolute',
               inset: 0,
@@ -305,7 +316,8 @@ export default function AppShell() {
           >
             <div
               style={{
-                background: 'var(--bg-elevated)',
+                background: 'var(--surface-overlay-bg)',
+                border: 'var(--surface-overlay-border)',
                 color: 'var(--text-primary)',
                 padding: '14px 22px',
                 borderRadius: 8,
@@ -318,43 +330,56 @@ export default function AppShell() {
             </div>
           </div>
         )}
-        {leftPanel && (
-          <ContextPanel title={PANEL_LABELS[leftPanel] ?? leftPanel} onClose={closeLeft}>
-            {renderPanelContent(leftPanel)}
-          </ContextPanel>
-        )}
         <div
           className="canvas-area__2d"
           style={{ flex: `${get2dFlexGrow()} 1 0px`, display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <LeftDock onOpenPanel={togglePanel} />
+          <LeftDock />
           <PatternEditor
             onImportDXF={() => dxfInputRef.current?.click()}
             onOpenPanel={openPanel}
+            ranuraDelPie={ranuraDelPie}
           />
         </div>
         {viewMode === 'split' && (
-          <div className="canvas-area__divider" onMouseDown={handleDividerMouseDown} />
+          <div className="canvas-area__divider" data-material="papel" onMouseDown={handleDividerMouseDown} />
         )}
         <div
           className="canvas-area__3d"
           data-shortcut-context="3d"
           style={{ flex: `${get3dFlexGrow()} 1 0px`, display: viewMode === '2d' ? 'none' : undefined }}
         >
-          <RightDock onOpenPanel={togglePanel} />
           <Viewport3DErrorBoundary>
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
         </div>
-        {rightPanel && (
-          <ContextPanel title={PANEL_LABELS[rightPanel] ?? rightPanel} onClose={closeRight}>
-            {renderPanelContent(rightPanel)}
+        {/* Los paneles (spec 2026-10-02 § 6.1): a la derecha y a ras, detrás
+            del 3D, así que la hoja se estrecha por la derecha y las
+            herramientas no se mueven. El primero de la lista va pegado al
+            borde de la ventana (o del margen del 3D): se pintan al revés. */}
+        {[...paneles].reverse().map((nombre) => (
+          <ContextPanel key={nombre} title={PANEL_LABELS[nombre] ?? nombre} onClose={() => closePanel(nombre)}>
+            {renderPanelContent(nombre, () => closePanel(nombre))}
           </ContextPanel>
-        )}
+        ))}
+        {/* El margen del 3D (§ 4.3): una columna pegada al borde derecho de la
+            ventana, DETRÁS de los paneles. Un panel se abre entre el escenario
+            y él, y el margen no se mueve. En 2D no se pinta. */}
+        <RightDock onOpenPanel={togglePanel} />
       </div>
-      <UnifiedBar
-        onOpenPanel={togglePanel}
-      />
+      {/* La línea al pie (spec 2026-10-02 § 5.3): la tercera fila de la
+          ventana, de lado a lado y siempre. Es papel, con los colores del margen
+          de herramientas (enmienda 2026-10-11; hasta entonces fue marco). La
+          sección del patrón la llena PatternEditor por portal, porque su frase
+          sale del estado de sus herramientas; la del 3D (la voz de la vista) es
+          un hijo directo. El estado de la simulación va al pie del margen del
+          3D (EstadoDeLaSimulacion). Con la vista 3D sola la ranura del patrón
+          se esconde y la del 3D ocupa todo el pie; con 2D no hay del 3D. */}
+      <div className={`linea-al-pie${viewMode === '3d' ? ' linea-al-pie--3d-solo' : ''}`} data-superficie="ambiente" data-material="papel">
+        <div ref={setRanuraDelPie} className="linea-al-pie__patron" hidden={viewMode === '3d'} />
+        {viewMode !== '2d' && <SeccionDel3D />}
+      </div>
+      {iaAbierta && <UnifiedBar onOpenPanel={togglePanel} />}
       <ToastContainer />
       {/* Enciende `copilotUI.pendingConfirmation`, que estuvo siendo una
           superficie oscura: useGuardedAction lo despachaba (Tijeras, Fusionar)

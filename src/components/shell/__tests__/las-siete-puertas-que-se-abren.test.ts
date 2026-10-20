@@ -132,11 +132,7 @@ describe('un catálogo más grande no puede borrarle el dock a María', () => {
     // doce de fábrica. O sea: quien fije de más pierde TODA su configuración,
     // sin aviso. Con catorce en el catálogo eso era inalcanzable; con veintiuna
     // no.
-    let estado: DockState = {
-      pinnedExtra: { left: [], right: [] },
-      signaling: 'subtle',
-      tools2d: [...DEFAULT_DOCK_2D_IDS],
-    };
+    let estado: DockState = { tools2d: [...DEFAULT_DOCK_2D_IDS] };
     for (let i = 0; i < 14; i++) {
       estado = dockReducer(estado, addDockTool(`extra-${i}`));
     }

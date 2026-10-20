@@ -5,10 +5,9 @@
  * New home: ContextPanel via AppShell's renderPanelContent('Properties'),
  * opened from the piece ContextMenu ("Properties…") and ⌘K.
  *
- * These tests pin (a) the opener surfaces, (b) the behaviors that must
- * survive the re-home (SA presets, seam editor actions), and (c) the one
- * NEW live wire: Notch Settings now writes tools.toolOptions.notch (it was
- * local useState — decorative — even in the old shell).
+ * These tests pin (a) the opener surfaces and (b) the behaviors that must
+ * survive the re-home (the piece's first level, seam editor actions). The
+ * margin presets and «Ajustes de piquete» went in P4 (spec 2026-10-02 § 6.1).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
@@ -19,7 +18,6 @@ import editorReducer, { selectPiece, selectSeam, setActiveTool } from '../../../
 import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import PropertiesPanel from '../PropertiesPanel';
-import { getPanelSide } from '../../shell/panelSide';
 import { COMMANDS } from '../../shell/unifiedBarCommandDefs';
 import type { AppDispatch } from '../../../store';
 import type { PatternPiece, Seam } from '../../../types/types';
@@ -61,10 +59,7 @@ function renderPanel(store = makeStore()) {
 }
 
 describe('opener surfaces', () => {
-  it('Properties is a left-side (2D-domain) panel', () => {
-    expect(getPanelSide('Properties')).toBe('left');
-  });
-
+  // Dónde se abre (a la derecha, en la ranura) lo fija usePanelHost.test.ts.
   it('⌘K has a show-properties command that opens the Properties panel', () => {
     const cmd = COMMANDS.find(c => c.id === 'show-properties');
     expect(cmd).toBeTruthy();
@@ -105,17 +100,8 @@ describe('PropertiesPanel content', () => {
     store.dispatch(addPiece(makePiece()));
     store.dispatch(selectPiece('p1'));
     renderPanel(store);
-    expect(screen.getByText('PIEZA')).toBeTruthy();
+    expect(screen.getByLabelText('Nombre')).toBeTruthy();
     expect(screen.getByDisplayValue('Front')).toBeTruthy();
-  });
-
-  it('SA preset buttons write piece.seamAllowance (Francesa → 15mm)', () => {
-    const store = makeStore();
-    store.dispatch(addPiece(makePiece()));
-    store.dispatch(selectPiece('p1'));
-    renderPanel(store);
-    fireEvent.click(screen.getByRole('button', { name: 'Francesa' }));
-    expect(store.getState().project.pieces[0].seamAllowance).toBe(15);
   });
 
   it('seam editor works with ONLY a seam selected (selectSeam clears piece selection)', () => {
@@ -143,15 +129,5 @@ describe('PropertiesPanel content', () => {
     expect(after.pieceA.pieceId).toBe('p1');
     expect(after.pieceB.pieceId).toBe('p2');
     expect(after.pieceB.reversed).toBe(true);
-  });
-
-  it('Notch Settings writes tools.toolOptions.notch (NEW live wire, was dead useState)', () => {
-    const store = makeStore();
-    store.dispatch(addPiece(makePiece()));
-    store.dispatch(selectPiece('p1'));
-    renderPanel(store);
-    const shapeSelect = screen.getByLabelText('Forma');
-    fireEvent.change(shapeSelect, { target: { value: 't-notch' } });
-    expect(store.getState().tools.toolOptions?.notch?.shape).toBe('t-notch');
   });
 });

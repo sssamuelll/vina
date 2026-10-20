@@ -5,7 +5,7 @@ export interface Superficie { nombre: string; firma: string }
 /** No cuentan: ambiente fijo, documento, cromo solo de desarrollo (spec § 3.1 y § 3.4). */
 const NO_CUENTAN = ['ambiente', 'documento', 'dev'];
 /** Su TEXTO es su contenido: cambiar de texto es «cambiar» (spec § 3.4). */
-const CON_FIRMA = ['pista', 'tira', 'toast'];
+const CON_FIRMA = ['pista', 'toast'];
 
 /**
  * Superficies visibles ahora. «Visible» = caja mayor que cero dentro del

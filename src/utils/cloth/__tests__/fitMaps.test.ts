@@ -511,36 +511,32 @@ describe('shouldRequestEdgeData (#1010)', () => {
     stretchingLengths: new Float32Array(0),
   };
 
-  it('no pide nada con el fit map apagado', () => {
-    expect(shouldRequestEdgeData('none', null, 10_000, 0)).toBe(false);
+  it('pide aunque el mapa de ajuste esté apagado: la superficie lo lee (fit_map, IA 1b-2)', () => {
+    expect(shouldRequestEdgeData(null, 10_000, 0)).toBe(true);
   });
 
   it('no pide nada si el edge data ya llegó', () => {
-    expect(shouldRequestEdgeData('strain', EDGE_DATA, 10_000, 0)).toBe(false);
-  });
-
-  it('pide cuando el fit map está activo y falta el edge data', () => {
-    expect(shouldRequestEdgeData('strain', null, 10_000, 0)).toBe(true);
+    expect(shouldRequestEdgeData(EDGE_DATA, 10_000, 0)).toBe(false);
   });
 
   it('trata la respuesta vacía del worker como dato ausente', () => {
     // Segundo modo de fallo silencioso: el worker contesta con arrays vacíos
     // si el solver no está listo. edgeDataRef queda no-nulo pero inservible —
     // el fit map computaría sobre cero aristas para siempre.
-    expect(shouldRequestEdgeData('strain', EMPTY_EDGE_DATA, 10_000, 0)).toBe(true);
+    expect(shouldRequestEdgeData(EMPTY_EDGE_DATA, 10_000, 0)).toBe(true);
   });
 
   it('no reinunda al worker mientras la respuesta puede venir en camino', () => {
     // Petición hecha en t=10000; a los 300 ms todavía no se reintenta.
-    expect(shouldRequestEdgeData('strain', null, 10_300, 10_000)).toBe(false);
+    expect(shouldRequestEdgeData(null, 10_300, 10_000)).toBe(false);
   });
 
   it('reintenta una vez cumplido el intervalo', () => {
-    expect(shouldRequestEdgeData('strain', null, 11_000, 10_000)).toBe(true);
+    expect(shouldRequestEdgeData(null, 11_000, 10_000)).toBe(true);
   });
 
   it('pide en el primer frame, sin esperar un intervalo', () => {
     // lastRequestMs = -Infinity es el estado inicial del ref.
-    expect(shouldRequestEdgeData('fit', null, 0, -Infinity)).toBe(true);
+    expect(shouldRequestEdgeData(null, 0, -Infinity)).toBe(true);
   });
 });

@@ -3,6 +3,8 @@
 ## 1. The Vision: The "Linux of Fashion"
 By making OpenClo 100% free (no SaaS tiers, no marketplace tax), we remove every single barrier to entry. Our goal is not to sell licenses, but to **standardize the garment design process globally** via the `.openclo` semantic format.
 
+> **Amendment, 2026-10-05 (Samuel).** The core stays free and open source. Vina's own hosted AI agent is a paid tier, and it is how the project bills: "no SaaS tiers" no longer holds. See `docs/superpowers/specs/2026-10-05-ia-una-superficie-design.md`, decisions D2 and D3.
+
 ## 2. Why "Free" is the Most Aggressive Business Move
 Legacy competitors (CLO3D, Optitex) survive on high-priced gatekeeping. 
 - **The Performance Moat**: OpenClo is now powered by **WebGPU and TSL (Three.js Shading Language)**. We offer 10–50x more performance than any other browser-based tool. By being free and technically superior, we make proprietary silos obsolete.

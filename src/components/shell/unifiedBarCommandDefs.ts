@@ -6,14 +6,15 @@
 import type { AppDispatch } from '../../store';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
-import { setViewMode, toggleSnapToGrid, toggleSeamAllowance, toggleGrainlines, togglePieceNames, undo, redo } from '../../store/editorSlice';
+import { setViewMode, toggleSeamAllowance, toggleGrainlines, togglePieceNames, undo, redo } from '../../store/editorSlice';
 import { startSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import {
-  FileText, Scissors, Ruler, Shirt, Download, Grid3x3, Eye,
+  FileText, Scissors, Ruler, Shirt, Download, Eye,
   Layers, ScanLine, Undo2, Redo2, User, Package,
   Search, PenLine, Tag, Hand, MousePointer2,
-  SlidersHorizontal, type LucideIcon,
+  SlidersHorizontal, Settings, Plug, type LucideIcon,
 } from 'lucide-react';
+import { conectarTuAgente, desconectarTuAgente } from '../../copilot/puente/puenteDeLaApp';
 import { setUserScheme } from '../../store/inputSchemeSlice';
 import { runAutoSew } from '../../store/autoSewThunk';
 import { openRenderSettings } from '../../store/renderSettingsThunk';
@@ -47,6 +48,10 @@ export const COMMANDS: CommandDef[] = [
   { id: 'dress-avatar', category: 'Acciones', name: 'Vestir avatar', description: 'Coloca las piezas y arranca la simulación', icon: Shirt, action: (d) => { d(setViewMode3D('simulate')); d(startSimulation()); } },
   { id: 'reset-sim', category: 'Acciones', name: 'Restablecer simulación', description: 'Detiene la simulación y vuelve al inicio', icon: Shirt, action: (d) => d(resetSimulation()) },
 
+  // ─── Tu agente (spec 2026-10-09) ───
+  { id: 'conectar-tu-agente', category: 'Acciones', name: 'Conectar tu agente', description: 'Deja que Claude Code, Claude Desktop o Cursor trabajen en este patrón', icon: Plug, action: () => conectarTuAgente() },
+  { id: 'desconectar-tu-agente', category: 'Acciones', name: 'Desconectar tu agente', description: 'Tu agente deja de ver y cambiar este patrón', icon: Plug, action: () => desconectarTuAgente() },
+
   // ─── Panels ───
   { id: 'show-avatar', category: 'Paneles', name: 'Avatar y medidas', description: 'Medidas corporales, pose y modelo del avatar', icon: User, action: (_d, cb) => cb.onOpenPanel('Avatar') },
   { id: 'show-bom', category: 'Paneles', name: 'Lista de materiales (BOM)', description: 'Telas, avíos y costos', icon: Package, action: (_d, cb) => cb.onOpenPanel('BOM') },
@@ -58,6 +63,7 @@ export const COMMANDS: CommandDef[] = [
   { id: 'show-nesting', category: 'Paneles', name: 'Marcada', description: 'Distribución de piezas en la tela (nesting)', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Nesting') },
   { id: 'show-layers', category: 'Paneles', name: 'Capas', description: 'Capas de piezas', icon: Layers, action: (_d, cb) => cb.onOpenPanel('Layers') },
   { id: 'show-properties', category: 'Paneles', name: 'Propiedades', description: 'Pieza, costura y materiales', icon: SlidersHorizontal, action: (_d, cb) => cb.onOpenPanel('Properties') },
+  { id: 'show-preferences', category: 'Paneles', name: 'IA y ratón', description: 'Conexiones de IA, idioma y ratón', icon: Settings, action: (_d, cb) => cb.onOpenPanel('Preferences') },
 
   // ─── Export ───
   { id: 'export-3d', category: 'Exportar', name: 'Exportar 3D / Vuelta 360°', description: 'Capturas en alta, vuelta 360°, glTF/USDZ', icon: Download, action: (d) => d(openRenderSettings()) },
@@ -68,11 +74,9 @@ export const COMMANDS: CommandDef[] = [
   { id: 'view-3d', category: 'Vista', name: 'Vista: solo 3D', description: 'Solo la simulación 3D', icon: Eye, action: (d) => d(setViewMode('3d')) },
   { id: 'view-split', category: 'Vista', name: 'Vista: dividida', description: '2D y 3D lado a lado', icon: Layers, action: (d) => d(setViewMode('split')) },
   { id: 'input-trackpad', category: 'Vista', name: 'Controles de panel táctil', description: 'Orbitar con dos dedos, zoom con pellizco', icon: Hand, action: (d) => d(setUserScheme('trackpad')) },
-  { id: 'input-mouse', category: 'Vista', name: 'Controles de ratón', description: 'Estilo CLO3D: orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
+  { id: 'input-mouse', category: 'Vista', name: 'Controles de ratón', description: 'Orbitar con clic derecho, zoom con rueda', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
 
   // ─── Toggles ───
-  // Sin atajo: `G` es la herramienta Línea interna, no la cuadrícula (#1170).
-  { id: 'toggle-grid', category: 'Vista', name: 'Mostrar u ocultar cuadrícula', description: 'La cuadrícula del lienzo', icon: Grid3x3, action: (d) => d(toggleSnapToGrid()) },
   { id: 'toggle-seam-allowance', category: 'Vista', name: 'Mostrar u ocultar margen de costura', description: 'El margen alrededor de cada pieza', icon: ScanLine, shortcutId: 'view.toggleSeamAllowance', action: (d) => d(toggleSeamAllowance()) },
   { id: 'toggle-grainlines', category: 'Vista', name: 'Mostrar u ocultar hilos', description: 'Las flechas de dirección de hilo', icon: PenLine, action: (d) => d(toggleGrainlines()) },
   { id: 'toggle-piece-names', category: 'Vista', name: 'Mostrar u ocultar nombres de pieza', description: 'Las etiquetas de cada pieza', icon: Tag, action: (d) => d(togglePieceNames()) },

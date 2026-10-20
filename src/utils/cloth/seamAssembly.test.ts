@@ -284,7 +284,7 @@ describe('matchVertices', () => {
     }
   });
 
-  it('pairs 20000×20000 vertices in under 100 ms (legacy O(n²) needs ≈ 700 ms)', () => {
+  it('pairs 20000×20000 vertices in under 300 ms (legacy O(n²) needs ≈ 550 ms)', () => {
     const N = 20000;
     const a: ParameterizedVertex[] = new Array(N);
     const b: ParameterizedVertex[] = new Array(N);
@@ -299,7 +299,12 @@ describe('matchVertices', () => {
     expect(pairs.length).toBe(N);
     expect(pairs[0]).toEqual([0, N]);
     expect(pairs[N - 1]).toEqual([N - 1, 2 * N - 1]);
-    expect(elapsed).toBeLessThan(100);
+    // Measured on the same machine (2026-10-04): alone this takes ~23 ms and
+    // the legacy O(n²) from before b0e914df takes 545-590 ms. Under the full
+    // parallel suite this call took 112-160 ms (the best of three runs too:
+    // the load is sustained, not a spike), and the deploy gate runs it
+    // without retries. 300 ms sits about halfway, in ratio, between the two.
+    expect(elapsed).toBeLessThan(300);
   });
 });
 

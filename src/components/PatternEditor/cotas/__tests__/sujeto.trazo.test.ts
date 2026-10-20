@@ -25,21 +25,19 @@ const base = {
   isDragging: false, contextMenuOpen: false, calibrationActive: false,
   hiddenLayerIds: [] as number[], layerLocked: {} as Record<number, boolean>,
 };
-const defaultRect = { width: 300, height: 150 };
 
 describe('cotasDelSujeto con un trazo seleccionado', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('con un tramo de trazo seleccionado, el sujeto son sus dos cotas y la tira lo dice', () => {
-    const s = cotasDelSujeto({ ...base, activeTool: 'select', trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 } }, defaultRect);
+    const s = cotasDelSujeto({ ...base, activeTool: 'select', trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 } });
     expect(s.piece).toBeNull();
     expect(s.cotas.map(c => c.kind)).toEqual(['tramo-largo', 'tramo-angulo']);
-    expect(s.lineaDeSujeto).toBe('Editando: el tramo seleccionado');
     expect(s.disabled).toBe(false);
   });
   it('arrastrando, o con la construcción oculta, no hay sujeto de trazo', () => {
-    expect(cotasDelSujeto({ ...base, trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 }, isDragging: true }, defaultRect).cotas).toEqual([]);
-    expect(cotasDelSujeto({ ...base, trazos: [], selectedTrazo: { trazoId: 't', segmentIndex: 2 } }, defaultRect).cotas).toEqual([]);
+    expect(cotasDelSujeto({ ...base, trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 }, isDragging: true }).cotas).toEqual([]);
+    expect(cotasDelSujeto({ ...base, trazos: [], selectedTrazo: { trazoId: 't', segmentIndex: 2 } }).cotas).toEqual([]);
   });
 
   // `cotasDeTrazo` cachea su índice de enganche por identidad del array de
@@ -56,8 +54,8 @@ describe('cotasDelSujeto con un trazo seleccionado', () => {
       ...base, pieces: [pieza('z')], hiddenLayerIds: [] as number[],
       trazos: [trazo], selectedTrazo: { trazoId: 't', segmentIndex: 2 },
     };
-    cotasDelSujeto(input, defaultRect);
-    cotasDelSujeto(input, defaultRect);
+    cotasDelSujeto(input);
+    cotasDelSujeto(input);
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });

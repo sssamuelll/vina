@@ -97,6 +97,10 @@ test.describe('seis firmas de María', () => {
     // quiero opciones … el botón de activar el visualizador de líneas o
     // desactivar, como aparecen cuando uno va a medir, eso es TOP, pero solo
     // eso, no quiero opciones ni que estén vinculadas con la creación».
+    // Pulsa «Largos», que desde P2 vive en la barra superior: a 1280 (el
+    // viewport de estos e2e) los seis interruptores no caben y se pliegan en
+    // «Mostrar» (spec 2026-10-02 § 4.2). Se mide en la pantalla de María.
+    await page.setViewportSize({ width: 1366, height: 768 });
     await waitForApp(page);
     await addPiece(page, 'fria', { x: 80, y: 100 }, 200, 150);
 
@@ -118,14 +122,15 @@ test.describe('seis firmas de María', () => {
     await activarHerramienta(page, 'z', 'select');
     await largos.click();
     await expect(largos).toHaveAttribute('aria-pressed', 'true');
-    // La pieza seleccionada ya tiene Ancho/Alto como chips: esas dos lecturas
-    // no se duplican. Seis lecturas + dos chips siguen cubriendo ocho lados.
-    await expect(lecturasDeLado(page)).toHaveCount(6);
+    // La pieza seleccionada tiene su cota Ancho como chip: esa lectura no se
+    // duplica. Desde P3a se ve una cota a la vez (spec 2026-10-02 § 5.5), así
+    // que Alto vuelve a ser lectura: siete lecturas + un chip cubren ocho lados.
+    await expect(lecturasDeLado(page)).toHaveCount(7);
     await largos.click();
     await expect(largos).toHaveAttribute('aria-pressed', 'false');
     await expect(lecturasDeLado(page)).toHaveCount(0);
     await largos.click();
-    await expect(lecturasDeLado(page)).toHaveCount(6);
+    await expect(lecturasDeLado(page)).toHaveCount(7);
 
     await dispatch(page, 'project/addInternalLine', {
       pieceId: 'fria',

@@ -12,6 +12,9 @@ OpenClo.ai is not just a CAD tool; it is a **Sustainability Engine**. The fashio
 While OpenClo remains **100% Free and Open Source**, providing a low-latency, agentic AI experience requires a sustainable cloud revenue model.
 
 ### Path A: Self-Hosted / BYOK (Bring Your Own Key) — FREE
+
+> **Amendment, 2026-10-05.** The free path is now bringing your own agent through MCP (Claude Desktop, Claude Code, Cursor…), the way Blender does it. API keys inside Vina go away. See `docs/superpowers/specs/2026-10-05-ia-una-superficie-design.md`, decisions D2 and D6.
+
 - **User Action**: The user enters their own API Key (Anthropic, OpenAI, etc.) in the settings.
 - **Cost**: $0 to OpenClo. 
 - **Experience**: Full access to all agentic features.

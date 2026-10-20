@@ -918,7 +918,6 @@ export interface EditorState {
   lineLengthModeSetByUser: boolean;
   showSewingLines: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
-  snapToGrid: boolean;
   gridSize: number;       // mm
   units: UnitSystem;
   /** Clipboard for copy/paste */

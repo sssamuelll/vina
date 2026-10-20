@@ -207,3 +207,33 @@ describe('teclado en captura — elástico', () => {
     expect(tools.elasticTool.handleKeyDown).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Revisión final de P4: el router en BURBUJA (`window`) tampoco puede darle a
+ * la herramienta las teclas que nacen en un campo. Los paneles suman campos
+ * que se fijan con Enter (las siete medidas del Avatar), y Retroceso en el
+ * nombre de una pieza borraba nodos con Editar patrón.
+ */
+describe('teclado en burbuja — las teclas de un campo son del campo', () => {
+  it('Retroceso en un campo de un panel no llega a Editar patrón', () => {
+    const { tools } = setup('editPattern');
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    press(input, 'Backspace');
+    expect(tools.editPattern.handleKeyDown).not.toHaveBeenCalled();
+  });
+
+  it('Enter en un campo de medida no corre el desfase', () => {
+    const { tools } = setup('offsetOutline');
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    press(input, 'Enter');
+    expect(tools.offsetTool.handleKeyDown).not.toHaveBeenCalled();
+  });
+
+  it('fuera de un campo, la tecla sigue llegando a la herramienta', () => {
+    const { tools } = setup('offsetOutline');
+    press(document.body, 'Enter');
+    expect(tools.offsetTool.handleKeyDown).toHaveBeenCalled();
+  });
+});

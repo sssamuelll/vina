@@ -78,6 +78,12 @@ describe('curación del piquete existente', () => {
     expect(grainlineIds).not.toContain('notchExactDistance');
   });
 
+  it('no se ofrece sobre una pieza bloqueada: su cota escribiría en ella (maria-204)', () => {
+    const ctx = notchCtx(anchoredNotch);
+    ctx.piece = { ...ctx.piece!, locked: true };
+    expect(resolveMenuActions(ctx).map(action => action.id)).not.toContain('notchExactDistance');
+  });
+
   it('abre el refinador con la pieza y la línea exactas del clic derecho', () => {
     const onRefineNotch = vi.fn();
     const ctx = notchCtx(anchoredNotch, onRefineNotch);

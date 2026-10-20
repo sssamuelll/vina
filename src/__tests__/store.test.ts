@@ -3,7 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, {
   addPiece, updatePiece, removePiece, movePiece, rotatePiece,
   addSeam, addInternalLine, setInternalLine, updateInternalLine,
-  setProjectName, loadProject, updateMeasurements,
+  setProjectName, loadProject, restoreProject, updateMeasurements,
   setAvatarMode, setAvatarModelUrl,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece, batchSetSeamAllowance,
@@ -11,14 +11,14 @@ import projectReducer, {
 import editorReducer, {
   setViewMode, setActiveTool, selectPiece, clearSelection,
   togglePieceSelection, selectSeam, setZoom2D, setPan2D,
-  toggleSeamAllowance, toggleGrainlines, toggleNotches, toggleSnapToGrid,
+  toggleSeamAllowance, toggleGrainlines, toggleNotches,
   copyPieces, clearClipboard, createPastedPieces,
 } from '../store/editorSlice';
 import {
   undoMiddleware, canUndo, canRedo, batchUndo, beginUndoBatch,
   endUndoBatch, getHistory, getUndoLength, withUndoBatchToken,
 } from '../store/undoMiddleware';
-import { PatternPiece } from '../types/types';
+import { PatternPiece, type VinaProject } from '../types/types';
 
 afterEach(() => vi.useRealTimers());
 
@@ -171,15 +171,21 @@ describe('projectSlice', () => {
 
   it('updates measurements', () => {
     const store = createStore();
+    const cinturaAntes = store.getState().project.avatar.measurements.waist;
     store.dispatch(updateMeasurements({ chest: 100 }));
     expect(store.getState().project.avatar.measurements.chest).toBe(100);
     // Other measurements unchanged
-    expect(store.getState().project.avatar.measurements.waist).toBe(82);
+    expect(store.getState().project.avatar.measurements.waist).toBe(cinturaAntes);
   });
 
   it('supports optional expanded measurements without breaking existing', () => {
     const store = createStore();
-    // New optional fields default to undefined
+    // Un proyecto de antes, con las 7 principales y ninguna opcional (el defecto de hoy, Mujer
+    // EU 38, ya trae las 15 del catálogo y no probaría que se AGREGAN).
+    store.dispatch(restoreProject({
+      id: 'viejo', name: 'Viejo', pieces: [], seams: [], fabrics: [], createdAt: 1000, updatedAt: 1000,
+      avatar: { id: 'default', name: 'Default Avatar', modelUrl: '', measurements: { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } },
+    } as VinaProject));
     expect(store.getState().project.avatar.measurements.neckCirc).toBeUndefined();
     expect(store.getState().project.avatar.measurements.thighCirc).toBeUndefined();
     // Can set them
@@ -333,7 +339,6 @@ describe('editorSlice', () => {
     expect(store.getState().editor.showSeamAllowance).toBe(!initial);
 
     store.dispatch(toggleGrainlines());
-    store.dispatch(toggleSnapToGrid());
   });
 
   it('toggles notch visibility off and back on', () => {

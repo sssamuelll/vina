@@ -1,95 +1,100 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Plus } from 'lucide-react';
-import { store, type RootState } from '../../store';
+import type { RootState } from '../../store';
 import { activate2DTool, selectHasInternalShapeHost } from '../../store/toolActivation';
-import { selectWorkflowStage } from '../../store/selectors';
-import { runUiExport } from '../../utils/export/uiExport';
-import { pinAuto, unpinAuto, addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
+import { addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
 import Dock from './Dock';
-import DockAutoZone from './DockAutoZone';
 import DockToolPicker from './DockToolPicker';
 import { DOCK_2D_CATALOG, getDockToolById, type DockToolDef } from './dock2dTools';
-import { getDockSuggestions, getAutoItemById, type DockSuggestion } from './dockSuggestions';
+import { herramientaParaMostrar } from './herramientaParaMostrar';
+import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
 
-interface LeftDockProps {
-  onOpenPanel: (name: string) => void;
-}
-
-/** The left (2D) dock: an editable tool set + the stage-driven auto zone + a ＋
- *  customize editor. Hidden in 3D-only view. */
-export default function LeftDock({ onOpenPanel }: LeftDockProps) {
+/** El margen de herramientas del patrón (spec 2026-10-02 § 4.3): las del dock
+ *  de la usuaria + el ＋ que las agrega y las quita. Hidden in 3D-only view. La
+ *  zona AUTO se fue en P2 (§ 8): Escalado y Lista de materiales están en
+ *  Vina › Patrón. */
+export default function LeftDock() {
   const dispatch = useDispatch();
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const hasInternalShapeHost = useSelector(selectHasInternalShapeHost);
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
-  const stage = useSelector(selectWorkflowStage);
-  const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
-  const signaling = useSelector((s: RootState) => s.dock.signaling);
   const tools2d = useSelector((s: RootState) => s.dock.tools2d);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // El personalizador cuelga de <body> (ver DockToolPicker): se abre donde
+  // está el «+» al pulsarlo, y un clic dentro de él no cuenta como «fuera».
+  const [ancla, setAncla] = useState({ left: 0, bottom: 0 });
   const editorRef = useRef<HTMLDivElement>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+
+  // Abierto, el foco entra al personalizador: en el DOM queda lejos del «+», y
+  // Tab desde el botón ya no llegaría a la lista.
+  useEffect(() => {
+    if (pickerOpen) pickerRef.current?.querySelector<HTMLButtonElement>('.dock-picker__item:not(:disabled)')?.focus();
+  }, [pickerOpen]);
 
   useEffect(() => {
     if (!pickerOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (editorRef.current && !editorRef.current.contains(e.target as Node)) setPickerOpen(false);
+      const t = e.target as Node;
+      if (editorRef.current?.contains(t) || pickerRef.current?.contains(t)) return;
+      setPickerOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPickerOpen(false); };
     window.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); };
+    return () => window.removeEventListener('mousedown', onDown);
   }, [pickerOpen]);
+
+  // Esc lo cierra antes que la selección, y si el foco estaba en el
+  // personalizador vuelve al «+» que lo abrió: un peldaño de la escalera de lo
+  // que se llama (spec 2026-10-02 § 6.2).
+  usePeldanoDeEscape('personalizador', 'menu', pickerOpen, () => {
+    if (pickerRef.current?.contains(document.activeElement)) addRef.current?.focus();
+    setPickerOpen(false);
+  });
 
   if (viewMode === '3d') return null;
 
   const tools = tools2d
     .map(getDockToolById)
     .filter((t): t is DockToolDef => t !== undefined);
-
-  const runSuggestion = (id: string) => {
-    if (id === 'grade') onOpenPanel('Grading');
-    else if (id === 'export') runUiExport('dxf', store.getState().project, dispatch);
-  };
-
-  const keptIds = pinnedExtra.left;
-  const kept = keptIds.map(getAutoItemById).filter((x): x is DockSuggestion => x !== undefined);
-  const suggested = getDockSuggestions(stage, 'left').filter((s) => !keptIds.includes(s.id));
+  // La activa siempre tiene marca (spec § 4.3): si no está en el margen, se
+  // pinta al final, sola y detrás de aire, mientras siga activa.
+  const activaFuera = tools.some((t) => t.id === activeTool) ? undefined : herramientaParaMostrar(activeTool);
 
   return (
     <Dock
-      domainLabel="2D"
       tools={tools}
       activeToolId={activeTool}
+      activaFuera={activaFuera}
       onSelectTool={(id) => activate2DTool(dispatch, id)}
       disabledReasons={hasInternalShapeHost ? undefined : {
         internalShape: 'Crea o muestra una pieza para dibujar líneas internas.',
       }}
       onReorderTool={(fromId, toId) => dispatch(reorderDockTool({ fromId, toId }))}
-      autoZone={
-        <DockAutoZone
-          kept={kept}
-          suggested={suggested}
-          signaling={signaling}
-          side="left"
-          onRun={runSuggestion}
-          onPin={(id) => dispatch(pinAuto({ side: 'left', id }))}
-          onUnpin={(id) => dispatch(unpinAuto({ side: 'left', id }))}
-        />
-      }
       footer={
         <div ref={editorRef} className="dock-editor">
           <button
+            ref={addRef}
             type="button"
             className="dock__add"
-            onClick={() => setPickerOpen((o) => !o)}
+            onClick={(e) => {
+              // ponytail: el ancla se mide al abrir; si el dock se desplaza o
+              // crece con el menú abierto, el menú no lo sigue.
+              const r = e.currentTarget.getBoundingClientRect();
+              setAncla({ left: r.right + 8, bottom: window.innerHeight - r.bottom });
+              setPickerOpen((o) => !o);
+            }}
             aria-label="Personalizar herramientas del dock"
             aria-expanded={pickerOpen}
+            aria-controls="dock-picker"
           >
             <Plus size={16} />
           </button>
           {pickerOpen && (
             <DockToolPicker
+              ancla={ancla}
+              raizRef={pickerRef}
               catalog={DOCK_2D_CATALOG}
               selectedIds={tools2d}
               onAdd={(id) => dispatch(addDockTool(id))}

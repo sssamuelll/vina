@@ -21,7 +21,7 @@ export const topstitchFreeTool: ToolDefinition = {
   options: [
     { id: 'stitchType', label: 'Tipo de puntada', type: 'select', value: 'straight',
       choices: [{ label: 'Recta', value: 'straight' }, { label: 'Zigzag', value: 'zigzag' }, { label: 'Triple', value: 'triple' }] },
-    { id: 'stitchLength', label: 'Largo de puntada (mm)', control: 'input', type: 'number', value: 3.0, min: 1.0, max: 8.0, step: 0.5 },
+    { id: 'stitchLength', label: 'Largo de puntada (mm)', type: 'number', value: 3.0, min: 1.0, max: 8.0, step: 0.5 },
     { id: 'threadColor', label: 'Color del hilo', type: 'color', value: '#333333' },
   ],
   copilot: {

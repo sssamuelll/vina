@@ -86,10 +86,14 @@ describe('la escala de z-index ordena por urgencia, no por antigüedad', () => {
 /** Cada fila: archivo, patrón que debe existir en el archivo (var(--token) o
  *  var(--token) + N para los anidados), y una nota de por qué. */
 const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> = [
-  { archivo: 'src/components/shell/Dock.css', patron: /z-index:\s*var\(--z-dock\)/, nota: 'dock' },
-  { archivo: 'src/components/PatternEditor/ToolStrip2D.css', patron: /\.tool-strip\s*\{[^}]*z-index:\s*var\(--z-canvas-chrome\)/, nota: 'tira de herramienta 2D' },
-  { archivo: 'src/components/PatternEditor/FilaDeCapas.css', patron: /\.fila-de-capas\s*\{[^}]*z-index:\s*var\(--z-canvas-chrome\)/, nota: 'fila de capas' },
+  // El dock del 3D flotaba con `--z-dock`; desde P5 es el margen, una columna
+  // en el flujo, y el rol queda en la escala sin consumidor (como `--z-panel`).
   { archivo: 'src/styles/layout.css', patron: /\.top-bar\s*\{[^}]*z-index:\s*var\(--z-bar\)/, nota: 'top-bar' },
+  { archivo: 'src/components/Viewport3D/MenuDeMapas.css', patron: /\.menu-de-mapas__hoja\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú «Mapa» de la barra superior: cuelga de <body>' },
+  { archivo: 'src/components/Viewport3D/SurfaceModePill.css', patron: /\.surface-pill__flyout\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú «Texturizado» de la barra superior: cuelga de <body>' },
+  { archivo: 'src/components/shell/EstadoDeLaSimulacion.css', patron: /\.estado-de-la-simulacion__detalle\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'detalle del estado de la simulación, al pie del margen del 3D: cuelga de <body>' },
+  { archivo: 'src/styles/layout.css', patron: /\.grupo-del-patron__menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú de «Mostrar», el grupo del patrón plegado: cuelga de <body>' },
+  { archivo: 'src/components/PatternEditor/SeccionDelPatron.css', patron: /\.seccion-del-patron__menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú «Más» de la línea al pie: cuelga de <body>' },
   { archivo: 'src/styles/unified-bar.css', patron: /z-index:\s*var\(--z-bar\)/, nota: 'unified-bar' },
   { archivo: 'src/styles/floating.css', patron: /\.logo-menu\s*\{[^}]*z-index:\s*var\(--z-menu\)/, nota: 'menú del logo' },
   { archivo: 'src/copilot/connections/ConnectionModal.tsx', patron: /zIndex:\s*['"]var\(--z-modal\)['"]/, nota: 'ConnectionModal reclasificado a modal (tiene velo)' },
@@ -97,7 +101,6 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
   { archivo: 'src/components/shared/SubMenu.css', patron: /z-index:\s*calc\(var\(--z-context-menu\)\s*\+\s*10\)/, nota: 'submenú DENTRO del menú contextual — solo ordena contra sus hermanos, ver nota abajo' },
   { archivo: 'src/styles/floating.css', patron: /\.logo-menu__submenu\s*\{[^}]*z-index:\s*calc\(var\(--z-menu\)\s*\+\s*10\)/, nota: 'submenú DENTRO del menú del logo — misma forma anidada' },
   { archivo: 'src/components/PatternEditor/CalibrationModal.css', patron: /z-index:\s*var\(--z-modal\)/, nota: 'CalibrationModal reclasificado a modal (tiene velo)' },
-  { archivo: 'src/components/PatternEditor/NotchPrecisionModal.css', patron: /z-index:\s*var\(--z-menu\)/, nota: 'NotchPrecisionModal reclasificado a la baja (el propio archivo dice sin velo)' },
   { archivo: 'src/components/shell/AppShell.tsx', patron: /zIndex:\s*'var\(--z-hint\)'/, nota: 'aviso de soltar-DXF: encima del lienzo, debajo de las barras' },
   { archivo: 'src/components/Debug/SolverMetrics.css', patron: /z-index:\s*var\(--z-debug\)/, nota: 'el 9999 era pánico, pero 25 lo enterraba bajo las barras: es diagnóstico de dev, tiene rol propio' },
   { archivo: 'src/components/shell/ToolTooltip.css', patron: /z-index:\s*var\(--z-tooltip\)/, nota: 'escalón propio: empatado con el toast, el desempate lo decidía el portal' },
@@ -114,7 +117,7 @@ const SITIOS_GLOBALES: Array<{ archivo: string; patron: RegExp; nota: string }> 
  * que leer ahí es una promesa de que el submenú le gana a algo de afuera.
  */
 
-describe('los 16 sitios verificables por texto usan el token que les toca', () => {
+describe('los 15 sitios verificables por texto usan el token que les toca', () => {
   it.each(SITIOS_GLOBALES)('$archivo — $nota', ({ archivo, patron }) => {
     const contenido = leer(archivo);
     expect(contenido).toMatch(patron);

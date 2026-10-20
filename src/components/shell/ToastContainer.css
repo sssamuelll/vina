@@ -3,7 +3,7 @@
 .toast-container {
   position: fixed;
   right: 16px;
-  bottom: 56px; /* clear the bottom-right Solver pill */
+  bottom: 56px; /* por encima de la línea al pie */
   /* Por encima del modal: una notificación tiene que verse aunque haya un
    * diálogo abierto. Antes era 300 contra el 1000 del modal, o sea al revés. */
   z-index: var(--z-toast);
@@ -12,6 +12,11 @@
   gap: 8px;
   pointer-events: none;
 }
+
+/* Con el visor a la vista, a la izquierda del margen del 3D (2026-10-11): al pie del margen va
+   el estado de la simulación, y un aviso a 16 px del borde le caía encima y se tragaba sus
+   clics durante 3 a 5 s, justo cuando sale el aviso de una costura que no cose. */
+.toast-container--con-margen-3d { right: calc(var(--margen-ancho) + 16px); }
 
 /* ─── Individual toast card ─── */
 
@@ -59,14 +64,16 @@
   word-break: break-word;
 }
 
-/* ─── Action button (e.g. restore-toast "Empezar de cero") ─── */
+/* ─── Action button (e.g. restore-toast "Empezar de cero") ───
+ * Papel hundido con línea de pelo, y al pasar el tinte del acento, como una
+ * fila de menú. Eran blancos translúcidos: sobre el aviso blanco no se veían. */
 
 .toast__action {
   flex-shrink: 0;
   align-self: center;
   padding: 3px 10px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--bg-elevated);
+  border: var(--hairline);
   border-radius: 6px;
   cursor: pointer;
   color: var(--text-primary);
@@ -78,8 +85,8 @@
 }
 
 .toast__action:hover {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: var(--accent-subtle);
+  border-color: var(--accent-border);
 }
 
 /* ─── Dismiss button ─── */
@@ -101,7 +108,8 @@
    * entra global vía base.css:1, así que --text-dim (hoy --text-tertiary) resolvía siempre—, o sea
    * que la equis llevaba 1,96:1 desde el primer día y borrarlo no cambia un
    * píxel. --text-dim es la tinta de lo inerte (deshabilitado); un botón que se
-   * pulsa lleva --text-muted, que da 4,87:1 y ya es el par reposo/hover con
+   * pulsa lleva --text-muted: 5,97:1 sobre el aviso blanco (4,87 sobre el
+   * oscuro de antes), y es el par reposo/hover con
    * --text-primary en .layer-icon-btn. */
   color: var(--text-muted);
   font-size: 14px;
@@ -113,7 +121,7 @@
 
 .toast__dismiss:hover {
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-elevated);
 }
 
 /* ─── Entry animation ─── */

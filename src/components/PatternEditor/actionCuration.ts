@@ -126,7 +126,8 @@ export interface CurationRow {
   menu: ActionId[];
 }
 
-export const BAR_MAX_VISIBLE = 5;
+/** La barrita es de cuatro (spec 2026-10-02 § 5.5). */
+export const BAR_MAX_VISIBLE = 4;
 /** En v1 la barra solo monta para pieza/multi (cabalga el transform box de T2).
  *  Las demás filas traen su `bar` autorada pero apagada — flip para v2 sin cirugía. */
 export const BAR_ENABLED_KINDS = new Set<TargetKind>(['piece', 'multiPiece']);
@@ -313,7 +314,8 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
   notchExactDistance: { id: 'notchExactDistance', group: 'transform', icon: '⌖', label: 'Ajustar distancia…',
     // Un path legado sin ancla conserva su dibujo, pero no sabe desde qué
     // referencia medir: ocultarlo evita ofrecer una precisión que no existe.
-    gate: (ctx) => ctx.internalLine?.type === 'notch' && !!ctx.internalLine.notchAnchor,
+    // Y con la pieza bloqueada tampoco: su cota escribiría en ella (maria-204).
+    gate: (ctx) => ctx.internalLine?.type === 'notch' && !!ctx.internalLine.notchAnchor && notLocked(ctx),
     run: (ctx) => {
       if (ctx.pieceId && ctx.internalLine) ctx.cb.onRefineNotch?.(ctx.pieceId, ctx.internalLine);
     } },
@@ -356,12 +358,12 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
 };
 
 // ── CURATION: la tabla que María edita ───────────────────────────────────────
-// Leyenda: `bar` rankeada (cap 5, apagada salvo BAR_ENABLED_KINDS); `menu` agrupada por ActionDef.group.
+// Leyenda: `bar` rankeada (cap 4, apagada salvo BAR_ENABLED_KINDS); `menu` agrupada por ActionDef.group.
 
 export const CURATION: CurationRow[] = [
   {
     targetKind: 'piece', stage: '*', altitude: 'body',
-    bar: ['rotate90', 'duplicate', 'flipH', 'properties', 'lockToggle'],
+    bar: ['rotate90', 'duplicate', 'flipH', 'properties'],
     menu: [
       'copy', 'paste', 'pasteMirror',
       'rotate90', 'flipH', 'flipV', 'optimizeAllCurves', 'convertSegment', 'convertSegmentToPoints', 'convertSegmentToBezier', 'saExactWidth',
@@ -451,12 +453,16 @@ export function resolveMenuActions(ctx: CurationCtx): ActionDef[] {
   return row.menu.map(id => ACTIONS[id]).filter(Boolean).filter(def => !def.gate || def.gate(ctx));
 }
 
-/** Barra (Surface A): solo BAR_ENABLED_KINDS, sin danger, gate aplicado, cap 5. */
+/** Barra (Surface A): solo BAR_ENABLED_KINDS, sin danger, gate aplicado, cap 4.
+ *  La regla del candado (spec 2026-10-02 § 5.5): bloquear vive en el menú del
+ *  clic derecho; con UNA pieza bloqueada, «Desbloquear» va primero, para que
+ *  nunca quede detrás de un menú. Con varias no: desbloquearía solo la primera. */
 export function resolveBarActions(ctx: CurationCtx): ActionDef[] {
   if (!BAR_ENABLED_KINDS.has(ctx.targetKind)) return [];
   const row = matchRow({ targetKind: ctx.targetKind, stage: ctx.stage, altitude: ctx.altitude });
   if (!row) return [];
-  return row.bar
+  const ids: ActionId[] = ctx.targetKind === 'piece' && ctx.piece?.locked ? ['lockToggle', ...row.bar] : row.bar;
+  return ids
     .map(id => ACTIONS[id]).filter(Boolean)
     .filter(def => !def.danger && (!def.gate || def.gate(ctx)))
     .slice(0, BAR_MAX_VISIBLE);

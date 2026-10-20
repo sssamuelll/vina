@@ -7,7 +7,8 @@
 
 const STORAGE_KEY = 'vina-bar-position';
 export const BAR_WIDTH = 560;
-export const BAR_HEIGHT = 58;
+/** La cápsula de una línea (spec 2026-10-02 § 6.2). */
+export const BAR_HEIGHT = 48;
 
 // Token max of --top-bar-h: clamp(36px, 2.5vw, 48px) — used when no .top-bar
 // is mounted (e.g. hideChrome shells, tests).
@@ -21,11 +22,21 @@ function topBarBottom(): number {
   return (el ? el.getBoundingClientRect().bottom : TOP_BAR_FALLBACK) + TOP_BAR_MARGIN;
 }
 
+/** Top edge of the foot line (spec 2026-10-02 «la interfaz en papel» § 5.3),
+ *  so the bar never covers it. Before the shell mounts (the first render,
+ *  tests) it is computed from the same clamp as `--top-bar-h`, which is also
+ *  the foot line's height. */
+function lineaAlPieTop(): number {
+  const el = document.querySelector('.linea-al-pie');
+  if (el) return el.getBoundingClientRect().top;
+  return window.innerHeight - Math.min(48, Math.max(36, window.innerWidth * 0.025));
+}
+
 export function clampPosition(x: number, y: number): { x: number; y: number } {
   const minX = 16;
   const maxX = window.innerWidth - BAR_WIDTH - 16;
   const minY = topBarBottom();
-  const maxY = window.innerHeight - BAR_HEIGHT - 16;
+  const maxY = lineaAlPieTop() - BAR_HEIGHT - 16;
   return {
     x: Math.max(minX, Math.min(maxX, x)),
     y: Math.max(minY, Math.min(maxY, y)),
@@ -50,7 +61,7 @@ export function loadPosition(): { x: number; y: number } {
   } catch { /* ignore */ }
   return {
     x: Math.round((window.innerWidth - BAR_WIDTH) / 2),
-    y: window.innerHeight - BAR_HEIGHT - 24,
+    y: lineaAlPieTop() - BAR_HEIGHT - 24,
   };
 }
 
