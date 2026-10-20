@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { I18N_SURFACES, collectText, openApp, visibleSurfaces } from '../e2e/i18n-surfaces';
 
@@ -93,17 +93,28 @@ for (const entry of I18N_SURFACES) {
   });
 }
 
-// Each project runs in its own worker and writes its own shots, so both files merge with what is already there.
-const merged = <T>(file: string, own: Record<string, T>, pick: (j: Record<string, unknown>) => Record<string, T>): Record<string, T> => {
-  try { return { ...pick(JSON.parse(readFileSync(file, 'utf8'))), ...own }; } catch { return own; }
-};
+// Each project runs in its own worker and writes its own shots, so both files merge with what an
+// earlier project of this run wrote; global-setup.ts empties them when the run starts.
+const merged = <T>(file: string, own: Record<string, T>, pick: (j: Record<string, unknown>) => Record<string, T>): Record<string, T> =>
+  existsSync(file) ? { ...pick(JSON.parse(readFileSync(file, 'utf8'))), ...own } : own;
 
-test.afterAll(() => {
+// eslint-disable-next-line no-empty-pattern -- Playwright reads fixtures from a destructured first argument
+test.afterAll(({}, testInfo) => {
   const file = path.join(OUT, 'superficies.json');
   const all = merged(file, registro, (j) => j as Record<string, string[]>);
   writeFileSync(file, JSON.stringify(Object.fromEntries(Object.keys(all).sort().map((k) => [k, all[k]])), null, 2) + '\n');
   const target = process.env.CAPTURAS_TEXTO;
   if (!target) return;
+  // A text baseline is written only from a project whose every shot was captured.
+  const project = testInfo.project.name;
+  const first = project === testInfo.config.projects[0].name;
+  const missing = I18N_SURFACES.filter((e) => first || !e.onlyFirstViewport)
+    .map((e) => (e.onlyFirstViewport ? e.id : `${project}--${e.id}`))
+    .filter((name) => !textos[name]);
+  if (missing.length) {
+    console.error(`CAPTURAS_TEXTO not written for ${project}: no capture for ${missing.join(', ')}`);
+    return;
+  }
   const shots = merged(target, textos, (j) => (j.shots ?? {}) as Record<string, Shot>);
   const sorted = Object.fromEntries(Object.keys(shots).sort().map((k) => [k, shots[k]]));
   const _base = execSync('git rev-parse --short=8 HEAD').toString().trim();

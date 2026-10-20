@@ -23,7 +23,7 @@
     "i18n:lock": "node scripts/i18n/lock.mjs",
     "lint:contraste": "tsx scripts/contraste-tokens.ts",
     "audit:ui": "node scripts/ui-surface-audit.mjs",
-    "audit:capturas": "playwright test --config playwright.capturas.config.ts",
+    "audit:capturas": "node scripts/pesado.mjs --nombre=capturas -- playwright test --config playwright.capturas.config.ts",
     "preview": "vite preview",
     "prepare": "husky",
     "test": "node scripts/pesado.mjs --nombre=suite -- vitest run",

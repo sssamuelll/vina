@@ -27,6 +27,7 @@ export const dismissToasts = (page: Page) =>
 export async function openApp(page: Page, origin: string, path: string): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Storage.clearDataForOrigin', { origin, storageTypes: 'all' });
+  await cdp.detach();
   await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 90_000 });
   await page.locator('.app-shell').waitFor({ state: 'visible', timeout: 90_000 });
   await page.waitForFunction(() => Boolean((window as unknown as { __VINA_STORE__?: { getState?: unknown } }).__VINA_STORE__?.getState), undefined, { timeout: 60_000 });

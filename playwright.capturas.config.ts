@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // DEV. Own port and strictPort: never reuse another server.
 export default defineConfig({
   testDir: './tests/capturas',
+  globalSetup: './tests/capturas/global-setup.ts',
   workers: 1,
   retries: 0,
   fullyParallel: false,
