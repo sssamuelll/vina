@@ -1,6 +1,8 @@
 # Husky hooks are run via `sh`; CRLF line endings break the shebang/parser on
 # checkout under Windows autocrlf. Force LF so the gate runs everywhere.
 .husky/pre-commit text eol=lf
+.husky/pre-merge-commit text eol=lf
+src/i18n/lock.json text eol=lf
 
 # Frozen DXF garment fixtures: keep bytes identical across platforms (the
 # parser tolerates CRLF, but byte-stable fixtures keep hashes/diffs honest).
@@ -47,3 +49,12 @@ public/*.webmanifest text eol=lf
 # shebang de bin/*.mjs rompe `npx vina-studio` en Mac y Linux. Force LF.
 mcp/** text eol=lf
 studio/** text eol=lf
+
+# i18n: the golden projects are compared byte for byte, and the i18n scripts are
+# .mjs files that vitest imports (a CRLF checkout breaks its SSR loader, see
+# above). Force LF.
+tests/fixtures/goldens/*.json text eol=lf
+scripts/i18n/*.mjs text eol=lf
+scripts/i18n-*.mjs text eol=lf
+scripts/persisted-surface.mjs text eol=lf
+scripts/bundle-ceiling.mjs text eol=lf

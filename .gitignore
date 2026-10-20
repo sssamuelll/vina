@@ -121,3 +121,6 @@ AGENTS.md.pre-graphify.bak
 
 # Blender compila los módulos de scripts/avatares/ al importarlos
 __pycache__/
+
+# Review documents written by scripts/i18n/review-doc.mjs
+/.i18n-review/

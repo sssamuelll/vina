@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { TEST_BROWSER_LOCALE } from './tests/locale-pin';
 
 // El puerto de los e2e se escoge con VINA_E2E_PORT (5174 por defecto). Con
 // `reuseExistingServer`, Playwright se queda con el primer servidor que
@@ -43,6 +44,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${PUERTO}`,
+    locale: TEST_BROWSER_LOCALE,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
     // WebGL needs actual GPU — use headed when available

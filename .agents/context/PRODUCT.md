@@ -27,7 +27,7 @@ product
 Minimalist, elegant, modern. A precision instrument (think quality CAD/instrumentation),
 not a SaaS dashboard and not a gamer tool. Calm surfaces, restrained color, the work
 (the pattern, the garment) is the protagonist — chrome recedes. Professional confidence
-without hype. UI copy: plain, honest, task-first; Spanish for user-facing messages.
+without hype. UI copy: plain, honest, task-first; user-facing messages through the catalog, in the person's language (en, es, de).
 
 ## Anti-references
 

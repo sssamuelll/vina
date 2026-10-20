@@ -30,6 +30,8 @@ import { ChevronRight, ChevronDown } from 'lucide-react';
 import { shortcutLabelFor } from './shortcutDisplay';
 import { computeScrollFade, encajarSubmenu, type Encaje, type ScrollFade } from '../PatternEditor/menuOverflow';
 import { usePeldanoDeEscape } from '../../shortcuts/escaleraDeLoLlamado';
+import { useT } from '../../i18n';
+import { supportedLocales, LANGUAGE_NAMES, getLocale, setLocale } from '../../i18n/locale';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +61,10 @@ interface MenuItem {
   disabled?: (state: RootState) => boolean;
   separator?: boolean;
   submenu?: MenuItem[];
+  /** Stable key when the label is not unique or not a stable identity. */
+  id?: string;
+  /** BCP 47 tag of the label's own language (a language named in itself). */
+  lang?: string;
 }
 
 // ─── Submenu Definitions ─────────────────────────────────────────────────────
@@ -260,6 +266,15 @@ const SIMULATION_MENU: MenuItem[] = [
 export const PREFERENCES_MENU: MenuItem[] = [
   { label: 'Avatar y medidas...', panel: 'Avatar' },
   { label: 'IA y ratón...', panel: 'Preferences' },
+  { separator: true, label: '' },
+  // Each language is named in itself (spec-approved exception to the Spanish-only copy).
+  ...supportedLocales().map((l): MenuItem => ({
+    id: `language.${l}`,
+    label: LANGUAGE_NAMES[l],
+    lang: l,
+    checked: () => getLocale() === l,
+    action: () => setLocale(l),
+  })),
 ];
 
 const HELP_MENU: MenuItem[] = [
@@ -273,6 +288,8 @@ const HELP_MENU: MenuItem[] = [
 
 interface TopLevelItem {
   label: string;
+  /** A stable hook for the e2e specs: the label gets translated, the id does not. */
+  id?: string;
   submenu: MenuItem[];
 }
 
@@ -283,7 +300,7 @@ const TOP_LEVEL: TopLevelItem[] = [
   { label: 'Patrón', submenu: PATTERN_MENU },
   { label: 'Simulación', submenu: SIMULATION_MENU },
   { separator: true } as unknown as TopLevelItem,
-  { label: 'Preferencias', submenu: PREFERENCES_MENU },
+  { id: 'preferences', label: 'Preferencias', submenu: PREFERENCES_MENU },
   { separator: true } as unknown as TopLevelItem,
   { label: 'Ayuda', submenu: HELP_MENU },
 ];
@@ -363,6 +380,8 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
   const [hoveredSub, setHoveredSub] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch<AppDispatch>();
+  // Re-render when the locale changes elsewhere so the Language check follows.
+  useT();
   // Suscripción solo con el menú abierto: cerrado devuelve null estable
   // (sin re-render por cada cambio del store). checked/disabled solo se
   // evalúan con el menú visible (Fase 2 — warning de selector root-state).
@@ -412,13 +431,13 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
 
     return (
       <div
-        key={item.label}
+        key={item.id ?? item.label}
         className={`logo-menu__item ${isDisabled ? 'logo-menu__item--disabled' : ''}`}
         onClick={() => !hasSubmenu && handleItemClick(item)}
         onMouseEnter={() => setHoveredSub(hasSubmenu ? item.label : null)}
       >
         <span className="logo-menu__check">{isChecked ? '✓' : ''}</span>
-        <span className="logo-menu__label">{item.label}</span>
+        <span className="logo-menu__label" lang={item.lang}>{item.label}</span>
         {rotulo && <span className="logo-menu__shortcut">{rotulo}</span>}
         {hasSubmenu && <ChevronRight size={14} className="logo-menu__chevron" />}
         {hasSubmenu && hoveredSub === item.label && (
@@ -458,6 +477,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
             return (
               <div
                 key={item.label}
+                data-menu={item.id}
                 className={`logo-menu__item ${hoveredTop === item.label ? 'logo-menu__item--hovered' : ''}`}
                 onMouseEnter={() => { setHoveredTop(item.label); setHoveredSub(null); }}
               >

@@ -20,6 +20,7 @@ export default defineConfig({
       'eslint-rules/tests/**/*.test.js',
     ],
     exclude: ['node_modules/**'],
+    setupFiles: ['tests/setup/locale.ts'],
     // La máquina es de varias sesiones y de otras aplicaciones, y la suite no se la
     // lleva entera. Por defecto vitest usa todas las CPU menos una: 23 workers en
     // 24 CPU lógicas. El 10-10, con `cusickGate.cpu` (105 s) y tres `.maria` (~29 s)

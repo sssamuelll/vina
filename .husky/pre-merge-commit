@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# Gate for merge commits, run before the commit is made: the pre-commit checks on
+# the files the merge changed, plus the i18n censuses.
+echo "🔍 Running TypeScript type check..."
+npx tsc -b --noEmit
+if [ $? -ne 0 ]; then
+  echo "❌ TypeScript errors found. Fix them before completing the merge."
+  exit 1
+fi
+
+echo "🔍 Running ESLint on files changed by the merge..."
+FILES=$(git diff --cached --name-only --diff-filter=ACMR HEAD -- '*.ts' '*.tsx')
+if [ -n "$FILES" ]; then
+  echo "$FILES" | xargs npx eslint --max-warnings=0
+  if [ $? -ne 0 ]; then
+    echo "❌ ESLint errors found. Fix them before completing the merge."
+    exit 1
+  fi
+fi
+
+echo "🔍 UI contract..."
+node scripts/ui-contract-lint.mjs
+if [ $? -ne 0 ]; then
+  echo "❌ A UI contract counter rose. See docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md"
+  exit 1
+fi
+
+echo "🔍 Running the i18n censuses..."
+npx vitest run tests/repo/i18n-literal-census.test.ts tests/repo/i18n-es-field-census.test.ts
+if [ $? -ne 0 ]; then
+  echo "❌ An i18n census failed. Fix it before completing the merge."
+  exit 1
+fi
+
+echo "✅ Pre-merge-commit checks passed!"

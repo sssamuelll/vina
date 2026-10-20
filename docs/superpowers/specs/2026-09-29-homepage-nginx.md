@@ -1,5 +1,7 @@
 # Homepage de Vina — lo que falta para publicar
 
+> **Amended 2026-10-20 by the i18n program** (`docs/superpowers/specs/2026-09-29-i18n-design.md` § 6.5, and deviation 3 of `docs/superpowers/plans/2026-10-20-i18n-phase-0-core.md`): the home is already English at `/` and Spanish at `/es/`; phase 7 adds `/de/` and the `?lang=` links into the app.
+>
 > **Estado:** pendiente. La home está implementada (spec `2026-09-28-homepage-design.md`), pero no
 > se publica hasta que Samuel haga estos pasos. El orden es el real: el deploy solo ya convierte `/`
 > en la home, así que todo lo que tiene que pasar antes de que María la vea va antes del deploy.

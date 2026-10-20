@@ -1,0 +1,157 @@
+{
+  "_doc": "The translation lock: for each catalog key and language, the hash of the entry as written, of the English it was written against, and its review. It is written by `npm run i18n:lock -- --stamp` and by the review-apply step (spec § 7.3), never by hand.",
+  "entries": {
+    "app.title": {
+      "de": {
+        "esHash": "272a5d682cc21f97e84ba53675354e2b0424bb2c6977644e297510031afbe285",
+        "hash": "392397c109384cc69026a7892ab1f52bf2f5b6ff67dc48c01b3b8ad5616d5260",
+        "sourceHash": "d95571a077d25cec763968f63d2026dd7f345023ec97526ace9947178f248ade"
+      },
+      "en": {
+        "esHash": "272a5d682cc21f97e84ba53675354e2b0424bb2c6977644e297510031afbe285",
+        "hash": "d95571a077d25cec763968f63d2026dd7f345023ec97526ace9947178f248ade"
+      },
+      "es": {
+        "hash": "272a5d682cc21f97e84ba53675354e2b0424bb2c6977644e297510031afbe285",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "272a5d682cc21f97e84ba53675354e2b0424bb2c6977644e297510031afbe285",
+        "signed": true,
+        "sourceHash": "d95571a077d25cec763968f63d2026dd7f345023ec97526ace9947178f248ade"
+      }
+    },
+    "keys.alt": {
+      "de": {
+        "esHash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593",
+        "hash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593",
+        "sourceHash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593"
+      },
+      "en": {
+        "esHash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593",
+        "hash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593"
+      },
+      "es": {
+        "hash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593",
+        "signed": true,
+        "sourceHash": "f8fc95de90bbebd8a754afea6d2dd2ebf6dfff8e8d33d7e7e0b02a0c761f8593"
+      }
+    },
+    "keys.backspace": {
+      "de": {
+        "esHash": "7923f3517f82ed6e8e69b058387fc8659e26e8e4596c67ebbd7055260595e9d9",
+        "hash": "401b5342e9962ef3175e5fb5487c14b9c6260875858f34ca1de95ce02e045610",
+        "sourceHash": "a0a7dde01a4416c03bd723b4049e7bff980c2bc678685cf9388c28a222100a72"
+      },
+      "en": {
+        "esHash": "7923f3517f82ed6e8e69b058387fc8659e26e8e4596c67ebbd7055260595e9d9",
+        "hash": "a0a7dde01a4416c03bd723b4049e7bff980c2bc678685cf9388c28a222100a72"
+      },
+      "es": {
+        "hash": "7923f3517f82ed6e8e69b058387fc8659e26e8e4596c67ebbd7055260595e9d9",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "7923f3517f82ed6e8e69b058387fc8659e26e8e4596c67ebbd7055260595e9d9",
+        "signed": true,
+        "sourceHash": "a0a7dde01a4416c03bd723b4049e7bff980c2bc678685cf9388c28a222100a72"
+      }
+    },
+    "keys.ctrl": {
+      "de": {
+        "esHash": "bf94f6cdee2dbc94bbf5b2bf158edc6a3b9a16f55d94808c4b4d08551c01c9c0",
+        "hash": "a4b98a757e97a56a99a5ab70a2fd9ccb737dc152b48e6fd0b0fc3cbcdbda8bff",
+        "sourceHash": "bf94f6cdee2dbc94bbf5b2bf158edc6a3b9a16f55d94808c4b4d08551c01c9c0"
+      },
+      "en": {
+        "esHash": "bf94f6cdee2dbc94bbf5b2bf158edc6a3b9a16f55d94808c4b4d08551c01c9c0",
+        "hash": "bf94f6cdee2dbc94bbf5b2bf158edc6a3b9a16f55d94808c4b4d08551c01c9c0"
+      },
+      "es": {
+        "hash": "bf94f6cdee2dbc94bbf5b2bf158edc6a3b9a16f55d94808c4b4d08551c01c9c0",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "bf94f6cdee2dbc94bbf5b2bf158edc6a3b9a16f55d94808c4b4d08551c01c9c0",
+        "signed": true,
+        "sourceHash": "bf94f6cdee2dbc94bbf5b2bf158edc6a3b9a16f55d94808c4b4d08551c01c9c0"
+      }
+    },
+    "keys.delete": {
+      "de": {
+        "esHash": "46ca1c389cab8452466d1e0d278658ccc7c33f0d483fb50f89fe02c38338ca7d",
+        "hash": "1dfa74fcbe51a3417d9849c68e128a383f64bab01a48f085cb1a884de0533715",
+        "sourceHash": "e3cde3cdc802eea42291143326ac4c6d9f8bab5d895663eb3b51abb3dba17f46"
+      },
+      "en": {
+        "esHash": "46ca1c389cab8452466d1e0d278658ccc7c33f0d483fb50f89fe02c38338ca7d",
+        "hash": "e3cde3cdc802eea42291143326ac4c6d9f8bab5d895663eb3b51abb3dba17f46"
+      },
+      "es": {
+        "hash": "46ca1c389cab8452466d1e0d278658ccc7c33f0d483fb50f89fe02c38338ca7d",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "46ca1c389cab8452466d1e0d278658ccc7c33f0d483fb50f89fe02c38338ca7d",
+        "signed": true,
+        "sourceHash": "e3cde3cdc802eea42291143326ac4c6d9f8bab5d895663eb3b51abb3dba17f46"
+      }
+    },
+    "keys.escape": {
+      "de": {
+        "esHash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4",
+        "hash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4",
+        "sourceHash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4"
+      },
+      "en": {
+        "esHash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4",
+        "hash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4"
+      },
+      "es": {
+        "hash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4",
+        "signed": true,
+        "sourceHash": "049b5cf9f03741d62fac5c11b9dff9c211c8e6265102327a88c7746167fb1fd4"
+      }
+    },
+    "keys.shift": {
+      "de": {
+        "esHash": "8e99b72aa33f469d34aed3eb536d1039d0d71bec525015c6eaf7e6dd341c11c2",
+        "hash": "1a789b1596552ac839714de57476156c8271a90fa0f700cfda6201e3a635be93",
+        "sourceHash": "8e99b72aa33f469d34aed3eb536d1039d0d71bec525015c6eaf7e6dd341c11c2"
+      },
+      "en": {
+        "esHash": "8e99b72aa33f469d34aed3eb536d1039d0d71bec525015c6eaf7e6dd341c11c2",
+        "hash": "8e99b72aa33f469d34aed3eb536d1039d0d71bec525015c6eaf7e6dd341c11c2"
+      },
+      "es": {
+        "hash": "8e99b72aa33f469d34aed3eb536d1039d0d71bec525015c6eaf7e6dd341c11c2",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "8e99b72aa33f469d34aed3eb536d1039d0d71bec525015c6eaf7e6dd341c11c2",
+        "signed": true,
+        "sourceHash": "8e99b72aa33f469d34aed3eb536d1039d0d71bec525015c6eaf7e6dd341c11c2"
+      }
+    },
+    "keys.space": {
+      "de": {
+        "esHash": "bf8bf79e5a0ebd2ec0d457aae2776a56f59f1a4204c1642d3d773e22054c1fa7",
+        "hash": "e61a627228b2d89c8001fa47cf74f2962e0a459374bf267cae66490a8fc94744",
+        "sourceHash": "b20b7b04f5417861b894196af63666afa5a73d0bbd8aa1542d13ef81bc9f235c"
+      },
+      "en": {
+        "esHash": "bf8bf79e5a0ebd2ec0d457aae2776a56f59f1a4204c1642d3d773e22054c1fa7",
+        "hash": "b20b7b04f5417861b894196af63666afa5a73d0bbd8aa1542d13ef81bc9f235c"
+      },
+      "es": {
+        "hash": "bf8bf79e5a0ebd2ec0d457aae2776a56f59f1a4204c1642d3d773e22054c1fa7",
+        "reviewedAt": "2026-10-20",
+        "reviewedBy": "signed copy 473c1772",
+        "reviewedHash": "bf8bf79e5a0ebd2ec0d457aae2776a56f59f1a4204c1642d3d773e22054c1fa7",
+        "signed": true,
+        "sourceHash": "b20b7b04f5417861b894196af63666afa5a73d0bbd8aa1542d13ef81bc9f235c"
+      }
+    }
+  }
+}

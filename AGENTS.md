@@ -12,6 +12,7 @@ Browser-based garment CAD with AI copilot and real-time XPBD cloth simulation. B
 - **Typecheck command.** Use `npx tsc -b --noEmit` (build mode), NOT bare `tsc --noEmit`. Root tsconfig has `"files": []` and returns clean vacuously. Pre-commit hook uses `-b`; manual verification must match.
 - **IDs.** Use `newId()` from `src/utils/ids.ts` (v4 UUID via `crypto.randomUUID()`). State-encoded composite IDs (e.g., `pin_${vertexIndex}`, `auto-seam-${rankIndex}`) marked `// state-encoded ID` are preserved — do not replace.
 - **Persistence.** IDB canonical via `storageSet`/`storageGet` from `src/utils/storage.ts`. Never write LS+IDB in parallel. Inline shape comment required at every `storageSet` callsite: `// shape: <Type> v<N> — opt-in envelope: <yes|no>`. LS-only writes need inline justification.
+- **i18n.** Visible text only through `src/i18n/` (`t()` / `useT()`); `vina/no-literal-ui-string`, `tsc -b` and the translation lock guard completeness; `es` values are María's signed copy, verbatim. Spec: `docs/superpowers/specs/2026-09-29-i18n-design.md`.
 - **Don't bypass gates.** No `--no-verify`. The Husky pre-commit hook (`.husky/pre-commit`) runs the *fast* gate — `npx tsc -b --noEmit` + `npx lint-staged` (eslint `--max-warnings=0` on staged `*.{ts,tsx}`). It does **not** run the test suite (too slow per commit); run the full gate including tests manually before committing (see "After Every Task"). The hook is tracked: `.husky/` is intentionally NOT gitignored (only the generated `.husky/_/` self-ignores) and `.gitattributes` pins it to LF — do not re-ignore it or the gate silently no-ops.
 
 ## Commands
@@ -23,6 +24,8 @@ Browser-based garment CAD with AI copilot and real-time XPBD cloth simulation. B
 | E2E tests | `npm run test:e2e` |
 | Lint | `npm run lint` |
 | Typecheck | `npx tsc -b --noEmit` |
+| Translation lock | `npm run i18n:lock` |
+| i18n launch gate | `npm run i18n:launch-gate` |
 | WASM rebuild | `cd crates/xpbd-wasm && wasm-pack build --target web --out-dir pkg && cp pkg/xpbd_wasm.{js,_bg.wasm} ../../public/wasm/` |
 
 ## Key Directories

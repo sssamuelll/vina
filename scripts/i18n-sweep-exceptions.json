@@ -1,0 +1,9 @@
+[
+  "docs/reports",
+  "docs/plans",
+  "docs/superpowers",
+  "docs/issues",
+  "docs/business",
+  "src/i18n/es/**",
+  "tests/i18n/baseline/**"
+]

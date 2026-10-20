@@ -35,8 +35,8 @@ Estas cuatro preguntas cubren el 90% de la deriva medida:
    componente.
 2. **¿Es una superficie que flota sobre el lienzo?** → usa un material entero
    (§2), y su raíz lleva `data-material="papel"`. No inventes el tuyo.
-3. **¿Es texto que ve la usuaria?** → español, y el término sale del glosario
-   `docs/specs/2026-07-16-ui-copy-es-glosario.md`.
+3. **Is it text a person reads?** → the catalog (`src/i18n/`), and the term comes
+   from the glossary `docs/specs/2026-09-29-ui-glossary.md`.
 4. **¿Es una función nueva?** → ¿por dónde entra? Si solo se llega por la
    paleta de comandos, no está terminada (§6).
 
@@ -273,11 +273,23 @@ de una sola lista por concepto (`FORMAS_DE_PIQUETE`, `TIPOS_DE_COSTURA`,
 
 ## 5. Ley de idioma y atajos
 
-- Español de Venezuela. Sentence case. Sin "¡", sin "por favor".
-- Un término por concepto — el glosario manda: pieza, costura, margen, piquete,
-  pinza, tramo.
-- Los `aria-label` **también** van en español.
-- Los términos de motor (WebGPU, WASM, fps, DXF) no se traducen; sus mensajes sí.
+- Visible text lives in the catalog (`src/i18n/`), one term per concept from the
+  glossary `docs/specs/2026-09-29-ui-glossary.md` (i18n spec § 7.2).
+- **en:** sentence case; no "!" and no "please"; buttons name the outcome
+  ("Delete piece"). The source copy goes through the solace-wren microcopy
+  protocol.
+- **es:** Venezuelan Spanish, `tú`, sentence case, no «¡», no «por favor», the
+  glossary's terms. The `es` values are María's signed copy, verbatim.
+- **de:** the infinitive for commands ("Schnittteil löschen"); impersonal
+  messages; `Sie` only when direct address is unavoidable; no "!", no "bitte".
+- **Banned words** are the glossary's `banned` rows, per language: «heredar»
+  and «heredado» in `es`, `inherit` and its forms in `en`, `vererben`, `vererbt`
+  and `geerbt` in `de`. Name the concept by the relation («Este borde usa el
+  margen de la pieza»).
+- **Never translated, in any language:** overlock, DXF, AAMA, WebGPU, WASM, fps.
+  A term a language keeps in English is a `keep` mark in that language's
+  glossary column.
+- `aria-label`s follow the same rules as visible text.
 - **Una sola notación de atajo**, vía `shortcutDisplay.ts`. Y si un atajo está en
   `src/shortcuts/defaults.ts`, el catálogo que lo muestra tiene que declararlo
   igual: `notch` tenía Shift+N registrado y el dock no lo mostraba, así que para

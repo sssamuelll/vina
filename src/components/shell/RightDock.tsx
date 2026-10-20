@@ -109,6 +109,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
           type="button"
           className={`dock__tool ${simActive ? 'dock__tool--active' : ''}`}
           onClick={() => { if (simActive) dispatch(pauseSimulation()); else dispatch(startSimulation()); }}
+          data-action="simulate"
           aria-label="Simular"
           aria-pressed={simActive}
         >
