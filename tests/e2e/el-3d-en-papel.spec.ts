@@ -19,7 +19,7 @@ test.describe.configure({ timeout: process.env.CI ? 240_000 : 120_000 });
 
 const MARIA = { width: 1366, height: 643 };
 /** El papel de la hoja (`--canvas-2d`), tal como lo calcula el navegador. */
-const PAPEL = 'rgb(250, 244, 227)';
+const PAPEL = 'rgb(245, 245, 245)';
 
 interface VentanaConStore {
   __VINA_STORE__: { getState: () => { renderSettings: { backgroundMode: string; avatarRenderStyle: string }; simulation: { simulationState: string; viewMode3D: string } } };
@@ -241,7 +241,7 @@ test('«Capturar visor 3D» saca el visor sobre el papel: la captura sale con el
   });
   expect(imagen.ancho, 'la captura salió vacía').toBeGreaterThan(100);
   expect(imagen.alto).toBeGreaterThan(100);
-  expect(imagen.esquina, 'la esquina de la captura no es el papel de la hoja (250, 244, 227)').toEqual([250, 244, 227, 255]);
+  expect(imagen.esquina, 'la esquina de la captura no es el papel de la hoja (245, 245, 245)').toEqual([245, 245, 245, 255]);
 });
 
 test('el pie lleva la sección del 3D con la voz de la vista: en Split y en 3D, no en 2D', async ({ page }) => {

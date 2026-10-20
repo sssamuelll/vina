@@ -36,7 +36,7 @@
 
   /* ── Acento — uno, tono 248, tres roles (spec § 4.3) ────────────────
    *   --accent         bordes, tintes, tiradores, línea de selección
-   *                    (3,59:1 sobre el papel; 4,67 sobre surface)
+   *                    (3,62:1 sobre el papel; 4,67 sobre surface)
    *   --accent-fuerte  relleno sólido que lleva texto blanco (5,04:1)
    *   --accent-fuerte-hover  ese relleno al pasar el mouse (4,65:1)
    *   --accent-ink     el acento ESCRITO sobre el cromo (8,65:1 surface)
@@ -91,13 +91,13 @@
   --grainline-color: #6bff6b; /* dato del visor 3D (el hilo), no cromo */
 
   /* ── La hoja del lienzo 2D (spec 2026-10-02 «la interfaz en papel» § 7.3) ──
-     Papel más amarillo que el de cromo callado (era #f1efe8) y una cuadrícula
-     de un solo paso que se ve siempre: 1,52:1 sobre el papel (las dos de antes
-     daban 1,16 y 1,30). El blanco de la pieza se separa del papel 1,10:1; si
-     las piezas se pierden, la reserva es #f5efde, que devuelve el 1,15. Los
-     dos pisos los fija contrasteDeTokens.ts. */
-  --canvas-2d: #faf4e3;
-  --grid-2d: #cfc8b6;
+     Desde el 20-10 es el gris claro del lienzo de Figma (#f5f5f5, el de su
+     tema claro): el crema #faf4e3 tiraba a amarillo. Una cuadrícula de un
+     solo paso que se ve siempre: 1,52:1 sobre el papel, el mismo paso que
+     tenía sobre el crema. El blanco de la pieza se separa del papel 1,09:1,
+     justo en su piso. Los dos pisos los fija contrasteDeTokens.ts. */
+  --canvas-2d: #f5f5f5;
+  --grid-2d: #c9c9c9;
   --ink-on-light: #2b2d33;     /* cut line, primary labels */
   --ink-on-light-2: #6f7480;   /* línea de costura, hilo, rótulos meta, puntos del contorno en reposo */
   --ink-on-light-3: #a0a5b0;   /* construction / reference lines */
@@ -114,7 +114,7 @@
   --seam-pair-8: oklch(0.55 0.11 20);
   /* Selección y costuras: el MISMO acento que el cromo. Hasta el 26-09 era
    * oklch(0.66 0.16 248), que daba 2,70:1 sobre el crema (bajo el 3:1 de un
-   * objeto gráfico); a L 0,60 da 3,59:1 sobre el papel y 3,95:1 sobre la pieza. */
+   * objeto gráfico); a L 0,60 da 3,62:1 sobre el papel y 3,95:1 sobre la pieza. */
   --accent-2d: var(--accent);
   --font-mono-2d: var(--font-mono);
   --font-ui-2d: var(--font-sans);
@@ -139,11 +139,11 @@
   --readout-ink-2d: #ffffff;
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
   /* Tinta de texto instructivo dibujado SOBRE el papel: la marca de escala y
-   * la pantalla vacía. Da 5,32:1 sobre --canvas-2d y 5,85:1 sobre
+   * la pantalla vacía. Da 5,27:1 sobre --canvas-2d y 5,74:1 sobre
    * --piece-fill-2d; lo verifica contrasteDeTokens.ts. La frase de la
    * herramienta vive desde P2b en la línea al pie, que es papel desde el
    * 2026-10-11 y usa los --text-* de su ámbito, no esta tinta. */
-  --ink-hint: #6b6459;
+  --ink-hint: #666666;
   /* Seam overlay (SeamRenderer) on the paper ground: tension labels are muted
      warm (gather) / cool (ease). */
   --seam-tension-gather-2d: oklch(0.58 0.11 50);
@@ -244,7 +244,7 @@
   --surface-overlay-shadow-recessed: 0 1px 2px rgba(0, 0, 0, 0.2);
 
   /* Cotas sobre el papel: el número que se escribe donde mide. Paso FUERTE
-   * del acento (lleva texto encima: blanco 5,04:1; 4,59:1 sobre el papel). */
+   * del acento (lleva texto encima: blanco 5,04:1; 4,62:1 sobre el papel). */
   --cota-bg-2d: var(--accent-2d-fuerte);
   --cota-ink-2d: #ffffff;
   --cota-line-2d: var(--accent-2d-fuerte);
@@ -314,21 +314,21 @@
 [data-material="papel"] {
   color: var(--text-primary);
 
-  --text-primary: oklch(0.27 0.010 80);     /* #292621 · 13,72 · 15,07 · 11,87 */
-  --text-secondary: oklch(0.45 0.012 80);   /* #59554e · 6,74 · 7,41 · 5,84 · rótulos */
-  --text-tertiary: oklch(0.50 0.012 80);    /* #67635c · 5,44 · 5,97 · 4,71 · atajos, placeholder */
-  --text-disabled: oklch(0.66 0.010 80);    /* #95928b · 2,83 · 3,11 · solo deshabilitado */
-  --bg-elevated: oklch(0.92 0.022 91);      /* #eae4d4 · papel hundido: hover, teclas */
+  --text-primary: oklch(0.27 0.010 80);     /* #292621 · 13,82 · 15,07 · 11,85 */
+  --text-secondary: oklch(0.45 0.012 80);   /* #59554e · 6,80 · 7,41 · 5,83 · rótulos */
+  --text-tertiary: oklch(0.50 0.012 80);    /* #67635c · 5,48 · 5,97 · 4,70 · atajos, placeholder */
+  --text-disabled: oklch(0.66 0.010 80);    /* #95928b · 2,85 · 3,11 · solo deshabilitado */
+  --bg-elevated: oklch(0.92 0 0);           /* #e4e4e4 · papel hundido: hover, teclas */
   --field-bg: #ffffff;
-  --border: oklch(0.62 0.012 80);           /* #8a857e · el borde de un campo: 3,33 · 3,66 */
+  --border: oklch(0.62 0.012 80);           /* #8a857e · el borde de un campo: 3,36 · 3,66 */
   --border-subtle: rgba(40, 36, 30, 0.14);  /* la línea de pelo y los separadores */
   --hairline: 1px solid var(--border-subtle);
-  --accent-ink: oklch(0.50 0.15 248);       /* #0066b3 · 5,38 · 5,91 */
-  --ai: oklch(0.50 0.16 295);               /* #6c4ab3 · 5,85 · 6,43 */
-  --success: oklch(0.50 0.13 150);          /* #137738 · 5,13 · 5,64 */
-  --warning: oklch(0.52 0.12 70);           /* #945a00 · 5,14 · 5,64 */
-  --destructive: oklch(0.52 0.18 25);       /* #ba2b2e · 5,50 · 6,05 */
-  --destructive-hover: oklch(0.46 0.18 25); /* #a50d1c · 7,15 · 7,85 */
+  --accent-ink: oklch(0.50 0.15 248);       /* #0066b3 · 5,42 · 5,91 */
+  --ai: oklch(0.50 0.16 295);               /* #6c4ab3 · 5,89 · 6,43 */
+  --success: oklch(0.50 0.13 150);          /* #137738 · 5,17 · 5,64 */
+  --warning: oklch(0.52 0.12 70);           /* #945a00 · 5,18 · 5,64 */
+  --destructive: oklch(0.52 0.18 25);       /* #ba2b2e · 5,55 · 6,05 */
+  --destructive-hover: oklch(0.46 0.18 25); /* #a50d1c · 7,20 · 7,85 */
 
   /* Lo que flota es papel que se despega de la hoja (§ 7.1). */
   --surface-overlay-bg: #ffffff;
