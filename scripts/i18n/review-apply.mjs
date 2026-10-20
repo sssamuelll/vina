@@ -43,7 +43,7 @@ const literal = (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace
 
 export function applyReview(csv, { root = ROOT, lock, signed = false }) {
   // A spreadsheet saved as UTF-8 csv starts with a byte order mark.
-  const [header, ...body] = parseCsv(csv.replace(/^﻿/, ''));
+  const [header, ...body] = parseCsv(csv.replace(/^\uFEFF/, ''));
   const rows = body.map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i] ?? ''])));
   const todo = rows.filter((r) => r.verdict !== '');
   for (const r of todo) {

@@ -150,7 +150,7 @@ describe('review-apply', () => {
 
   it('reads a csv saved with a byte order mark', () => {
     const { root, cats, lock } = setup();
-    const csv = '﻿' + [HEADER, row(['keys.space', 'de', cats().en.get('keys.space').hash, 'correct', '', 'reviewer', '2026-10-20'])].join('\r\n');
+    const csv = '\uFEFF' + [HEADER, row(['keys.space', 'de', cats().en.get('keys.space').hash, 'correct', '', 'reviewer', '2026-10-20'])].join('\r\n');
     const result = applyReview(csv, { root, lock });
     expect(result.setAside).toEqual([]);
     expect(result.lock.entries['keys.space'].de.reviewedBy).toBe('reviewer');
