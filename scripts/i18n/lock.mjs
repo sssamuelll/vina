@@ -1,9 +1,9 @@
 // npm run i18n:lock [-- --stamp <area|key> [--reason "<why>"]] [-- --launch]
 // Reports the lock state per area and locale; writes src/i18n/lock.json only with --stamp (spec § 7.3).
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
-import { lockStatus, readCatalog, stamp } from './lock-core.mjs';
+import { lockStatus, readCatalog, stamp, writeLock } from './lock-core.mjs';
 
 const LOCK = fileURLToPath(new URL('../../src/i18n/lock.json', import.meta.url));
 const LOCALE_TS = fileURLToPath(new URL('../../src/i18n/locale.ts', import.meta.url));
@@ -35,11 +35,6 @@ function shippedLocales() {
   return init.elements.map((e) => e.text);
 }
 
-const sortDeep = (v) =>
-  Array.isArray(v) || typeof v !== 'object' || v === null
-    ? v
-    : Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])]));
-
 const catalogs = Object.fromEntries(LOCALES.map((l) => [l, readCatalog(l)]));
 let lock = existsSync(LOCK) ? JSON.parse(readFileSync(LOCK, 'utf8')) : { entries: {} };
 lock._doc = DOC;
@@ -56,7 +51,7 @@ if (target !== undefined) {
     console.error(e.message);
     process.exit(1);
   }
-  writeFileSync(LOCK, JSON.stringify(sortDeep(lock), null, 2) + '\n');
+  writeLock(LOCK, lock);
 }
 
 const status = lockStatus(lock, catalogs);

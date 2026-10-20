@@ -1,7 +1,7 @@
 // The translation lock (spec § 7.3): hashes of catalog entries read from the TypeScript AST, and the
 // states and stamping built on them. Shared by scripts/i18n/lock.mjs and tests/repo/i18n-lock.test.ts.
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
@@ -138,6 +138,8 @@ function walkObject(obj, prefix, ctx, out) {
       if (g) glossaryExempt.push({ term: g[1], reason: g[2] });
     }
     out.set(key, {
+      file: ctx.file,
+      span: [value.getStart(ctx.sf), value.end],
       hash: entryHash(value),
       text: isString ? value.text : value.getText(ctx.sf),
       isFunction,
@@ -230,11 +232,27 @@ export function stamp(lock, catalogs, target, opts = {}) {
   return next;
 }
 
-export function markReviewed(lock, catalogs, key, locale, reviewer, date) {
+const sortDeep = (v) =>
+  Array.isArray(v) || typeof v !== 'object' || v === null
+    ? v
+    : Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])]));
+
+// The lock file format: 2-space JSON, keys sorted deep, final newline.
+export function writeLock(path, lock) {
+  writeFileSync(path, JSON.stringify(sortDeep(lock), null, 2) + '\n');
+}
+
+export function markReviewed(lock, catalogs, key, locale, reviewer, date, { signed } = {}) {
+  if (signed && locale !== 'es') throw new Error(`only es can be signed, not ${locale}:${key}`);
   const rec = recordOf(lock, key, locale);
   const cur = catalogs[locale].get(key);
   if (!rec || !cur) throw new Error(`${locale}:${key} is not stamped`);
   const next = structuredClone(lock);
   Object.assign(next.entries[key][locale], { reviewedBy: reviewer, reviewedAt: date, reviewedHash: cur.hash });
+  if (signed) {
+    next.entries[key].es.signed = true;
+    // en and de now translate the signed Spanish; pin them to it so neither goes stale
+    for (const l of ['en', 'de']) if (next.entries[key][l]) next.entries[key][l].esHash = cur.hash;
+  }
   return next;
 }

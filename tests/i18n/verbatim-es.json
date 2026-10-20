@@ -1,0 +1,34 @@
+{
+  "app.title": {
+    "source": "app/index.html:7",
+    "text": "Vina — Patronaje y simulación 3D"
+  },
+  "keys.alt": {
+    "source": "src/components/shell/shortcutDisplay.ts:24",
+    "text": "Alt"
+  },
+  "keys.backspace": {
+    "source": "src/components/shell/shortcutDisplay.ts:37",
+    "text": "Retroceso"
+  },
+  "keys.ctrl": {
+    "source": "src/components/shell/shortcutDisplay.ts:22",
+    "text": "Ctrl"
+  },
+  "keys.delete": {
+    "source": "src/components/shell/shortcutDisplay.ts:38",
+    "text": "Supr"
+  },
+  "keys.escape": {
+    "source": "src/components/shell/shortcutDisplay.ts:39",
+    "text": "Esc"
+  },
+  "keys.shift": {
+    "source": "src/components/shell/shortcutDisplay.ts:23",
+    "text": "Shift"
+  },
+  "keys.space": {
+    "source": "src/components/shell/shortcutDisplay.ts:36",
+    "text": "Espacio"
+  }
+}
