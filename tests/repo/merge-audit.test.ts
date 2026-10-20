@@ -6,9 +6,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { auditMerge } from '../../scripts/i18n/merge-audit.mjs';
 
 const repo = mkdtempSync(join(tmpdir(), 'vina-merge-audit-'));
+// The pre-push hook runs this suite with GIT_DIR and GIT_INDEX_FILE set to the real repository:
+// inherited, they turn `git init` and `git commit` below into writes to it.
+const ENV_WITHOUT_GIT = Object.fromEntries(
+  Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')),
+) as NodeJS.ProcessEnv;
 const git = (...args: string[]) =>
   execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'core.hooksPath=.no-hooks', '-c', 'core.autocrlf=false', ...args], {
     cwd: repo,
+    env: ENV_WITHOUT_GIT,
     encoding: 'utf8',
   });
 const write = (rel: string, text: string) => {

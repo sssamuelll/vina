@@ -8,9 +8,13 @@ import ts from 'typescript';
 
 const isTest = (p) => /(^|\/)(tests|__tests__)\//.test(p) || /\.(test|spec)\.[^/]+$/.test(p);
 
+// Inside a hook git exports GIT_DIR, GIT_INDEX_FILE and the rest; without this, `cwd` would not
+// choose the repository.
+const ENV_WITHOUT_GIT = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
+
 export function auditMerge(commit = 'HEAD', cwd = process.cwd()) {
   const git = (...args) =>
-    execFileSync('git', ['-c', 'core.quotepath=off', ...args], { cwd, encoding: 'utf8', maxBuffer: 1 << 28 });
+    execFileSync('git', ['-c', 'core.quotepath=off', ...args], { cwd, env: ENV_WITHOUT_GIT, encoding: 'utf8', maxBuffer: 1 << 28 });
   const lines = (out) => out.split('\n').filter(Boolean);
   const tree = (rev) => new Set(lines(git('ls-tree', '-r', '--name-only', rev)));
 
