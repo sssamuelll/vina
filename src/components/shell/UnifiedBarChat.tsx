@@ -94,7 +94,7 @@ export default function UnifiedBarChat({ pendingDXF, clearAttachment }: Props) {
                     <span style={{ flexShrink: 0 }}>
                       {tc.status === 'done' ? '✓' : tc.status === 'error' ? '✗' : '·'}
                     </span>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>{tc.name}</span>
+                    <span lang="en" translate="no" style={{ fontFamily: 'var(--font-mono)' }}>{tc.name}</span>
                     {/* #1194 — el error se traduce al pintarlo, no al producirlo:
                         `classifyError` y el reintento del LLM leen el original. */}
                     {tc.error && <span style={{ opacity: 0.85 }}>— {mensajeDeErrorEs(tc.error)}</span>}
