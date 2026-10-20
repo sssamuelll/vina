@@ -61,7 +61,8 @@ function commentsOf(text, ext) {
     const c = text[i];
     if (quotes.includes(c)) {
       i++;
-      while (i < text.length && text[i] !== c) i += text[i] === '\\' ? 2 : 1;
+      // Only a template spans lines: a quote that a regex or a JSX apostrophe opened ends at the line.
+      while (i < text.length && text[i] !== c && (c === '\x60' || text[i] !== '\n')) i += text[i] === '\\' ? 2 : 1;
       i++;
     } else if (c === '/' && text[i + 1] === '*') {
       const end = text.indexOf('*/', i + 2);

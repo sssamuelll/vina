@@ -82,11 +82,14 @@ function compare(name: string, got: Shot) {
     }
     expected.push(...(exception?.added[key] ?? []));
     const shot = [...got[key]];
+    // A key counts only as a pair: its English left the shot and its Spanish joined it, in one place.
     for (const [enText, esText] of ALLOWED) {
+      if (enText === esText) continue;
       const missing = expected.indexOf(enText);
-      if (missing >= 0 && !shot.includes(enText)) expected.splice(missing, 1);
       const added = shot.indexOf(esText);
-      if (added >= 0 && !expected.includes(esText)) shot.splice(added, 1);
+      if (missing < 0 || added < 0 || shot.includes(enText) || expected.includes(esText)) continue;
+      expected.splice(missing, 1);
+      shot.splice(added, 1);
     }
     expect(shot.sort(), `${name} ${key}`).toEqual(expected.sort());
   }

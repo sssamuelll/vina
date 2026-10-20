@@ -55,4 +55,10 @@ describe('sweep report', () => {
     run(low, '--update');
     expect(JSON.parse(readFileSync(join(low, 'scripts', 'i18n-sweep-baseline.json'), 'utf8')).comments).toBe(0);
   });
+
+  it('counts a comment after a quote that a regex opened', () => {
+    const root = tree({ ...ZERO, comments: 1 });
+    writeFileSync(join(root, 'src', 'b.ts'), "const q = /'/;\n// la costura que se cierra con el margen\n");
+    expect(run(root)).toBe(1);
+  });
 });
