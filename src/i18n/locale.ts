@@ -16,8 +16,8 @@ export const LANGUAGE_NAMES: Readonly<Record<Locale, string>> = { en: 'English',
 export const LOCALE_STORAGE_KEY = 'vina-locale';
 
 function allowAll(): boolean {
-  const env = import.meta.env as Record<string, unknown>;
-  return Boolean(env.DEV) || env.MODE === 'test' || env.VITE_ALL_LOCALES === '1';
+  // Direct property reads so Vite folds DEV and the pseudo path drops out of production builds.
+  return Boolean(import.meta.env.DEV) || import.meta.env.MODE === 'test' || import.meta.env.VITE_ALL_LOCALES === '1';
 }
 
 export function supportedLocales(): readonly Locale[] {
@@ -68,9 +68,10 @@ function remember(locale: Locale): void {
 }
 
 export function setLocale(locale: Locale): void {
-  if (locale === current) return;
+  if (!isSupported(locale)) return;
+  if (locale === current && !pseudo) return;
   remember(locale);
-  commit(locale, pseudo);
+  commit(locale, false);
 }
 
 export interface DetectEnv {

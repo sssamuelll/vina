@@ -184,6 +184,28 @@ describe('setLocale and subscribe', () => {
     expect(m.getLocaleSnapshot()).toBe('es');
   });
 
+  it('an explicit choice ends the pseudo override', async () => {
+    const m = await load();
+    m.detectLocale(env({ search: '?locale=pseudo', allowPseudo: true }));
+    m.setLocale('de');
+    expect(m.isPseudo()).toBe(false);
+    expect(m.getLocale()).toBe('de');
+    expect(m.getLocaleSnapshot()).toBe('de');
+    m.detectLocale(env({ search: '?locale=pseudo', allowPseudo: true }));
+    m.setLocale('en');
+    expect(m.isPseudo()).toBe(false);
+  });
+
+  it('ignores a value outside the supported locales', async () => {
+    const m = await load();
+    const listener = vi.fn();
+    m.subscribe(listener);
+    m.setLocale('xx' as Parameters<typeof m.setLocale>[0]);
+    expect(m.getLocale()).toBe('en');
+    expect(listener).not.toHaveBeenCalled();
+    expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
   it('__resetLocaleForTests sets the locale without writing storage and clears pseudo', async () => {
     const m = await load();
     m.detectLocale(env({ search: '?locale=pseudo', allowPseudo: true }));
