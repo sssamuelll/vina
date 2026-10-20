@@ -20,6 +20,7 @@
     "start": "node dist-server/index.js",
     "lint": "eslint .",
     "lint:ui": "node scripts/ui-contract-lint.mjs",
+    "i18n:lock": "node scripts/i18n/lock.mjs",
     "lint:contraste": "tsx scripts/contraste-tokens.ts",
     "audit:ui": "node scripts/ui-surface-audit.mjs",
     "audit:capturas": "node scripts/capturas-ui.mjs",
