@@ -1,5 +1,6 @@
 import type { KeyCombo } from '../../shortcuts/ShortcutRegistry';
 import { DEFAULT_SHORTCUTS } from '../../shortcuts/defaults';
+import { t } from '../../i18n';
 
 /**
  * Notación visible canónica: `Ctrl+Shift+Z` fuera de macOS y `⌘⇧Z` en macOS.
@@ -18,10 +19,11 @@ export function displayShortcut(shortcut: string, isMac: boolean = IS_MAC): stri
 
   if (isMac) return glyphShortcut;
 
+  const { ctrl, shift, alt } = t().keys;
   return glyphShortcut
-    .replace(/⌘/g, 'Ctrl+')
-    .replace(/⇧/g, 'Shift+')
-    .replace(/⌥/g, 'Alt+');
+    .replace(/⌘/g, `${ctrl}+`)
+    .replace(/⇧/g, `${shift}+`)
+    .replace(/⌥/g, `${alt}+`);
 }
 
 /**
@@ -32,12 +34,11 @@ export function displayModifierKey(glyph: '⇧' | '⌘' | '⌥', isMac: boolean 
   return isMac ? glyph : displayShortcut(glyph, false).replace(/\+$/, '');
 }
 
-const KEY_LABELS: Readonly<Record<string, string>> = {
-  ' ': 'Espacio',
-  Backspace: 'Retroceso',
-  Delete: 'Supr',
-  Escape: 'Esc',
-};
+// Se lee del catálogo al llamar, no al cargar el módulo: sigue al idioma activo.
+function keyLabel(key: string): string | undefined {
+  const k = t().keys;
+  return ({ ' ': k.space, Backspace: k.backspace, Delete: k.delete, Escape: k.escape } as Record<string, string>)[key];
+}
 
 /**
  * El rótulo de un atajo, a partir del ID de su acción — nunca de una cadena
@@ -68,7 +69,7 @@ export function displayShortcutBinding(
     binding.shift ? '⇧' : '',
     binding.alt ? '⌥' : '',
   ].join('');
-  const key = KEY_LABELS[binding.key] ?? (
+  const key = keyLabel(binding.key) ?? (
     binding.key.length === 1 ? binding.key.toUpperCase() : binding.key
   );
 
