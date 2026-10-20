@@ -124,7 +124,7 @@ Areas with a closed audit (`docs/reports/`) have ratified conventions — read t
 
 ## Terminology
 
-Use consistent garment terms across code, comments, and docs. The product UI is Spanish; these are the anchors:
+Use consistent garment terms across code, comments, and docs; the glossary `docs/specs/2026-09-29-ui-glossary.md` is the source:
 
 | English | Español | Meaning |
 |---------|---------|---------|
@@ -138,6 +138,17 @@ Use consistent garment terms across code, comments, and docs. The product UI is 
 | Nesting | Marcada | Arranging pieces to minimize fabric use |
 | Topstitch | Pespunte | Decorative or structural visible stitch |
 | Interfacing | Entretela | Stiffening layer fused to fabric |
+
+### Blame
+
+The repository-language sweep rewrites comments and identifiers in bulk. To keep `git blame` on
+the commits that wrote the code, run once:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+The file arrives with the sweep.
 
 ## Code of conduct
 

@@ -44,7 +44,7 @@ Each line links to the code that makes it true; a test fails if that code goes a
 - Fabrics measured from cloth. Thirty-two presets today. · [#1005](https://github.com/sssamuelll/vina/issues/1005)
 <!-- /en-construccion -->
 
-The workshop's interface is in Spanish, for professional pattern makers. Contributor docs and code are in English.
+The workshop's interface is in Spanish today; English and German are in progress (#964).
 
 ## Send a pattern
 
