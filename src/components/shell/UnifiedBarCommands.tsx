@@ -52,6 +52,7 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Pr
         return (
           <button
             key={cmd.id}
+            data-command={cmd.id}
             style={{
               display: 'flex', alignItems: 'center', gap: 'var(--sp-2)',
               width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-sm)',

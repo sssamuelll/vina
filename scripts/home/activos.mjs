@@ -6,7 +6,7 @@
  *   npm run home:activos -- --url=http://localhost:4179 [--espera=120000] [--sin-poster]
  * --sin-poster salta el paso 7 (2,5 min de simulación); el resto sale byte a byte igual.
  * --gpu: Chrome visible con WebGPU (máquina con GPU): el póster y fig-02 salen del render real y en segundos, no en minutos.
- * Los pasos del taller están copiados de scripts/capturas-ui.mjs (es un script, no un módulo).
+ * Los pasos del taller viven ahora en tests/e2e/i18n-surfaces.ts (la lista de estados de la interfaz; el script capturas-ui.mjs ya no existe).
  */
 import { chromium } from 'playwright';
 import { writeFile, readFile } from 'node:fs/promises';
