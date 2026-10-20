@@ -123,6 +123,7 @@ npm run build > /tmp/vina-deploy-build.log 2>&1 || { tail -20 /tmp/vina-deploy-b
 # entrada se llama como su clave en rollupOptions.input: `app` → app-*.js.
 BUNDLE=$(grep -oE 'assets/app-[^"]+\.js' dist/app/index.html | head -1)
 [ -n "$BUNDLE" ] || { echo "✗ dist/app/index.html no referencia ningún assets/app-*.js" >&2; exit 1; }
+node scripts/bundle-ceiling.mjs --check "dist/$BUNDLE" || exit 1
 echo "✓ dist listo ($(du -sh dist | cut -f1), bundle ${BUNDLE})"
 
 # LOS E2E MIDEN EL BUILD, NO EL SERVIDOR DE DESARROLLO (2026-10-10).
@@ -309,6 +310,9 @@ SPECS_DEL_GATE=(
 )
 # Los specs de la lista que todavía no pasaron sobre este árbol.
 sin_marca() { for s in "${SPECS_DEL_GATE[@]}"; do [ -f "$MARCAS/$(basename "$s").ok" ] || echo "$s"; done; }
+for s in "${SPECS_DEL_GATE[@]}"; do
+  [ -f "$s" ] || { echo "✗ el gate nombra $s, que no existe" >&2; exit 1; }
+done
 mapfile -t PENDIENTES < <(sin_marca)
 if [ ${#PENDIENTES[@]} -eq 0 ]; then
   echo "✓ emplazamiento y contratos: los ${#SPECS_DEL_GATE[@]} specs ya pasaron sobre este árbol"
