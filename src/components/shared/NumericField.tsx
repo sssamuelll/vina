@@ -33,9 +33,14 @@ export function NumericField({
   const [invalid, setInvalid] = useState(false);
   const dirty = useRef(false);
 
-  // Re-seed from the parent's value (or locale) unless the person is mid-edit.
+  const focused = useRef(false);
+
+  // Re-seed from the parent's value (or locale) unless the person is mid-edit (focused and typed in).
   useEffect(() => {
-    if (!dirty.current) setDraft(seed);
+    if (focused.current && dirty.current) return;
+    dirty.current = false;
+    setInvalid(false);
+    setDraft(seed);
   }, [seed]);
 
   const clamp = (n: number) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n));
@@ -81,11 +86,13 @@ export function NumericField({
       aria-valuemin={min}
       aria-valuemax={max}
       aria-valuenow={Number.isFinite(value) ? value : undefined}
+      aria-valuetext={Number.isFinite(value) ? seed : undefined}
       aria-invalid={invalid || undefined}
       value={draft}
       onChange={(e) => { dirty.current = true; setInvalid(false); setDraft(e.target.value); }}
       onKeyDown={onKeyDown}
-      onBlur={commitDraft}
+      onFocus={() => { focused.current = true; }}
+      onBlur={() => { focused.current = false; commitDraft(); }}
     />
   );
 }

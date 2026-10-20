@@ -136,6 +136,28 @@ describe('NumericField', () => {
     expect(input.getAttribute('aria-invalid')).not.toBe('true');
   });
 
+  it('an invalid entry left by blur gives way to a new value', () => {
+    const { props, view, input } = mount();
+    fireEvent.focus(input);
+    type(input, 'abc');
+    fireEvent.blur(input);
+    view.rerender(<NumericField {...props} value={20} />);
+    expect(input.value).toBe('20,0');
+    expect(input.getAttribute('aria-invalid')).not.toBe('true');
+  });
+
+  it('a new value does not overwrite what is being typed', () => {
+    const { props, view, input } = mount();
+    fireEvent.focus(input);
+    type(input, '13');
+    view.rerender(<NumericField {...props} value={20} />);
+    expect(input.value).toBe('13');
+  });
+
+  it('announces the value as displayed', () => {
+    expect(mount().input.getAttribute('aria-valuetext')).toBe('12,5');
+  });
+
   it('re-seeds when the value changes while not being edited', () => {
     const { props, view, input } = mount();
     view.rerender(<NumericField {...props} value={20} />);
