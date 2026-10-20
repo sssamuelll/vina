@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# A merge that stopped on conflicts concludes with `git commit`, which runs this
+# hook and not pre-merge-commit: give it the same gate a clean merge gets.
+if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+  exec sh .husky/pre-merge-commit
+fi
+
 # Run TypeScript type checking on entire project
 echo "🔍 Running TypeScript type check..."
 npx tsc -b --noEmit

@@ -1,5 +1,7 @@
 // Lists what a merge of main into the i18n branch removed or changed.
 // node scripts/i18n/merge-audit.mjs [<merge commit>=HEAD]   (always exits 0)
+// ponytail: removed lines are scanned with a regex, so a literal with an escaped quote, split by `+`
+// or spanning lines is missed; parse the removed hunks with typescript if a miss ever matters.
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
