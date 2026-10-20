@@ -76,7 +76,7 @@ function literalText(source) {
   return parts.join('\n');
 }
 
-const textOf = (e) => (e.isFunction ? literalText(e.text) : e.text);
+export const textOf = (e) => (e.isFunction ? literalText(e.text) : e.text);
 
 export function checkCatalogs(catalogs, { terms, banned }) {
   const violations = [];

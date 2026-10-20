@@ -96,4 +96,63 @@ describe('review-apply', () => {
     const de = [HEADER, row(['keys.space', 'de', hash, 'correct', '', 'signed copy 473c1772', '2026-10-20'])].join('\n');
     expect(() => applyReview(de, { root, lock, signed: true })).toThrow(/signed/);
   });
+
+  it('a correction stamps only the entry it changed, so a corrected English leaves its translations stale', () => {
+    const { root, cats, lock } = setup();
+    const hash = (key: string) => cats().en.get(key).hash;
+    const csv = [
+      HEADER,
+      row(['keys.delete', 'de', hash('keys.delete'), 'correct', '', 'reviewer', '2026-10-20']),
+      row(['keys.space', 'en', hash('keys.space'), 'correction', 'Space bar', 'reviewer', '2026-10-20']),
+    ].join('\n');
+    const result = applyReview(csv, { root, lock });
+    const status = lockStatus(result.lock, cats());
+    expect(stateOf(status, 'keys.delete', 'de')).toBe('ok');
+    expect(stateOf(status, 'keys.space', 'en')).toBe('ok');
+    expect(stateOf(status, 'keys.space', 'es')).toBe('stale');
+    expect(stateOf(status, 'keys.space', 'de')).toBe('stale');
+  });
+
+  it('a correction to signed Spanish takes the signed mark from the entry', () => {
+    const { root, cats, lock } = setup();
+    const hash = cats().en.get('keys.space').hash;
+    const sign = [HEADER, row(['keys.space', 'es', hash, 'correct', '', 'signed copy 473c1772', '2026-10-20'])].join('\n');
+    const signed = applyReview(sign, { root, lock, signed: true }).lock;
+    const fix = [HEADER, row(['keys.space', 'es', hash, 'correction', 'Barra espaciadora', 'reviewer', '2026-10-21'])].join('\n');
+    const result = applyReview(fix, { root, lock: signed });
+    expect(result.lock.entries['keys.space'].es.signed).toBeUndefined();
+    expect(result.lock.entries['keys.space'].es).toMatchObject({ reviewedBy: 'reviewer', reviewedAt: '2026-10-21' });
+    expect(stateOf(lockStatus(result.lock, cats()), 'keys.space', 'es')).toBe('ok');
+  });
+
+  it('a row that fails leaves every catalog file as it was', () => {
+    const { root, cats, lock } = setup();
+    const before = readFileSync(join(root, 'de', 'keys.ts'), 'utf8');
+    const csv = [
+      HEADER,
+      row(['keys.delete', 'de', cats().en.get('keys.delete').hash, 'correction', 'Entf', 'reviewer', '2026-10-20']),
+      row(['keys.space', 'fr', cats().en.get('keys.space').hash, 'correction', 'Espace', 'reviewer', '2026-10-20']),
+    ].join('\n');
+    expect(() => applyReview(csv, { root, lock })).toThrow(/keys\.space:fr/);
+    expect(readFileSync(join(root, 'de', 'keys.ts'), 'utf8')).toBe(before);
+  });
+
+  it('--signed takes correct rows only, and only for Spanish unchanged since its stamp', () => {
+    const { root, cats, lock } = setup();
+    const hash = cats().en.get('keys.space').hash;
+    const fix = [HEADER, row(['keys.space', 'es', hash, 'correction', 'Barra', 'signed copy 473c1772', '2026-10-20'])].join('\n');
+    expect(() => applyReview(fix, { root, lock, signed: true })).toThrow(/signed/);
+    const file = join(root, 'es', 'keys.ts');
+    writeFileSync(file, readFileSync(file, 'utf8').replace('Espacio', 'Espacio largo'));
+    const ok = [HEADER, row(['keys.space', 'es', hash, 'correct', '', 'signed copy 473c1772', '2026-10-20'])].join('\n');
+    expect(() => applyReview(ok, { root, lock, signed: true })).toThrow(/stamp/);
+  });
+
+  it('reads a csv saved with a byte order mark', () => {
+    const { root, cats, lock } = setup();
+    const csv = '﻿' + [HEADER, row(['keys.space', 'de', cats().en.get('keys.space').hash, 'correct', '', 'reviewer', '2026-10-20'])].join('\r\n');
+    const result = applyReview(csv, { root, lock });
+    expect(result.setAside).toEqual([]);
+    expect(result.lock.entries['keys.space'].de.reviewedBy).toBe('reviewer');
+  });
 });

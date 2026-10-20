@@ -42,35 +42,48 @@ function parseCsv(text) {
 const literal = (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r/g, '\\r').replace(/\n/g, '\\n')}'`;
 
 export function applyReview(csv, { root = ROOT, lock, signed = false }) {
-  const [header, ...body] = parseCsv(csv);
+  // A spreadsheet saved as UTF-8 csv starts with a byte order mark.
+  const [header, ...body] = parseCsv(csv.replace(/^﻿/, ''));
   const rows = body.map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i] ?? ''])));
   const todo = rows.filter((r) => r.verdict !== '');
   for (const r of todo) {
     if (r.verdict !== 'correct' && r.verdict !== 'correction') throw new Error(`${r.key}:${r.locale}: unknown verdict "${r.verdict}"`);
-    if (signed && r.locale !== 'es') throw new Error(`--signed takes es rows only, not ${r.key}:${r.locale}`);
+    if (signed && (r.locale !== 'es' || r.verdict !== 'correct')) throw new Error(`--signed takes correct es rows only, not ${r.verdict} ${r.key}:${r.locale}`);
   }
   const read = () => Object.fromEntries(LOCALES.map((l) => [l, readCatalog(l, root)]));
   const setAside = [];
   const manual = [];
+  // All or nothing: a row that throws puts back every catalog file already corrected.
+  const original = new Map();
   let cats = read();
-  for (const r of todo) {
-    const id = `${r.key}:${r.locale}`;
-    if (r.sourceHash !== cats.en.get(r.key)?.hash) {
-      setAside.push(id);
-      continue;
-    }
-    if (r.verdict === 'correction') {
-      const entry = cats[r.locale].get(r.key);
-      if (entry.isFunction) {
-        manual.push(id);
+  try {
+    for (const r of todo) {
+      const id = `${r.key}:${r.locale}`;
+      if (r.sourceHash !== cats.en.get(r.key)?.hash) {
+        setAside.push(id);
         continue;
       }
-      const src = readFileSync(entry.file, 'utf8');
-      writeFileSync(entry.file, src.slice(0, entry.span[0]) + literal(r.correction) + src.slice(entry.span[1]));
-      cats = read();
-      lock = stamp(lock, cats, r.key);
+      const entry = cats[r.locale]?.get(r.key);
+      if (!entry) throw new Error(`${id}: no such entry in the ${r.locale} catalog`);
+      if (r.verdict === 'correction' && r.correction !== entry.text) {
+        if (entry.isFunction) {
+          manual.push(id);
+          continue;
+        }
+        const src = readFileSync(entry.file, 'utf8');
+        if (!original.has(entry.file)) original.set(entry.file, src);
+        writeFileSync(entry.file, src.slice(0, entry.span[0]) + literal(r.correction) + src.slice(entry.span[1]));
+        cats = read();
+        // Only the corrected entry is stamped: a corrected English leaves es and de stale (spec § 7.3).
+        lock = stamp(lock, cats, r.key, { locale: r.locale });
+        // A correction takes the signed-copy mark from the Spanish (spec § 8.2).
+        if (r.locale === 'es') delete lock.entries[r.key].es.signed;
+      }
+      lock = markReviewed(lock, cats, r.key, r.locale, r.reviewer, r.date, signed ? { signed: true } : {});
     }
-    lock = markReviewed(lock, cats, r.key, r.locale, r.reviewer, r.date, signed ? { signed: true } : {});
+  } catch (e) {
+    for (const [file, src] of original) writeFileSync(file, src);
+    throw e;
   }
   return { lock, setAside, manual };
 }

@@ -3,7 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { findTerms, parseGlossary } from './glossary-core.mjs';
+import { findTerms, parseGlossary, textOf } from './glossary-core.mjs';
 import { lockStatus, readCatalog } from './lock-core.mjs';
 
 const ROOT = fileURLToPath(new URL('../../src/i18n', import.meta.url));
@@ -30,7 +30,7 @@ export function buildReview(root = ROOT, lock) {
       return `<td>${e.isFunction ? `<code>${esc(e.text)}</code>` : esc(e.text)}</td>`;
     };
     const en = catalogs.en.get(key);
-    const used = en ? findTerms(en.text, terms, 'en').map((t) => t.en.join(' / ')) : [];
+    const used = en ? findTerms(textOf(en), terms, 'en').map((t) => t.en.join(' / ')) : [];
     const state = LOCALES.map((l) => `${l}: ${states.get(`${key}:${l}`) ?? '-'}`).join('<br>');
     const area = key.split('.')[0];
     const rows = areas.get(area) ?? [];

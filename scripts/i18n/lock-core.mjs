@@ -209,11 +209,13 @@ export function stamp(lock, catalogs, target, opts = {}) {
     isKey ? k === target : k.startsWith(`${target}.`),
   );
   if (!keys.length) throw new Error(`nothing to stamp for "${target}"`);
+  // opts.locale stamps one translation of a key and leaves its siblings to go stale (review-apply)
+  const locales = opts.locale ? [opts.locale] : LOCALES;
   for (const key of keys) {
     const needsReason = new Set();
     if (isKey) {
       // en counts too: for a signed key it is a translation of the Spanish (spec § 7.3)
-      for (const l of LOCALES) {
+      for (const l of locales) {
         const rec = recordOf(next, key, l);
         const cur = catalogs[l].get(key);
         if (rec && cur && stateOf(next, catalogs, key, l) === 'stale' && cur.hash === rec.hash) needsReason.add(l);
@@ -222,7 +224,7 @@ export function stamp(lock, catalogs, target, opts = {}) {
         throw new Error(`${key}: ${[...needsReason].join(', ')} stale with an unchanged translation; pass a reason to acknowledge it`);
       }
     }
-    for (const locale of LOCALES) {
+    for (const locale of locales) {
       if (!catalogs[locale].has(key)) continue;
       if (!isKey && recordOf(next, key, locale)) continue;
       next.entries[key] ??= {};
@@ -247,6 +249,8 @@ export function markReviewed(lock, catalogs, key, locale, reviewer, date, { sign
   const rec = recordOf(lock, key, locale);
   const cur = catalogs[locale].get(key);
   if (!rec || !cur) throw new Error(`${locale}:${key} is not stamped`);
+  // signing pins en and de to the Spanish, so it must be the Spanish they were stamped against
+  if (signed && rec.hash !== cur.hash) throw new Error(`es:${key} changed since its stamp; stamp it before signing`);
   const next = structuredClone(lock);
   Object.assign(next.entries[key][locale], { reviewedBy: reviewer, reviewedAt: date, reviewedHash: cur.hash });
   if (signed) {
