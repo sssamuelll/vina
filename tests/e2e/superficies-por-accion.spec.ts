@@ -30,6 +30,11 @@ function registrar(accion: string, nombres: string[]): void {
   medidas[accion] = nombres.length;
   const techo = techoDe(baseline, accion);
   console.log(`superficies · ${accion}: ${nombres.length} [${nombres.join(', ')}] · línea base ${baseline.estados[accion] ?? '—'} · techo ${techo ?? '—'} · meta ${baseline.meta}`);
+  // Una acción que no está en la línea base no medía nada: `techoDe` daba
+  // undefined y la aserción se saltaba. Ahora falla, salvo en la corrida que la escribe.
+  if (!process.env.SUPERFICIES_UPDATE) {
+    expect.soft(techo, `«${accion}» no está en ${BASELINE}: fíjalo con SUPERFICIES_UPDATE=1`).toBeDefined();
+  }
   if (techo !== undefined) {
     expect(nombres.length, `${accion}: aparecieron o cambiaron ${nombres.join(', ')}`).toBeLessThanOrEqual(techo);
   }
