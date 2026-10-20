@@ -84,6 +84,11 @@ describe('formatCount', () => {
     expect(formatCount(1200, 'es')).toBe('1200');
     expect(formatCount(1200, 'de')).toBe('1.200');
   });
+
+  it('prints a non-finite value as String(value), like formatNumber', () => {
+    expect(formatCount(NaN, 'es')).toBe('NaN');
+    expect(formatCount(Infinity, 'de')).toBe('Infinity');
+  });
 });
 
 describe('parseNumber', () => {
@@ -117,6 +122,11 @@ describe('parseNumber', () => {
     expect(parseNumber('12 mm mm', { suffix: 'mm' })).toBeNull();
   });
 
+  it('tries the longest suffix first', () => {
+    expect(parseNumber('12mm', { suffix: ['m', 'mm'] })).toBe(12);
+    expect(parseNumber('12 m', { suffix: ['m', 'mm'] })).toBe(12);
+  });
+
   it.each(LOCALES)('%s round-trips formatNumber, with and without trim', (locale) => {
     for (const [x, d] of parityCases) {
       const rounded = Number(x.toFixed(d));
@@ -138,6 +148,11 @@ describe('toMachine and helpers', () => {
     expect(helpers('de').num(12.3456, 1)).toBe('12,3');
     expect(helpers('es').num(12, 1, { trim: true })).toBe('12');
     expect(helpers('en').num(12.3456, 3)).toBe('12.346');
+  });
+
+  it('helpers are built once per locale', () => {
+    expect(helpers('es')).toBe(helpers('es'));
+    expect(helpers('es')).not.toBe(helpers('de'));
   });
 
   it('plural picks the CLDR form and falls back to other', () => {

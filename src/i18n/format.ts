@@ -4,11 +4,10 @@ export type PluralForms = { other: string } & Partial<Record<Intl.LDMLPluralRule
 
 const formatters = new Map<string, Intl.NumberFormat>();
 
-function numberFormat(locale: Locale, options: Intl.NumberFormatOptions): Intl.NumberFormat {
-  const key = `${locale}|${JSON.stringify(options)}`;
+function cached(key: string, make: () => Intl.NumberFormat): Intl.NumberFormat {
   let nf = formatters.get(key);
   if (!nf) {
-    nf = new Intl.NumberFormat(locale, options);
+    nf = make();
     formatters.set(key, nf);
   }
   return nf;
@@ -21,18 +20,25 @@ export function formatNumber(
   locale: Locale = getLocale(),
 ): string {
   if (!Number.isFinite(value)) return String(value);
-  // The ES2020 lib lacks signDisplay 'negative' (no sign on negative zero), hence the cast.
-  return numberFormat(locale, {
-    useGrouping: false,
-    minimumFractionDigits: opts.trim ? 0 : opts.decimals,
-    maximumFractionDigits: opts.decimals,
-    signDisplay: 'negative' as string,
-  } as Intl.NumberFormatOptions).format(value);
+  const min = opts.trim ? 0 : opts.decimals;
+  const max = opts.decimals;
+  return cached(
+    `${locale}|${min}|${max}`,
+    () =>
+      new Intl.NumberFormat(locale, {
+        useGrouping: false,
+        minimumFractionDigits: min,
+        maximumFractionDigits: max,
+        // The ES2020 lib lacks signDisplay 'negative' (no sign on negative zero), hence the cast.
+        signDisplay: 'negative' as string,
+      } as Intl.NumberFormatOptions),
+  ).format(value);
 }
 
-/** An integer count with the locale's own grouping. */
+/** An integer count with the locale's own grouping. Non-finite values print as String(n). */
 export function formatCount(n: number, locale: Locale = getLocale()): string {
-  return numberFormat(locale, {}).format(n);
+  if (!Number.isFinite(n)) return String(n);
+  return cached(`${locale}|count`, () => new Intl.NumberFormat(locale)).format(n);
 }
 
 // Same grammar as parseMedida.ts: ASCII or U+2212 minus, digits, at most one . or , with digits after it.
@@ -42,7 +48,8 @@ const NUMBER = /^[-−]?\d+(?:[.,]\d+)?$/;
 export function parseNumber(text: string, opts?: { suffix?: string | readonly string[] }): number | null {
   let t = text.trim();
   const suffixes = opts?.suffix === undefined ? [] : ([] as string[]).concat(opts.suffix);
-  const suffix = suffixes.find((s) => s !== '' && t.endsWith(s));
+  // Longest first, so ['m', 'mm'] strips 'mm' from "12mm".
+  const suffix = suffixes.sort((x, y) => y.length - x.length).find((s) => s !== '' && t.endsWith(s));
   if (suffix !== undefined) t = t.slice(0, -suffix.length).trimEnd();
   if (!NUMBER.test(t)) return null;
   return Number(t.replace('−', '-').replace(',', '.'));
@@ -53,13 +60,22 @@ export function toMachine(n: number, decimals: number): string {
   return n.toFixed(decimals);
 }
 
-export function helpers(locale: Locale): {
+type Helpers = {
   num: (x: number, decimals: number, opts?: { trim?: boolean }) => string;
   plural: (n: number, forms: PluralForms) => string;
-} {
-  const rules = new Intl.PluralRules(locale);
-  return {
-    num: (x, decimals, opts) => formatNumber(x, { decimals, trim: opts?.trim }, locale),
-    plural: (n, forms) => forms[rules.select(n)] ?? forms.other,
-  };
+};
+
+const helperCache = new Map<Locale, Helpers>();
+
+export function helpers(locale: Locale): Helpers {
+  let h = helperCache.get(locale);
+  if (!h) {
+    const rules = new Intl.PluralRules(locale);
+    h = {
+      num: (x, decimals, opts) => formatNumber(x, { decimals, trim: opts?.trim }, locale),
+      plural: (n, forms) => forms[rules.select(n)] ?? forms.other,
+    };
+    helperCache.set(locale, h);
+  }
+  return h;
 }
