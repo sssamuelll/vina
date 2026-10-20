@@ -5,6 +5,8 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import vinaPlugin from './eslint-rules/index.js'
 import { ARCHIVOS_CON_DEUDA } from './eslint-rules/deuda-espacio-de-pieza.js'
+import { I18N_DEBT_FILES } from './eslint-rules/i18n-debt.js'
+import { I18N_EXCLUDED } from './eslint-rules/i18n-scope.js'
 
 export default tseslint.config(
   // Nada de esto es fuente del repo, y todo aparece SOLO en local: CI arranca de
@@ -55,6 +57,11 @@ export default tseslint.config(
     },
   },
   {
+    // Text a person reads lives in src/; bench, cli and scripts print to a terminal.
+    files: ['src/**/*.{ts,tsx}'],
+    rules: { 'vina/no-literal-ui-string': 'error' },
+  },
+  {
     // La deuda declarada de #1068. `lint-staged` corre `eslint
     // --max-warnings=0` sobre lo staged, así que sin este bloque tocar
     // `patternOps.ts` por cualquier motivo bloquearía el commit con sus 9
@@ -67,6 +74,19 @@ export default tseslint.config(
     // que las dos mitades no puedan divergir.
     files: ARCHIVOS_CON_DEUDA,
     rules: { 'vina/conversion-espacio-de-pieza': 'off' },
+  },
+  {
+    // The i18n debt list: files that still hold literal UI text. Without this
+    // block, touching one of them would fail the pre-commit hook on strings the
+    // author did not write. They are not unwatched: tests/repo/i18n-literal-census.test.ts
+    // counts the same rule per file and fails if any of them rises.
+    files: I18N_DEBT_FILES,
+    rules: { 'vina/no-literal-ui-string': 'off' },
+  },
+  {
+    // Not UI text (model-facing, DEV only, the catalog, tests); reasons in i18n-scope.js.
+    files: I18N_EXCLUDED.map((e) => e.files),
+    rules: { 'vina/no-literal-ui-string': 'off' },
   },
   {
     // Los tests calculan la coordenada esperada A MANO, y tiene que ser así:
