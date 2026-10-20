@@ -53,6 +53,10 @@ describe('no-literal-ui-string', () => {
         { filename: FILE, code: "const x = { name: 'createPiece' }; // i18n-ignore: identifier" },
         // A module table read only at a position nobody sees.
         { filename: FILE, code: "const IDS = { a: 'Alpha' };\nexport function f(k) { return IDS[k] === 'x'; }" },
+        // A catalog read in a callback that runs later, or once per instance.
+        { filename: FILE, code: "el.addEventListener('click', () => show(t().app.title));" },
+        { filename: FILE, code: 'function A({ locale }) { return useMemo(() => items.map((i) => t().app.title), [locale]); }' },
+        { filename: FILE, code: 'class C { label = t().app.title; }' },
       ],
       invalid: [
         // 1. JSX text and literals in a JSX expression container.
@@ -79,9 +83,16 @@ describe('no-literal-ui-string', () => {
         ),
         at("const NAMES = ['Uno', 'Dos'];\nconst A = ({ i }) => <span>{NAMES[i]}</span>;", literal(2)),
         at("const HINTS = { drag: 'Arrastra' };\nfunction f() { return { hint: HINTS.drag }; }", literal()),
+        at("const HINTS = { drag: 'Arrastra' };\nconst A = () => <span>{HINTS?.drag}</span>;", literal()),
+        // A read of one key reports that key's text, not the identifiers beside it.
+        at("const TOOLS = [{ id: 'select', kind: 'tool', label: 'Seleccionar' }];\nconst A = ({ i }) => <span>{TOOLS[i].label}</span>;", literal()),
         // 6. Frozen: module scope, hook initializers that never re-run, reducers, workers.
         ...CATALOG_READERS.map((call) => at(`const FROZEN = ${call};`, frozen)),
         at('function A() { return useMemo(() => t().app.title, []); }', frozen),
+        // A synchronous callback or an IIFE runs where it is written.
+        at('const LABELS = KEYS.map((k) => ({ label: t().app.title }));', frozen),
+        at('function A() { return useMemo(() => items.map((i) => t().app.title), []); }', frozen),
+        at('const TITLE = (() => t().app.title)();', frozen),
         at('function A() { const [s] = useState(() => t().keys.delete); return s; }', frozen),
         at(
           "const slice = createSlice({ name: 'x', initialState: {}, reducers: { a(state) { state.label = t().app.title; } } });",

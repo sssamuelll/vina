@@ -19,8 +19,10 @@
  * 4. An argument of `showToast`, `showErrorToast`, `showSuccessToast`, `showInfoToast` or
  *    `showUndoToast`, called bare or as a member.
  * 5. A module-level `const` object or array literal that the same file reads (`TABLE[x]`,
- *    `TABLE.x`) at a position 1-4: each letter-bearing literal inside it is reported. A table
- *    read only elsewhere (`IDS[k] === 'x'`) is not.
+ *    `TABLE.x`, `TABLE?.x`) at a position 1-4. A computed read (`TABLE[x]`) reports every
+ *    letter-bearing literal in it; a read of one key (`TABLE.x`, `TABLE[i].x`) reports only the
+ *    literals under a property keyed `x`, anywhere in the table. A table read only elsewhere
+ *    (`IDS[k] === 'x'`) is not.
  *
  * At positions 1-4 the value is followed through the branches of a conditional (not its test),
  * both operands of `??` and `||`, and the right operand of `&&`; a template counts by its
@@ -32,6 +34,13 @@
  * `formatMedida` or `errorMessage` at module scope, inside a `useMemo` callback whose
  * dependency array is `[]`, inside a `useState(() => ...)` initializer, inside the
  * `reducers`/`extraReducers` of `createSlice`, or anywhere in a file under `src/workers/`.
+ *
+ * Code that runs where it is written does not defer the call: walking outward, an IIFE and a
+ * callback of a synchronous iterator (`map`, `flatMap`, `forEach`, `filter`, `reduce`, `some`,
+ * `every`, `find`, `findIndex`, `sort`) are transparent. Any other enclosing function (a
+ * declaration, a named arrow, a callback to an unknown call such as `addEventListener`) defers
+ * the call, so it is not frozen; `useMemo` with dependencies is the same. A non-static class
+ * field runs once per instance and is not frozen; a static one is.
  *
  * Skipped
  * -------
@@ -59,6 +68,8 @@ const TOASTS = new Set(['showToast', 'showErrorToast', 'showSuccessToast', 'show
 const CATALOG_READERS = new Set([
   't', 'displayShortcut', 'displayModifierKey', 'formatNumber', 'formatCount', 'formatMedida', 'errorMessage',
 ]);
+// ponytail: fixed list of synchronous iterators; an unlisted name (a custom `each`) reads as deferred.
+const ITERATORS = new Set(['map', 'flatMap', 'forEach', 'filter', 'reduce', 'some', 'every', 'find', 'findIndex', 'sort']);
 const FUNCTIONS = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
 
 const LETTER = /\p{L}/u;
@@ -134,21 +145,27 @@ export default {
       if (text !== null && LETTER.test(text)) report(node, 'literal', { text: text.trim() });
     }
 
-    /** Every letter-bearing literal held by a table (object or array literal). */
-    function reportTable(node) {
+    /**
+     * Letter-bearing literals of a table: all of them, or with `key` only those under a
+     * property keyed `key`.
+     */
+    function reportTable(node, key, matched = false) {
       if (node.type === 'ObjectExpression') {
-        for (const p of node.properties) if (p.type === 'Property') reportTable(p.value);
+        for (const p of node.properties) {
+          if (p.type === 'Property') reportTable(p.value, key, matched || keyName(p) === key);
+        }
       } else if (node.type === 'ArrayExpression') {
-        for (const e of node.elements) if (e) reportTable(e);
+        for (const e of node.elements) if (e) reportTable(e, key, matched);
       } else if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression') {
-        reportTable(node.expression);
-      } else {
+        reportTable(node.expression, key, matched);
+      } else if (key == null || matched) {
         reportText(node);
       }
     }
 
     /** `TABLE[x]` / `TABLE.x`, where TABLE is a module-level const object or array. */
     function readTable(member) {
+      const key = !member.computed && member.property.type === 'Identifier' ? member.property.name : null;
       let obj = member.object;
       while (obj.type === 'MemberExpression') obj = obj.object;
       if (obj.type !== 'Identifier') return;
@@ -158,7 +175,7 @@ export default {
         const def = variable.defs[0];
         if (scope.type !== 'module' && scope.type !== 'global') return;
         if (!def || def.type !== 'Variable' || def.parent.kind !== 'const' || !def.node.init) return;
-        reportTable(def.node.init);
+        reportTable(def.node.init, key);
         return;
       }
     }
@@ -178,6 +195,7 @@ export default {
         case 'TSAsExpression':
         case 'TSNonNullExpression':
         case 'TSSatisfiesExpression':
+        case 'ChainExpression':
           checkValue(node.expression);
           break;
         case 'MemberExpression':
@@ -200,11 +218,15 @@ export default {
         }
       }
       for (let i = ancestors.length - 1; i >= 0; i--) {
-        if (!FUNCTIONS.has(ancestors[i].type)) continue;
-        const fn = ancestors[i];
+        const a = ancestors[i];
+        if (a.type === 'PropertyDefinition' && !a.static) return false;
+        if (!FUNCTIONS.has(a.type)) continue;
         const parent = ancestors[i - 1];
-        if (parent?.type !== 'CallExpression' || parent.arguments[0] !== fn) return false;
+        if (parent?.type !== 'CallExpression') return false;
+        if (parent.callee === a) continue; // IIFE
+        if (parent.arguments[0] !== a) return false;
         const name = calleeName(parent);
+        if (ITERATORS.has(name)) continue;
         if (name === 'useState') return true;
         const deps = parent.arguments[1];
         return name === 'useMemo' && deps?.type === 'ArrayExpression' && deps.elements.length === 0;
