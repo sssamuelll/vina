@@ -734,6 +734,7 @@
     "vina-last-boundary-error",
     "vina-last-journal",
     "vina-layout",
+    "vina-locale",
     "vina-ollama-config",
     "vina-provider-config",
     "vina-puente-puerto",
