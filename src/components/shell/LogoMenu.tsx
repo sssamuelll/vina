@@ -288,6 +288,8 @@ const HELP_MENU: MenuItem[] = [
 
 interface TopLevelItem {
   label: string;
+  /** A stable hook for the e2e specs: the label gets translated, the id does not. */
+  id?: string;
   submenu: MenuItem[];
 }
 
@@ -298,7 +300,7 @@ const TOP_LEVEL: TopLevelItem[] = [
   { label: 'Patrón', submenu: PATTERN_MENU },
   { label: 'Simulación', submenu: SIMULATION_MENU },
   { separator: true } as unknown as TopLevelItem,
-  { label: 'Preferencias', submenu: PREFERENCES_MENU },
+  { id: 'preferences', label: 'Preferencias', submenu: PREFERENCES_MENU },
   { separator: true } as unknown as TopLevelItem,
   { label: 'Ayuda', submenu: HELP_MENU },
 ];
@@ -475,6 +477,7 @@ export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
             return (
               <div
                 key={item.label}
+                data-menu={item.id}
                 className={`logo-menu__item ${hoveredTop === item.label ? 'logo-menu__item--hovered' : ''}`}
                 onMouseEnter={() => { setHoveredTop(item.label); setHoveredSub(null); }}
               >
