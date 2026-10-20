@@ -1,6 +1,7 @@
 #!/bin/sh
 
-# Gate for merges of main into the i18n branch. Runs before the merge commit is made.
+# Gate for merge commits, run before the commit is made: the pre-commit checks on
+# the files the merge changed, plus the i18n censuses.
 echo "🔍 Running TypeScript type check..."
 npx tsc -b --noEmit
 if [ $? -ne 0 ]; then
@@ -18,10 +19,10 @@ if [ -n "$FILES" ]; then
   fi
 fi
 
-echo "🔍 Contrato de interfaz..."
+echo "🔍 UI contract..."
 node scripts/ui-contract-lint.mjs
 if [ $? -ne 0 ]; then
-  echo "❌ Un contador del contrato de UI subió. Ver docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md"
+  echo "❌ A UI contract counter rose. See docs/reports/2026-08-14-auditoria-ui-deriva-de-diseno.md"
   exit 1
 fi
 
