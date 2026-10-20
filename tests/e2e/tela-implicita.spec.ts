@@ -23,8 +23,12 @@ interface ResultadoTela {
   segundosHastaQuieta?: number | null;
   dgCpu?: number;
   medidas?: MedidasDeCamiseta;
-  estado?: { cuadro: number; cg: number; proyectados: number; alfa: number; quietud: number; quietudMaxima: number; dg: number; pares: number; desbordes: number };
+  estado?: {
+    cuadro: number; cg: number; proyectados: number; alfa: number; quietud: number; quietudMaxima: number; dg: number; pares: number;
+    desbordes: number; desbordesLista: number; desbordesCeldas: number; residuo: number;
+  };
   perfil?: Array<{ entrada: string; veces: number; ms: number }>;
+  instrumentos?: { serie: Record<string, number[]>; resumen: { cuadros: number } & Record<string, unknown> };
   error?: string;
 }
 
@@ -83,7 +87,8 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
 
   test('con lugar para 8 pares, la GPU cuenta los que no caben y la tela no se llena de NaN', async ({ page }) => {
     const r = await correr(page, 'modo=paridad&escena=capas&cg=50&cuadros=3&maxPares=8');
-    expect(r.estado?.desbordes).toBeGreaterThan(0);
+    expect(r.estado?.desbordesLista).toBeGreaterThan(0);
+    expect(r.estado?.desbordes).toBe(r.estado!.desbordesLista + r.estado!.desbordesCeldas);
     expect(Number.isFinite(r.dif?.maxima)).toBe(true);
   });
 
@@ -148,6 +153,18 @@ test.describe('La camiseta de María en la GPU, contra la referencia @gpu-local'
     expect(camiseta.segundosHastaQuieta).not.toBeNull();
     expect(camiseta.segundosHastaQuieta!).toBeLessThanOrEqual(10);
     expect(velocidad50.msPorCuadro!).toBeLessThanOrEqual(17);
+  });
+
+  test('tres corridas con instrumentos a 5 mm y 50 iteraciones, cada una con su velocidad sin instrumentos (medido, sin meta)', async ({ page }) => {
+    const extra = process.env.VINA_TELA_AJUSTES ? `&${process.env.VINA_TELA_AJUSTES}` : '';
+    const corridas: Array<{ camiseta: ResultadoTela; msPorCuadro: number }> = [];
+    for (let k = 0; k < 3; k++) {
+      const camiseta = await correr(page, `modo=camiseta&escena=camiseta&malla=5${extra}&cg=50&instr=1`, 880_000);
+      const velocidad = await correr(page, `modo=velocidad&escena=camiseta&malla=5${extra}&cg=50&cuadros=60`, 880_000);
+      corridas.push({ camiseta, msPorCuadro: velocidad.msPorCuadro! });
+    }
+    console.log(`[instrumentos] informe: ${guardarInforme('camiseta-instrumentos', { extra, corridas })}`);
+    for (const c of corridas) expect(c.camiseta.instrumentos!.resumen.cuadros).toBeGreaterThan(0);
   });
 
   test('velocidad por partes a 5 mm: iteraciones × contacto propio (medida, sin meta)', async ({ page }) => {
