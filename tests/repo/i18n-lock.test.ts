@@ -89,6 +89,9 @@ describe('lock states and commands', () => {
   it('a translation equal to en without same-as-en is untranslated', () => {
     const plain = read(fixture({ ...BASE, de: "{ title: 'Pattern', count: (n: number) => `${num(n, 1)} mm` }" }));
     expect(stateOf(lockStatus(stamp(emptyLock(), plain, 'app'), plain), 'app.title', 'de')).toBe('untranslated');
+    // a pasted English function, reformatted and with its parameter renamed, is still English
+    const renamed = read(fixture({ ...BASE, de: "{ title: 'Schnitt', count: (mm: number) =>\n  `${num(mm, 1)} mm` }" }));
+    expect(stateOf(lockStatus(stamp(emptyLock(), renamed, 'app'), renamed), 'app.count', 'de')).toBe('untranslated');
     const marked = read(
       fixture({ ...BASE, de: "{\n  title: 'Pattern', // same-as-en: the brand name\n  count: (n: number) => `${num(n, 1)} mm`,\n}" }),
     );

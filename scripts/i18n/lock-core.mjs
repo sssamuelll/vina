@@ -174,7 +174,8 @@ function stateOf(lock, catalogs, key, locale) {
   const cur = catalogs[locale].get(key);
   const en = catalogs.en.get(key);
   if (!cur) return 'untranslated';
-  if (locale !== 'en' && en && cur.text === en.text && !cur.sameAsEn) return 'untranslated';
+  // text catches a string against a bare template; the hash, a function reformatted or with renamed parameters
+  if (locale !== 'en' && en && (cur.text === en.text || cur.hash === en.hash) && !cur.sameAsEn) return 'untranslated';
   if (locale !== 'en' && en && rec.sourceHash !== en.hash) return 'stale';
   const esRec = recordOf(lock, key, 'es');
   const es = catalogs.es.get(key);

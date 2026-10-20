@@ -2,6 +2,7 @@
 # checkout under Windows autocrlf. Force LF so the gate runs everywhere.
 .husky/pre-commit text eol=lf
 .husky/pre-merge-commit text eol=lf
+src/i18n/lock.json text eol=lf
 
 # Frozen DXF garment fixtures: keep bytes identical across platforms (the
 # parser tolerates CRLF, but byte-stable fixtures keep hashes/diffs honest).
