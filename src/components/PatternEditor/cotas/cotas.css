@@ -37,7 +37,7 @@
 
 /* hover y focus-visible en UNA línea: el trinquete R5 empareja línea a línea. */
 .cota:hover, .cota:focus-visible { transform: translate(-50%, calc(-50% - 1px)); }
-.cota:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cota:focus-visible { outline: 2px solid var(--accent-2d); outline-offset: 2px; }
 
 .cota[aria-disabled='true'] { opacity: 0.45; cursor: default; }
 .cota[aria-disabled='true']:hover, .cota[aria-disabled='true']:focus-visible { transform: translate(-50%, -50%); }
@@ -51,7 +51,7 @@
   border-left: var(--focus-rail);
   text-align: right;
 }
-.cota--editando:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cota--editando:focus-visible { outline: 2px solid var(--accent-2d); outline-offset: 2px; }
 .cota--invalida { border-left-color: var(--destructive); }
 
 /* Las dos magnitudes comparten una sola superficie también al escribir.

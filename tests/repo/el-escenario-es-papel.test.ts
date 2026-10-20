@@ -199,15 +199,16 @@ describe('el pie reparte el ancho: el patrón ocupa lo que necesita y la secció
 describe('la línea al pie es papel, como los márgenes (enmienda 2026-10-11)', () => {
   // Samuel, con P5 desplegada: «me equivoqué con la línea al pie … creo que va mejor en los
   // colores de la barra de herramientas: Herramientas del patrón». Es lo que hace el margen
-  // (Dock.css): el color de la hoja, la tinta del ámbito y una línea de pelo como borde.
+  // (Dock.css): --papel, la tinta del ámbito y una línea de pelo como borde. Hasta el 20-10
+  // los dos pintaban la hoja; con la hoja en el gris de CLO tienen su propio papel.
   const layout = lee('src/styles/layout.css');
   const margen = lee('src/components/shell/Dock.css');
   const appShell = lee('src/components/shell/AppShell.tsx');
 
-  it('pinta el color de la hoja con la línea de pelo, los mismos tokens que el margen', () => {
+  it('pinta el papel de los márgenes con la línea de pelo, los mismos tokens que el margen', () => {
     const pie = regla(layout, '.linea-al-pie');
-    expect(regla(margen, '.margen'), 'el margen cambió de fondo: el pie lo copia').toContain('background: var(--canvas-2d)');
-    expect(pie).toContain('background: var(--canvas-2d)');
+    expect(regla(margen, '.margen'), 'el margen cambió de fondo: el pie lo copia').toContain('background: var(--papel)');
+    expect(pie).toContain('background: var(--papel)');
     expect(pie, 'lo que separa es línea de pelo, no el borde de un campo').toContain('border-top: var(--hairline)');
   });
 

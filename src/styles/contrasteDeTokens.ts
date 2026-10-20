@@ -12,13 +12,14 @@ import { contrastRatio, cssDelAmbito, tokenColor } from './colorMath';
 export interface Par { tinta: string; fondo: string; minimo: number; por: string; ambito?: 'papel' }
 export interface Resultado extends Par { ratio: number; ok: boolean }
 
-/** Los pares del ámbito de papel: sobre la hoja (que lo gana en P2), sobre el
- *  blanco de lo que flota y, el texto, sobre el papel hundido del hover y las
- *  teclas. Son los números de la tabla de § 7.2. */
+/** Los pares del ámbito de papel: sobre el papel de los márgenes y la línea al
+ *  pie (hasta el 20-10 era la hoja), sobre el blanco de lo que flota y, el
+ *  texto, sobre el papel hundido del hover y las teclas. Son los números de la
+ *  tabla de § 7.2. */
 const papel = (tinta: string, fondos: string[], minimo: number, por: string): Par[] =>
   fondos.map((fondo) => ({ tinta, fondo, minimo, por: `papel · ${por}`, ambito: 'papel' as const }));
-const HOJA_Y_BLANCO = ['--canvas-2d', '--surface-overlay-bg'];
-const Y_HUNDIDO = [...HOJA_Y_BLANCO, '--bg-elevated'];
+const PAPEL_Y_BLANCO = ['--papel', '--surface-overlay-bg'];
+const Y_HUNDIDO = [...PAPEL_Y_BLANCO, '--bg-elevated'];
 
 export const PARES: Par[] = [
   { tinta: '--text-primary', fondo: '--bg-surface', minimo: 4.5, por: 'texto principal' },
@@ -35,9 +36,9 @@ export const PARES: Par[] = [
   { tinta: '--on-accent', fondo: '--accent-fuerte-hover', minimo: 4.5, por: 'texto blanco sobre el relleno al pasar el mouse' },
   { tinta: '--on-accent', fondo: '--destructive-fuerte-hover', minimo: 4.5, por: 'texto blanco sobre Eliminar al pasar el mouse' },
   { tinta: '--accent', fondo: '--bg-surface', minimo: 3, por: 'borde/relleno del dock activo' },
-  { tinta: '--accent', fondo: '--canvas-2d', minimo: 3, por: 'línea de selección sobre el crema' },
-  { tinta: '--accent', fondo: '--piece-fill-2d', minimo: 3, por: 'línea de selección sobre la pieza' },
-  { tinta: '--accent-fuerte', fondo: '--canvas-2d', minimo: 3, por: 'chip de cota sobre el crema' },
+  { tinta: '--accent-2d', fondo: '--canvas-2d', minimo: 3, por: 'línea de selección sobre la hoja' },
+  { tinta: '--accent-2d', fondo: '--piece-fill-2d', minimo: 3, por: 'línea de selección sobre la pieza' },
+  { tinta: '--accent-2d-fuerte', fondo: '--canvas-2d', minimo: 3, por: 'chip de cota sobre la hoja' },
   { tinta: '--ai', fondo: '--bg-surface', minimo: 4.5, por: '«lo hizo la IA»' },
   { tinta: '--success', fondo: '--bg-surface', minimo: 4.5, por: 'semántico' },
   { tinta: '--warning', fondo: '--bg-surface', minimo: 4.5, por: 'semántico' },
@@ -55,14 +56,14 @@ export const PARES: Par[] = [
   ...papel('--text-primary', Y_HUNDIDO, 4.5, 'texto principal'),
   ...papel('--text-secondary', Y_HUNDIDO, 4.5, 'rótulos'),
   ...papel('--text-tertiary', Y_HUNDIDO, 4.5, 'atajos, placeholder, lo inactivo'),
-  ...papel('--text-disabled', HOJA_Y_BLANCO, 2.5, 'solo deshabilitado'),
-  ...papel('--border', HOJA_Y_BLANCO, 3, 'el borde de un campo'),
-  ...papel('--accent-ink', HOJA_Y_BLANCO, 4.5, 'el acento escrito'),
-  ...papel('--ai', HOJA_Y_BLANCO, 4.5, '«lo hizo la IA»'),
-  ...papel('--success', HOJA_Y_BLANCO, 4.5, 'semántico'),
-  ...papel('--warning', HOJA_Y_BLANCO, 4.5, 'semántico'),
-  ...papel('--destructive', HOJA_Y_BLANCO, 4.5, 'texto destructivo'),
-  ...papel('--destructive-hover', HOJA_Y_BLANCO, 4.5, 'texto destructivo al pasar el mouse'),
+  ...papel('--text-disabled', PAPEL_Y_BLANCO, 2.5, 'solo deshabilitado'),
+  ...papel('--border', PAPEL_Y_BLANCO, 3, 'el borde de un campo'),
+  ...papel('--accent-ink', PAPEL_Y_BLANCO, 4.5, 'el acento escrito'),
+  ...papel('--ai', PAPEL_Y_BLANCO, 4.5, '«lo hizo la IA»'),
+  ...papel('--success', PAPEL_Y_BLANCO, 4.5, 'semántico'),
+  ...papel('--warning', PAPEL_Y_BLANCO, 4.5, 'semántico'),
+  ...papel('--destructive', PAPEL_Y_BLANCO, 4.5, 'texto destructivo'),
+  ...papel('--destructive-hover', PAPEL_Y_BLANCO, 4.5, 'texto destructivo al pasar el mouse'),
 ];
 
 export function verificarContraste(css: string): Resultado[] {

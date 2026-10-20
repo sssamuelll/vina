@@ -1,7 +1,7 @@
 /* La sección del patrón de la línea al pie (spec 2026-10-02 «la interfaz en
    papel» § 5.3): quién, las opciones y la frase, en ese orden, el de la barra
    de opciones de Illustrator. Vive en la línea al pie, que es papel desde el
-   2026-10-11: tinta del ámbito sobre --canvas-2d. Los controles están en
+   2026-10-11: tinta del ámbito sobre --papel. Los controles están en
    ToolOptionControls.css. */
 .seccion-del-patron {
   flex: 1 1 auto;

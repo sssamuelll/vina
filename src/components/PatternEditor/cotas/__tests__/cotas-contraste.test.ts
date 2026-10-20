@@ -121,12 +121,12 @@ describe('F5 — el número que María lee cumple AA', () => {
 });
 
 describe('F5 — arreglar la cota no puede cambiar la selección por descuido', () => {
-  // La selección y las costuras cambiaron de valor UNA vez, a propósito, el
-  // 26-09 (cromo callado, spec § 4.3): --accent-2d es ahora alias del acento
-  // del cromo, a L 0,60 (3,43:1 sobre el crema; antes 2,70:1). Cualquier otro
-  // cambio pasa por aquí.
-  it('--accent-2d es el acento del cromo, tono 248 a L 0,60', () => {
-    expect(token('--accent-2d')).toBe('oklch(0.60 0.16 248)');
+  // La selección y las costuras cambiaron de valor a propósito el 26-09 (cromo
+  // callado, spec § 4.3: alias del acento del cromo, a L 0,60) y el 20-10 (la
+  // hoja pasó al gris de CLO, donde el L 0,60 daba 2,34:1; a L 0,53 da 3,10).
+  // Cualquier otro cambio pasa por aquí.
+  it('--accent-2d es el tono 248 del cromo a L 0,53', () => {
+    expect(token('--accent-2d')).toBe('oklch(0.53 0.15 248)');
   });
 
   it('la familia de cotas es del mismo tono que la selección (no un azul nuevo)', () => {

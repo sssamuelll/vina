@@ -45,7 +45,6 @@ async function medir(page: Page) {
       // El ancho útil dentro del margen, sin la barra de desplazamiento.
       utilRight: m.left + margen.clientWidth,
       fondo: getComputedStyle(margen).backgroundColor,
-      papel: getComputedStyle(document.querySelector('.canvas-area__2d')!).backgroundColor,
       botones,
     };
   });
@@ -59,7 +58,8 @@ test('con las doce de fábrica: una columna de papel al lado de la hoja, sin des
   expect(r.margen.left, 'el margen no está pegado al borde del área 2D').toBe(0);
   expect(Math.round(r.margen.width), 'el margen no mide 44 px').toBe(44);
   expect(r.hojaLeft, 'la hoja empieza debajo del margen: el margen la tapa').toBeGreaterThanOrEqual(r.margen.right);
-  expect(r.fondo, 'el margen no es del color de la hoja').toBe(r.papel);
+  // El margen es papel (--papel, #f4f4f4), más claro que el gris de la hoja.
+  expect(r.fondo, 'el margen no es del color del papel').toBe('rgb(244, 244, 244)');
   expect(r.desborda, 'a 1366 × 643 las doce y el «+» no caben sin desplazarse').toBe(false);
   expect(r.botones).toHaveLength(13);
 });
