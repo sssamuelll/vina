@@ -10,7 +10,7 @@ cuadros más de la mitad de los vértices que atraviesan están a dos anillos o 
 Cada pieza se malla sola, así que los dos lados de una costura casi nunca tienen los mismos vértices. E1 cose cada
 vértice de un lado a un punto entre dos vértices del otro, y E8 lo cose ahí; los vértices del otro lado quedan sueltos
 entre puntadas (los puntos de vuelta se apagan cuando la línea ya es la de B). Censo de la camiseta de María a 10 mm
-(rama 1): 937 puntos de costura, 442 caen entre dos vértices del otro lado y 462 son de vuelta; solo 33 caen en un
+(rama 1): 841 puntos de costura, 390 caen entre dos vértices del otro lado y 402 son de vuelta; solo 49 caen en un
 vértice. La copa de la manga trae hasta 2,4 veces los vértices de la sisa. El 2026-10-16 ya se había medido lo que
 cuesta: los vecinos de cada punto cosido se ven como dos capas y se empujan 1-2 mm, y los puntos de vuelta quedan a
 1,6-2,7 mm, el lado con más vértices arrugado entre puntadas. La referencia cose los dos lados sobre los mismos vértices.
