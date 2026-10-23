@@ -240,6 +240,7 @@ ENDSEC
 
 function dxfEntities(pieces: PatternPiece[], blockNames: string[], seams?: Seam[]): string {
   // Use pipeline for consistent layout (same 1:1 order as dxfBlocks).
+  // The blocks write y flipped (`-y`), so the INSERT flips the layout's offsetY too.
   const prepared = preparePieces(pieces, { spacing: 30, seams });
 
   let s = `0
@@ -261,7 +262,7 @@ ${blockNames[i]}
 10
 ${pp.offsetX.toFixed(4)}
 20
-${pp.offsetY.toFixed(4)}
+${(-pp.offsetY).toFixed(4)}
 30
 0.0
 41
@@ -843,6 +844,7 @@ ENTITIES
   let bi = 0; // running index into the deduped flat blockNames (gs→pieces order)
 
   for (const gs of gradedSets) {
+    // Blocks write y flipped, as in dxfEntities: the INSERT flips offsetY.
     const prepared = preparePieces(gs.pieces, { spacing: 30 });
 
     let maxHeight = 0;
@@ -863,7 +865,7 @@ ${blockNames[bi++]}
 10
 ${pp.offsetX.toFixed(4)}
 20
-${(pp.offsetY - currentY).toFixed(4)}
+${(-pp.offsetY - currentY).toFixed(4)}
 30
 0.0
 41

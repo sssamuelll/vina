@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { generateMultiSizeDXF } from '../exportAAMA';
+import { generateDXFAAMA, generateMultiSizeDXF } from '../exportAAMA';
 import type { PatternPiece } from '../../../types/types';
 
-/** Where the INSERTs land. */
+/**
+ * Where the INSERTs land. Each block writes the piece with y flipped (`-y`),
+ * so the layout's y offset has to flip with it: an outline at y 500..800 is
+ * -800..-500 inside the block and needs an INSERT at +500 to sit at -300..0.
+ */
 
 function rect(name: string, w: number, h: number, y0 = 0, seamAllowance = 0): PatternPiece {
   return {
@@ -22,7 +26,17 @@ function rect(name: string, w: number, h: number, y0 = 0, seamAllowance = 0): Pa
 const insertYs = (dxf: string) =>
   [...dxf.matchAll(/INSERT\n5\n[^\n]+\n8\n[^\n]+\n2\n[^\n]+\n10\n[^\n]+\n20\n([^\n]+)/g)].map((m) => Number(m[1]));
 
+describe('generateDXFAAMA — layout', () => {
+  it('puts the top of a piece on y = 0 wherever its outline sits', () => {
+    expect(insertYs(generateDXFAAMA([rect('P', 100, 300, 500)]))).toEqual([500]);
+  });
+});
+
 describe('generateMultiSizeDXF — layout', () => {
+  it('puts the top of each size row on its line wherever the outline sits', () => {
+    expect(insertYs(generateMultiSizeDXF([{ size: 'S', pieces: [rect('P', 100, 300, 500)] }]))).toEqual([500]);
+  });
+
   it('spaces the size rows by the cut-line height, so a wide seam allowance keeps the full gap', () => {
     const ys = insertYs(generateMultiSizeDXF([
       { size: 'S', pieces: [rect('Front', 200, 400, 0, 60)] },
