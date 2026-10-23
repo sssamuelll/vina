@@ -396,7 +396,7 @@ Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el 
 el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
 la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
 Aprobó E12 y E13 el 2026-10-18, y E14 el 2026-10-19. El 2026-10-23 ordenó la rama 1, el contacto entre capas: E15
-y E16 (el valor de E15 espera su ratificación).
+y E16, y el mismo día ratificó el valor de E15 (27,8 N/m en el jersey medido).
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.

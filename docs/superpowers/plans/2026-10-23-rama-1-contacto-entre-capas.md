@@ -9,7 +9,7 @@ midió); la memoria de lado empeoró la camiseta y se descartó.
 están en el doc «Cloth Engine: Shirt Diagnosis» (corridas del 2026-10-19, PR #1264): en las nueve corridas la tela
 cruza la tela desde los primeros cuadros y no vuelve; con la misma tela, pasar de 2000 a 50 N/m baja los vértices del
 lado malo un 45 %, los aplastados de ~1 % a < 0,2 % y el estiramiento p95 de 20-29 % a 5-7 %. Samuel aprobó el
-alcance de la rama 1 y ordenó empezarla el 2026-10-23. El valor de la rigidez espera su ratificación antes del merge.
+alcance de la rama 1 y ordenó empezarla el 2026-10-23. Ratificó el valor de la rigidez el mismo día.
 
 ## Punto de partida (main `3a750fc7`)
 
