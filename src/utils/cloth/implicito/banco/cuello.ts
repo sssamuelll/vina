@@ -40,14 +40,18 @@ export function anillarTira(
   sep: number,
 ): TiraEnAnillo | null {
   const enTira = (v: number) => v >= tira.v0 && v < tira.v0 + tira.nv;
-  // el punto del escote de cada vértice cosido de la tira (el promedio, si tiene más de uno)
+  // el punto del escote de cada vértice cosido de la tira (el promedio, si tiene más de uno); soldada (E17), la tira
+  // puede ser el lado B: su vértice es b0 = b1 y el escote, a
   const suma = new Map<number, number[]>();
-  for (const p of puntos) {
-    if (!enTira(p.a) || enTira(p.b0) || enTira(p.b1)) continue;
-    const t = suma.get(p.a) ?? [0, 0, 0, 0];
-    for (let d = 0; d < 3; d++) t[d] += (1 - p.s) * x[3 * p.b0 + d] + p.s * x[3 * p.b1 + d];
+  const sumar = (v: number, q: (d: number) => number) => {
+    const t = suma.get(v) ?? [0, 0, 0, 0];
+    for (let d = 0; d < 3; d++) t[d] += q(d);
     t[3]++;
-    suma.set(p.a, t);
+    suma.set(v, t);
+  };
+  for (const p of puntos) {
+    if (enTira(p.a) && !enTira(p.b0) && !enTira(p.b1)) sumar(p.a, (d) => (1 - p.s) * x[3 * p.b0 + d] + p.s * x[3 * p.b1 + d]);
+    else if (!enTira(p.a) && p.b0 === p.b1 && enTira(p.b0)) sumar(p.b0, (d) => x[3 * p.a + d]);
   }
   if (suma.size < 3) return null;
   const objetivo = new Map([...suma].map(([v, t]) => [v, [t[0] / t[3], t[1] / t[3], t[2] / t[3]]]));
