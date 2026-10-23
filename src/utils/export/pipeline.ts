@@ -38,6 +38,8 @@ export interface PreparedPiece {
   flatSeamOutline: Point2D[];
   /** Bounding box of the piece outline */
   boundingBox: BBox;
+  /** Bounding box of outline ∪ cut line — what the layout and the page size measure */
+  cutBox: BBox;
   /** Layout offset X (mm) — position in left-to-right strip layout */
   offsetX: number;
   /** Layout offset Y (mm) */
@@ -152,7 +154,11 @@ export function preparePiece(
     }
   }
 
-  return { piece, flatOutline, seamOutline, flatSeamOutline, boundingBox };
+  // The allowance sticks out of the outline: laying out by `boundingBox` puts a
+  // wide allowance inside the neighbour and at negative coordinates.
+  const cutBox = computeBBox([...piece.outline, ...seamOutline]);
+
+  return { piece, flatOutline, seamOutline, flatSeamOutline, boundingBox, cutBox };
 }
 
 /**
@@ -175,7 +181,7 @@ export function preparePieces(
     // full piece set + seams. Absent seams → undefined → mitered fallback.
     const matchLookup = opts.seams ? buildMatchLookup(piece, pieces, opts.seams) : undefined;
     const base = preparePiece(piece, opts, matchLookup);
-    const bb = base.boundingBox;
+    const bb = base.cutBox;
 
     const offsetX = currentX - bb.minX;
     const offsetY = -bb.minY;

@@ -847,7 +847,7 @@ ENTITIES
 
     let maxHeight = 0;
     for (const pp of prepared) {
-      const h = pp.boundingBox.height;
+      const h = pp.cutBox.height;
       if (h > maxHeight) maxHeight = h;
     }
 

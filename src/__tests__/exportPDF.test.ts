@@ -166,6 +166,18 @@ describe('exportPDF', () => {
     expect(Math.max(...xs)).toBeLessThan(pageW);
   });
 
+  it('keeps a seam allowance wider than the page margin inside the page on every side', () => {
+    const pdf = generatePDF([makePiece({ seamAllowance: 40 })]);
+    const [pageW, pageH] = pdf.match(/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/)!.slice(1).map(Number);
+    const pts = [...pdf.matchAll(/(-?[\d.]+) (-?[\d.]+) [ml]\n/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    const xs = pts.map(([x]) => x);
+    const ys = pts.map(([, y]) => y);
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...xs)).toBeLessThanOrEqual(pageW);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(pageH);
+  });
+
   it('has xref table', () => {
     const pdf = generatePDF([makePiece()]);
     expect(pdf).toContain('xref');
