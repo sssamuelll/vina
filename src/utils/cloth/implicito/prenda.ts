@@ -152,7 +152,7 @@ export interface LadosDeCostura {
  * Los puntos de costura de la prenda y los lados de cada costura, con índices globales. Cada par trae sus
  * lados desde `seamInitDataToPairs`, con los índices de cada pieza tal como llegó.
  */
-export function costurasDePrenda(prenda: Prenda, pares: readonly SeamPair[]): { puntos: PuntoDeCostura[]; lados: LadosDeCostura[] } {
+export function costurasDePrenda(prenda: Prenda, pares: ReadonlyArray<Pick<SeamPair, 'pieceAId' | 'pieceBId' | 'lados'>>): { puntos: PuntoDeCostura[]; lados: LadosDeCostura[] } {
   const rango = new Map(prenda.piezas.map((p) => [p.id, p]));
   // una copia soldada cuenta una sola vez; un vértice que armarPrenda quitó no es tela (los puntos de una línea interna
   // que sale de la pieza) y la costura sigue por los vértices de al lado; el t de cada vértice se va con él

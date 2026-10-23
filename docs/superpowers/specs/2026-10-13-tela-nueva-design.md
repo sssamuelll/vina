@@ -396,7 +396,8 @@ Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el 
 el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
 la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
 Aprobó E12 y E13 el 2026-10-18, y E14 el 2026-10-19. El 2026-10-23 ordenó la rama 1, el contacto entre capas: E15
-y E16, y el mismo día ratificó el valor de E15 (27,8 N/m en el jersey medido).
+y E16, y el mismo día ratificó el valor de E15 (27,8 N/m en el jersey medido) y ordenó la rama 2, la costura
+soldada: E17.
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -555,6 +556,35 @@ y E16, y el mismo día ratificó el valor de E15 (27,8 N/m en el jersey medido).
   solución. Se probó y se descartó revisar los pares dentro del gradiente conjugado: cada 10 iteraciones, el gradiente
   conjugado dejaba de converger y quedaban pares hasta 2 mm adentro; solo al converger, en la camiseta nunca corre. Plan
   `2026-10-23-rama-1-contacto-entre-capas.md`.
+- **E17 (§4.3.3; corrige E1). La costura se suelda: sus dos lados con los mismos vértices.** Con E1 cada pieza se
+  mallaba sola: un vértice se cosía a un punto entre dos vértices del otro lado, y los vértices de ese lado quedaban
+  sueltos entre puntadas, como puntos de vuelta que E8 nunca cose. Ahora cada costura parte su tramo cosido en N
+  tramos iguales en largo de arco sobre el contorno aplanado de cada lado, con N = ⌈máx(largo de A, largo de B) /
+  arista⌉ para los dos (el B en el sentido del cosido y, si es parcial, en su rango); el mallador toma esas muestras
+  como vértices del borde después de quitar duplicados y simplificar (`TramoDelBorde` en `mesh/cdtMesher.ts`), y lo
+  que no se cose de un borde cosido se parte a la arista (`soldadura.ts`). La muestra k de A se cose al vértice k de
+  B (b0 = b1, s = 0), y no queda ningún punto de vuelta: en la camiseta de María, de 841 puntos a 10 mm (390 entre
+  dos vértices, 402 de vuelta) a 302, y de 1317 a 5 mm a 578, todos en un vértice. Dos costuras que se pisan en un
+  borde no se sueldan y siguen con E1. Un t que cae en el de un vértice del otro lado se cose a ese vértice solo, sin
+  el vecino a peso 0, que salía de su contacto propio (`costuras.ts`). La tira del cuello (E11) toma su escote
+  también de los puntos donde es el lado B (`banco/cuello.ts`): solo leía los de vuelta, y sin anillo arrancaba plana
+  y terminaba con el estiramiento p95 de la tira en 619 %. Medido el 2026-10-23 con el jersey medido, E15, E16 y 50
+  iteraciones, 600 cuadros, contra la rama 1. En la CPU a 10 mm: 1602 aristas que atraviesan contra 2106 (la media de
+  las muestras del 300 al 600, 1550 contra 1994), 357 vértices del lado malo contra 445 (223 junto a una costura
+  contra 340, y 134 lejos contra 105), 0,01 % de aplastados contra 0,10 %, 54 pliegues de más de 150° contra 73 y 9
+  pasos recortados por la búsqueda contra 32; pero el estiramiento p95 sube de 4,9 a 5,7 %, la distancia p90 a la
+  asentada de la referencia de 28,1 a 33,1 mm, y un punto de la sisa, a unos 55 mm de la axila, queda abierto 46,6
+  mm contra 13,2. En la GPU a 5 mm (tres corridas): 3893-4628 aristas que atraviesan contra 4717-6773, 465-539
+  vértices del lado malo al final contra 744-983, la costura más abierta en 0,0 mm contra 1,8-10,6 (562 puntos
+  cosidos, 16 en esquinas y ninguno en resorte, contra 631 en resorte), p90 a la referencia 28,0-31,2 mm contra
+  31,2-31,7, 107-158 pliegues de más de 150° contra 136-195 y 799-970 desbordes de celda contra 1874-12492, con
+  0,09-0,11 % de aplastados contra 0,04-0,16 % y 40-42 ms por cuadro. Ninguna corrida queda quieta y el gradiente
+  conjugado llega al tope en todos los cuadros. *Costo:* la malla depende de las costuras (cambiar una costura
+  vuelve a mallar sus piezas), y el lado más corto de una costura con embebido lleva aristas más cortas (la tira del
+  cuello, 8,7 mm contra 9,9 del escote). Con menos puntos, el resorte de cierre (1000 N/m por punto, sin importar el
+  largo que representa) jala menos: la sisa de 10 mm pasa de 118 puntos a 24, y el punto abierto arranca a 68,9 mm,
+  baja a 31 mm hacia el cuadro 120 y vuelve a 46 mm desde el 180, sin llegar a los 25 mm en que E8 cose; al final su
+  línea roza el cuerpo, a 0,8 mm. Plan `2026-10-23-rama-2-costura-soldada.md`.
 - **Probado y descartado: la memoria de lado.** Cada par vértice-triángulo guardaba el lado de la cara en que se lo vio
   primero, y el vértice que cruzaba recibía un par que lo empujaba de vuelta. Medido el 2026-10-23 igual que E16, con
   E15 y E16: 3019 aristas que atraviesan a los 600 cuadros contra 2106 sin memoria, una costura de la manga abierta 62

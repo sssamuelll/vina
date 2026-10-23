@@ -35,6 +35,17 @@ export interface MeshConfig {
   curveResolution?: number;
 }
 
+/**
+ * Un tramo del contorno con sus vértices fijos (la costura soldada del motor implícito): los puntos del contorno
+ * aplanado entre `desde` y `hasta` (lugares en el contorno de flattenPath, fraccionarios y con vuelta) se cambian por
+ * `puntos`, que van de una punta a la otra, cada uno con su lugar en el contorno.
+ */
+export interface TramoDelBorde {
+  desde: number;
+  hasta: number;
+  puntos: ReadonlyArray<{ x: number; y: number; orig: number }>;
+}
+
 /** Default mesh configuration */
 const DEFAULT_CONFIG: Required<MeshConfig> = {
   yHeight: 1.2,
@@ -73,6 +84,7 @@ export function meshPiece(
   piece: PatternPiece,
   config: MeshConfig = {},
   particleDistance?: number,
+  tramos?: readonly TramoDelBorde[],
 ): ClothMeshData {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   if (particleDistance) cfg.maxEdgeLength = particleDistance;
@@ -80,12 +92,12 @@ export function meshPiece(
   try {
     // Flatten the outline to 2D points
     const outlinePoints = flattenPath(piece.outline, cfg.curveResolution);
-    
+
     if (outlinePoints.length < 3) {
       return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
     }
 
-    return meshPieceOutline(outlinePoints, piece.internals, cfg);
+    return meshPieceOutline(outlinePoints, piece.internals, cfg, tramos);
   } catch (error) {
     console.warn('CDT meshing failed for piece', piece.id, ':', error);
     return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
@@ -104,6 +116,7 @@ export function meshPieceOutline(
   outlinePoints: Point2D[],
   internalLines: { path: PathCommand[] }[] = [],
   config: Required<MeshConfig> = DEFAULT_CONFIG,
+  tramos?: readonly TramoDelBorde[],
 ): ClothMeshData {
   if (outlinePoints.length < 3) {
     return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
@@ -118,6 +131,8 @@ export function meshPieceOutline(
   // Simplify dense outlines (300+ points from offset operations)
   const simplifyResult = simplifyOutline(cleanOutline, 200, 0.5);
   cleanOutline = simplifyResult.points;
+  // los tramos van después de simplificar: la simplificación se llevaría los puntos de un tramo recto
+  if (tramos?.length) cleanOutline = removeDuplicatePoints(conTramos(cleanOutline, outlinePoints, tramos));
 
   // Ensure clockwise winding (positive signedArea in screen coords / y-down)
   // CDT2D's interior:true needs CW winding to correctly identify interior triangles.
@@ -229,6 +244,30 @@ function removeDuplicatePoints(points: Point2D[], tolerance: number = TOLERANCIA
   }
 
   return result;
+}
+
+/**
+ * El contorno limpio con los tramos puestos: sus puntos que caen dentro de un tramo (puntas incluidas) se cambian por
+ * los del tramo, en orden de contorno. El lugar de cada punto limpio es su índice en `outline`: quitar duplicados y
+ * simplificar se quedan con los mismos objetos.
+ */
+function conTramos(clean: Point2D[], outline: Point2D[], tramos: readonly TramoDelBorde[]): Point2D[] {
+  const N = outline.length, lugar = new Map<Point2D, number>();
+  outline.forEach((p, i) => {
+    if (!lugar.has(p)) lugar.set(p, i);
+  });
+  const vuelta = (o: number) => ((o % N) + N) % N;
+  const dentro = (o: number) => tramos.some((t) => vuelta(o - t.desde) <= vuelta(t.hasta - t.desde) + 1e-9);
+  let previo = 0;
+  const quedan: Array<{ p: Point2D; o: number }> = [];
+  for (const p of clean) {
+    const o = lugar.get(p) ?? previo;
+    previo = o;
+    if (!dentro(o)) quedan.push({ p, o });
+  }
+  const base = quedan.length ? quedan[0].o : tramos[0].desde;
+  const todos = [...quedan, ...tramos.flatMap((t) => t.puntos.map((q) => ({ p: { x: q.x, y: q.y }, o: q.orig })))];
+  return todos.sort((a, b) => vuelta(a.o - base) - vuelta(b.o - base)).map((e) => e.p);
 }
 
 /**

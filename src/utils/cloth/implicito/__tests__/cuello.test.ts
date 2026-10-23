@@ -71,6 +71,16 @@ describe('la tira del cuello en anillo (E11)', () => {
     for (let v = 0; v < nt; v++) expect(ancho.cercano(x[3 * v], x[3 * v + 1], x[3 * v + 2])!.d).toBeGreaterThan(sep);
   });
 
+  it('con la tira del lado B de la costura (soldada, E17), la coloca igual', () => {
+    // la costura soldada cose el escote (A) a un vértice de la tira (B), sin puntos de vuelta
+    const ida = armar(), vuelta = armar();
+    anillarTira(ida.x, ida.patron, { v0: 0, nv: ida.nt }, ida.puntos, cuerpo, sep);
+    const alReves = vuelta.puntos.map((p) => ({ a: p.b0, b0: p.a, b1: p.a, s: 0 }));
+    const r = anillarTira(vuelta.x, vuelta.patron, { v0: 0, nv: vuelta.nt }, alReves, cuerpo, sep);
+    expect(r?.cosidos).toBe(ida.borde.length);
+    expect(vuelta.x).toEqual(ida.x);
+  });
+
   it('sin escote no toca nada', () => {
     const { nt, x, patron } = armar();
     const antes = Float64Array.from(x);

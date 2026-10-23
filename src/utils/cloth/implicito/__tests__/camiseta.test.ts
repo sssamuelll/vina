@@ -18,7 +18,8 @@ describe('la camiseta de María para el motor implícito', () => {
     // sin las líneas de dibujo, el mallador no deja puntos fuera de la pieza
     expect(c.prenda.piezas.every((p) => p.local.every((j) => j >= 0))).toBe(true);
     expect(c.lados.length).toBeGreaterThanOrEqual(15);
-    expect(c.costuras.puntos.length).toBeGreaterThan(400);
+    // soldadas (E17): unos 3,3 m de costura, un punto cada 20 mm o menos y ninguno de vuelta
+    expect(c.costuras.puntos.length).toBeGreaterThan(150);
     expect(c.costuras.bisagras.length).toBeGreaterThan(100);
     expect(c.franja.some((f) => f === 1)).toBe(true);
     const s = new SistemaTela(c.prenda.malla, TELA_DE_LABORATORIO, { costuras: c.costuras, franja: c.franja, ajustes: { gravedad: 0 } });
@@ -41,23 +42,20 @@ describe('la camiseta de María para el motor implícito', () => {
     expect(Math.max(...k)).toBeLessThan(1e8 * mediana);
   }, 120_000);
 
-  it('a 20 mm, la punta del escote se cose en el segmento de la tira que cruza la punta del tramo', () => {
-    const c = camisetaDeMaria(DXF, 20, TELA_DE_LABORATORIO, enFila);
+  it.each([10, 20])('a %i mm, las costuras se sueldan (E17): cada punto cae en un vértice del otro lado y ninguno vuelve', (mm) => {
+    const c = camisetaDeMaria(DXF, mm, TELA_DE_LABORATORIO, enFila);
+    expect(c.lados.length).toBeGreaterThanOrEqual(15);
+    expect(c.costuras.puntos.every((p) => p.b0 === p.b1 && p.s === 0 && !p.inversa)).toBe(true);
+    // los dos lados de cada costura con los mismos vértices, y a menos de una arista y media (patrón en m)
     const { patron } = c.prenda.malla;
-    const cortos = c.lados.filter((l) => l.ta && l.tb && l.tb[0] > 0.05 && l.ta[0] < l.tb[0]);
-    expect(cortos.length).toBeGreaterThan(0);
-    for (const l of cortos) {
-      const vecino = l.vecinosB?.antes;
-      expect(vecino).toBeDefined();
-      // el vecino es el vértice de la tira que sigue: de la misma pieza y a menos de una arista y media del primero de adentro
-      const r = c.prenda.piezas.find((p) => l.b[0] >= p.v0 && l.b[0] < p.v0 + p.nv)!;
-      expect(vecino!.v).toBeGreaterThanOrEqual(r.v0);
-      expect(vecino!.v).toBeLessThan(r.v0 + r.nv);
-      expect(Math.hypot(patron[2 * vecino!.v] - patron[2 * l.b[0]], patron[2 * vecino!.v + 1] - patron[2 * l.b[0] + 1])).toBeLessThan(0.03);
-      const punta = c.costuras.puntos.find((p) => p.a === l.a[0] && p.b1 === l.b[0]);
-      expect(punta).toMatchObject({ b0: vecino!.v });
-      expect(punta!.s).toBeGreaterThan(0);
-      expect(punta!.s).toBeLessThan(1);
+    for (const l of c.lados) {
+      expect(l.b).toHaveLength(l.a.length);
+      for (const lado of [l.a, l.b]) {
+        for (let k = 1; k < lado.length; k++) {
+          const p = lado[k - 1], q = lado[k];
+          expect(Math.hypot(patron[2 * q] - patron[2 * p], patron[2 * q + 1] - patron[2 * p + 1])).toBeLessThan(0.0015 * mm);
+        }
+      }
     }
   }, 120_000);
 
