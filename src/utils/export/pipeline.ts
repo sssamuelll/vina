@@ -2,7 +2,7 @@
  * Unified Export Pipeline — shared piece preparation for all export formats.
  *
  * Extracts common logic (bounding box, seam allowance, layout) so that
- * format-specific renderers (DXF, AAMA, PDF, cutting layout) consume
+ * format-specific renderers (AAMA DXF, PDF, cutting layout) consume
  * pre-processed data without duplicating preparation steps.
  */
 
@@ -132,7 +132,7 @@ export function preparePiece(
   // Y tiene que ser antes de `computeBBox`: si se gira más abajo (por ejemplo
   // dentro del emisor de un formato), `preparePieces` ya decidió `currentX`
   // con el ancho SIN girar y las piezas se pisan. Girar aquí lo arregla para
-  // los cuatro consumidores a la vez — AAMA, PDF, DXF plano y layout de corte.
+  // los tres consumidores a la vez — AAMA, PDF y layout de corte.
   const piece = applyPieceRotation(rawPiece);
 
   const flatOutline = flattenPath(piece.outline, resolution);
@@ -164,7 +164,7 @@ export function preparePiece(
 /**
  * Prepare all pieces and lay them out left-to-right with spacing.
  *
- * This is the shared preparation step used by DXF (legacy), AAMA, and PDF exporters.
+ * This is the shared preparation step used by the AAMA and PDF exporters.
  * Each piece is positioned so its bounding box starts at (currentX, 0) with
  * minX/minY normalized to origin.
  */

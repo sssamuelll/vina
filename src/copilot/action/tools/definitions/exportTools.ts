@@ -22,11 +22,6 @@ const exportDXFTool: ToolDefinition = {
         items: { type: 'string' },
         description: 'Pieces to export (default: all) / Piezas a exportar (defecto: todas)',
       },
-      format: {
-        type: 'string',
-        enum: ['aama', 'legacy'],
-        description: 'DXF format / Formato DXF',
-      },
       includeSeamAllowance: { type: 'boolean', description: 'Include SA in export / Incluir margen de costura' },
       filename: { type: 'string', description: 'Output filename / Nombre del archivo' },
     },
