@@ -396,8 +396,8 @@ Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el 
 el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
 la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
 Aprobó E12 y E13 el 2026-10-18, y E14 el 2026-10-19. El 2026-10-23 ordenó la rama 1, el contacto entre capas: E15
-y E16, y el mismo día ratificó el valor de E15 (27,8 N/m en el jersey medido) y ordenó la rama 2, la costura
-soldada: E17.
+y E16, y el mismo día ratificó el valor de E15 (27,8 N/m en el jersey medido), ordenó la rama 2, la costura
+soldada (E17), y después la fuerza de la costura por su largo: E18 (su valor espera la ratificación).
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -585,6 +585,30 @@ soldada: E17.
   largo que representa) jala menos: la sisa de 10 mm pasa de 118 puntos a 24, y el punto abierto arranca a 68,9 mm,
   baja a 31 mm hacia el cuadro 120 y vuelve a 46 mm desde el 180, sin llegar a los 25 mm en que E8 cose; al final su
   línea roza el cuerpo, a 0,8 mm. Plan `2026-10-23-rama-2-costura-soldada.md`.
+- **E18 (§4.3.3; corrige la rigidez por punto de E1 y E17). La costura jala por su largo, no por sus puntos.** Cada
+  punto de costura tenía 1000 N/m sin importar cuánta costura representaba, así que lo que jalaba una costura dependía
+  de la malla: con E17, la sisa de 10 mm pasó de 118 puntos a 24. Ahora cada punto lleva el largo que representa (en
+  t, hasta la mitad del camino a cada punto vecino de la costura, los de vuelta incluidos, y en las puntas hasta la
+  punta del tramo, por lo que mide el tramo en el patrón de su lado: `puntosDeCostura`), y su rigidez es
+  `kCosturaPorLargo` por ese largo. El valor de partida, 2·10⁵ N/m², son los 1000 N/m por punto de antes con puntos
+  cada 5 mm; un punto sin largo cuenta 5 mm. La GPU lee la rigidez de cada punto. En la camiseta de María las
+  costuras suman 554,6 kN/m a 10 mm y 554,7 a 5 mm, sobre 2773 mm de costura (antes, 302 y 578). Medido el 2026-10-23
+  igual que E17, contra E17. En la CPU a 10 mm todas las costuras cierran (la más abierta en 0,0 mm contra 46,6: el
+  punto de la sisa se cose), con 1513 aristas que atraviesan contra 1602 (la media del 300 al 600, 1615 contra 1550),
+  0,01 % de aplastados como antes, 1,07 % de encogidas de más del 10 % contra 1,42, y 207 pliegues de más de 90°
+  contra 235 y 42 de más de 150° contra 54; pero quedan 430 vértices del lado malo contra 357 (272 junto a una
+  costura contra 223), el estiramiento p95 sube de 5,7 a 6,1 % (la manga de la sisa, de 13,9 a 17,6; con E1 era 6,1),
+  la distancia p90 a la asentada de la referencia de 33,1 a 35,6 mm y la máxima de 99,8 a 136,9, y la búsqueda recorta
+  69 pasos contra 9. En la GPU a 5 mm, donde la rigidez de cada punto casi no cambia (mediana 986 N/m), seis corridas
+  quedan en el ruido de las tres de E17: 4129-6496 aristas que atraviesan contra 3893-4628, 467-772 vértices del lado
+  malo al final contra 465-539, p90 a la referencia 26,5-32,0 mm contra 28,0-31,2, 114-182 pliegues de más de 150°
+  contra 107-158, las costuras en 0,0 mm y 39,7-41,5 ms por cuadro con la máquina libre (57-78 ms en las corridas que
+  compartieron la máquina con otras aplicaciones). La paridad no cambia: 14 escenas, a menos de 0,06 mm. Ninguna
+  corrida queda quieta. *Costo:* la sisa se cierra, pero lejos de donde la tiene la referencia. Con las dos reglas, el
+  vértice más lejano de la asentada es el mismo par cosido de la axila, la copa de la manga en (−131, 60) mm y la sisa
+  del cuerpo en (224, 95), junto al punto que con 1000 N/m quedaba abierto (arrancaba a 68,9 mm en la colocación): con
+  1000 N/m por punto estaba a 99,8 mm de la referencia; por su largo, a 136,9, y arrastra el cuerpo (su p90, de 37,2 a
+  51,8 mm). La otra manga tiene su vértice más lejano en el mismo lugar de la copa, (131, 60), a 121,6 mm.
 - **Probado y descartado: la memoria de lado.** Cada par vértice-triángulo guardaba el lado de la cara en que se lo vio
   primero, y el vértice que cruzaba recibía un par que lo empujaba de vuelta. Medido el 2026-10-23 igual que E16, con
   E15 y E16: 3019 aristas que atraviesan a los 600 cuadros contra 2106 sin memoria, una costura de la manga abierta 62
