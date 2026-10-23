@@ -21,7 +21,7 @@ import {
   camisetaContraLaReferencia, medirCamiseta, type CamisetaContraLaReferencia, type ConfigCamiseta, type MedidasDeCamiseta,
 } from '../../utils/cloth/implicito/banco/camiseta';
 import { toparPlaca } from '../../utils/cloth/implicito/banco/experimentos';
-import { costurasPorClase, LadosDeLosPares } from '../../utils/cloth/implicito/banco/instrumentos';
+import { aristasQueAtraviesan, costurasPorClase, LadosDeLosPares } from '../../utils/cloth/implicito/banco/instrumentos';
 import { percentil } from '../../utils/cloth/implicito/banco/medidas';
 import { paresEnCosturas, peoresPuntos, type ParesEnCostura, type PeorPunto } from '../../utils/cloth/implicito/banco/paresEnCosturas';
 import { SistemaTela } from '../../utils/cloth/implicito/sistema';
@@ -71,6 +71,8 @@ interface Instrumentos {
     ladoMaloAlFinal: number;
     paresAnotados: number;
     cruces: ReturnType<LadosDeLosPares['cruces']>;
+    /** las aristas que atraviesan un triángulo de tela al final, y sus vértices: el cruce que no depende de los pares */
+    atraviesan: ReturnType<typeof aristasQueAtraviesan>;
     costuras: ReturnType<typeof costurasPorClase>;
   };
 }
@@ -117,6 +119,7 @@ async function instrumentar(motor: MotorGpu, nuevo: () => SistemaTela): Promise<
       ladoMaloAlFinal: serie.ladoMaloVertices.at(-1) ?? 0,
       paresAnotados: lados.anotados,
       cruces: lados.cruces(x, costura),
+      atraviesan: aristasQueAtraviesan(x, cpu.tris, cpu.excluidos),
       costuras: costurasPorClase(x, cpu.costuras, await motor.leerCosidos(), (e, d) => cpu.cruzaUnObstaculo(cpu.costuras.a[e], d)),
     },
   };
