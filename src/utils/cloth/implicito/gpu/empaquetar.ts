@@ -52,6 +52,8 @@ export interface PaqueteGpu {
     cs: Float32Array;
     /** el largo de reposo de cada punto de costura, ahora */
     cl: Float32Array;
+    /** la rigidez de cada punto de costura (costuras.ts, k) */
+    ck: Float32Array;
     /** la rigidez de cada bisagra de costura al encenderse */
     ckh: Float32Array;
     /** E8: las puntadas al empaquetar, cosido (0 o 1) y desfase (3 por punto) */
@@ -267,6 +269,7 @@ export function empaquetar(s: SistemaTela, op: { maxPares?: number } = {}): Paqu
       pcr,
       cs: Float32Array.from(c.s),
       cl: Float32Array.from(c.L),
+      ck: Float32Array.from(c.k),
       ckh: Float32Array.from(s.placa.costura, (k) => k.kh),
       ccos: Float32Array.from(c.cosido),
       cdes: Float32Array.from(c.desfase),

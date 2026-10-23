@@ -159,9 +159,10 @@ describe('el paquete de una prenda cosida', () => {
     for (let q = 0; q < Ap.length; q++) expect(Ap[q]).toBeCloseTo(esperado[q], 6);
   });
 
-  it('lleva el largo de cada punto y dónde encender cada bisagra de costura', () => {
+  it('lleva el largo y la rigidez de cada punto y dónde encender cada bisagra de costura', () => {
     expect(p.nc).toBe(s.costuras.n);
     expect(Array.from(p.f32.cl)).toEqual(Array.from(Float32Array.from(s.costuras.L)));
+    expect(Array.from(p.f32.ck)).toEqual(Array.from(Float32Array.from(s.costuras.k)));
     expect(Array.from(p.u32.costuraK)).toEqual(s.placa.costura.map((c) => c.o));
   });
 

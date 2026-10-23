@@ -32,12 +32,12 @@ export interface AjustesImplicito {
   /** rigidez de los pares entre capas de tela (N/m); sin ella, la de la tela (`rigidezEntreCapas`, E15) */
   kPropio?: number;
   /**
-   * rigidez de cada punto de costura (N/m). Con 1000, una costura que sostiene 1 N/m de tela con puntos cada
-   * 5 mm queda abierta 5 µm. El banco todavía no la escoge (spec §5): el 2026-10-16, con 300, 1000 y 3000 N/m la
-   * camiseta no quedó quieta y ninguno cumplió las costuras de §2; 3000 las cerró mejor pero duplicó los aplastados
-   * en la CPU a 20 mm. Queda 1000 hasta que el gradiente conjugado converja.
+   * rigidez de la costura por metro (N/m²): cada punto lleva esta por el largo que representa (E18). 2·10⁵ son los
+   * 1000 N/m por punto de antes con puntos cada 5 mm: una costura que sostiene 1 N/m de tela queda abierta 5 µm. El
+   * banco todavía no la escoge (spec §5): el 2026-10-16, con 300, 1000 y 3000 N/m por punto la camiseta no quedó quieta
+   * y ninguno cumplió las costuras de §2; 3000 las cerró mejor pero duplicó los aplastados en la CPU a 20 mm.
    */
-  kCostura: number;
+  kCosturaPorLargo: number;
   /**
    * lo más que se cierra en un cuadro el largo de reposo de una costura (m, E7): con huecos de decenas de centímetros
    * en la colocación, el cierre de ×0,97¹⁵ tiraba de cada costura más de un tercio de su hueco en el primer cuadro.
@@ -63,7 +63,7 @@ export const AJUSTES_IMPLICITO: AjustesImplicito = {
   gravedad: -9.81,
   aire: 1,
   kContacto: 2000,
-  kCostura: 1000,
+  kCosturaPorLargo: 2e5,
   cierreMaximo: 0.005,
   capasDelMargen: CAPAS_DEL_MARGEN,
   flexionDelMargen: FLEXION_DEL_MARGEN,
@@ -160,7 +160,7 @@ export class SistemaTela {
     this.membrana = new Membrana(malla.tris, this.coef, this.tela);
     this.placa = new Placa(uv, malla.tris, this.tela, { costura: op.costuras?.bisagras, factor: flexion });
     this.x = Float64Array.from(malla.x);
-    this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCostura, this.aj.cierreMaximo, this.fijo);
+    this.costuras = new Costuras(op.costuras?.puntos ?? [], malla.x, this.aj.kCosturaPorLargo, this.aj.cierreMaximo, this.fijo);
     this.xt = Float64Array.from(malla.x);
     this.v = new Float64Array(3 * this.n);
     this.vPedida = new Float64Array(3 * this.n);

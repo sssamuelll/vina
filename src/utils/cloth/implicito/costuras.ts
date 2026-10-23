@@ -6,7 +6,8 @@
  *   E = ½·k·max(|d| − L, 0)²,   d = x_a − (1 − s)·x_b0 − s·x_b1,
  * con un largo de reposo L que arranca en la separación de la colocación y se cierra a 0 como hoy. La costura
  * tira y no empuja. Con L = 0 la energía es cuadrática y la hessiana, k·I, exacta; con L > 0 también es la
- * exacta: k·(L/|d|)·n·nᵀ + k·(1 − L/|d|)·I.
+ * exacta: k·(L/|d|)·n·nᵀ + k·(1 − L/|d|)·I. La k de cada punto es la de la costura por metro por el largo que el
+ * punto representa (E18): la costura tira lo mismo con puntos cada 5 mm que cada 10.
  */
 import type { TelaSI } from './tela';
 
@@ -18,12 +19,16 @@ export interface PuntoDeCostura {
   s: number;
   /** E8: un vértice de B sobre A, de vuelta; con A cosido sobre B, sobra */
   inversa?: boolean;
+  /** E18: el largo de costura que representa (m), en el patrón de su lado; sin él, LARGO_SIN_MEDIR */
+  largo?: number;
 }
 
 /** Cuánto se cierra el largo de reposo por cuadro: el cierre de hoy, ×0,97 por subpaso de 15. */
 export const CIERRE_POR_CUADRO = 0.97 ** 15;
 /** Largo (m) bajo el cual la costura queda cerrada: desde ahí, L = 0. */
 export const LARGO_CERRADO = 1e-4;
+/** E18: el largo de un punto que no trae el suyo (m); con él, los 2·10⁵ N/m² por defecto dan los 1000 N/m por punto de antes. */
+export const LARGO_SIN_MEDIR = 0.005;
 /** E8: un punto se cose a menos de estos cuadros de cierre al tope de E7 de su punto. */
 export const CUADROS_DE_PUNTADA = 5;
 /** E8: en cuántos tramos se mira la línea entre un vértice y su punto para ver si cruza un obstáculo. */
@@ -79,6 +84,8 @@ function sobre(t: number, lado: readonly number[], tl: readonly number[], vecino
  * son el lugar de cada vértice en el tramo cosido del patrón (0 al inicio, 1 al final): en una costura parcial, los
  * vértices que quedan dentro del tramo no llegan a sus puntas, y medir el largo de arco entre ellos correría el cosido.
  * Sin ellos, el lado se toma como el tramo entero. `vecinosA` y `vecinosB` cosen las puntas (VecinosDelTramo).
+ * Cada punto lleva el largo que representa (E18): en t, hasta la mitad del camino a cada punto vecino de la costura (los
+ * de vuelta incluidos; en las puntas, hasta la punta del tramo), por lo que mide el tramo en el patrón de su lado.
  */
 export function puntosDeCostura(
   patron: ArrayLike<number>,
@@ -91,16 +98,27 @@ export function puntosDeCostura(
 ): PuntoDeCostura[] {
   if (ladoA.length === 0 || ladoB.length === 0) return [];
   const tA = tLadoA ?? largosEnElPatron(patron, ladoA), tB = tLadoB ?? largosEnElPatron(patron, ladoB);
-  const puntos: PuntoDeCostura[] = [];
-  const agregar = (p: PuntoDeCostura) => {
-    // un vértice cosido a un segmento suyo (lados que comparten una punta) no es costura
-    if (p.a !== p.b0 && p.a !== p.b1) puntos.push(p);
+  // lo que mide el tramo cosido en el patrón de un lado; un lado de un vértice no lo dice
+  const tramo = (lado: readonly number[], t: readonly number[]) => {
+    let arco = 0;
+    for (let k = 1; k < lado.length; k++) arco += Math.hypot(patron[2 * lado[k]] - patron[2 * lado[k - 1]], patron[2 * lado[k] + 1] - patron[2 * lado[k - 1] + 1]);
+    const dt = t[t.length - 1] - t[0];
+    return dt > 0 ? arco / dt : undefined;
   };
-  ladoA.forEach((a, i) => agregar({ a, ...sobre(tA[i], ladoB, tB, vecinosB) }));
+  const LA = tramo(ladoA, tA), LB = tramo(ladoB, tB);
+  const puntos: Array<{ p: PuntoDeCostura; t: number; L?: number }> = [];
+  ladoA.forEach((a, i) => puntos.push({ p: { a, ...sobre(tA[i], ladoB, tB, vecinosB) }, t: tA[i], L: LA }));
   ladoB.forEach((b, i) => {
-    if (!tA.some((t) => Math.abs(t - tB[i]) < 1e-9)) agregar({ a: b, ...sobre(tB[i], ladoA, tA, vecinosA), inversa: true });
+    if (!tA.some((t) => Math.abs(t - tB[i]) < 1e-9)) puntos.push({ p: { a: b, ...sobre(tB[i], ladoA, tA, vecinosA), inversa: true }, t: tB[i], L: LB });
   });
-  return puntos;
+  const orden = puntos.map((_, i) => i).sort((i, j) => puntos[i].t - puntos[j].t);
+  orden.forEach((i, k) => {
+    const { p, t, L } = puntos[i];
+    const desde = k > 0 ? (puntos[orden[k - 1]].t + t) / 2 : 0, hasta = k + 1 < orden.length ? (t + puntos[orden[k + 1]].t) / 2 : 1;
+    if (L !== undefined) p.largo = L * (hasta - desde);
+  });
+  // un vértice cosido a un segmento suyo (lados que comparten una punta) no es costura
+  return puntos.map(({ p }) => p).filter((p) => p.a !== p.b0 && p.a !== p.b1);
 }
 
 export class Costuras {
@@ -109,6 +127,8 @@ export class Costuras {
   readonly b0: Uint32Array;
   readonly b1: Uint32Array;
   readonly s: Float64Array;
+  /** E18, por punto: la rigidez (N/m), la de la costura por metro por el largo que representa */
+  readonly k: Float64Array;
   /** largo de reposo al coser (la separación en la colocación) y el de ahora (m) */
   readonly L0: Float64Array;
   readonly L: Float64Array;
@@ -133,9 +153,13 @@ export class Costuras {
   /** E8, por vértice: el punto soldable del que depende (−1 si ninguno) */
   readonly dependeDe: Int32Array;
 
-  /** `cierreMaximo`: lo más que baja L en un cuadro (m); sin tope, el cierre de hoy. Un vértice `fijo` no se cose. */
-  constructor(puntos: readonly PuntoDeCostura[], x: ArrayLike<number>, readonly k: number, readonly cierreMaximo = Infinity, fijo?: ArrayLike<number>) {
+  /**
+   * `kPorLargo`: la rigidez de la costura por metro (N/m²). `cierreMaximo`: lo más que baja L en un cuadro (m); sin
+   * tope, el cierre de hoy. Un vértice `fijo` no se cose.
+   */
+  constructor(puntos: readonly PuntoDeCostura[], x: ArrayLike<number>, kPorLargo: number, readonly cierreMaximo = Infinity, fijo?: ArrayLike<number>) {
     this.n = puntos.length;
+    this.k = Float64Array.from(puntos, (p) => kPorLargo * (p.largo ?? LARGO_SIN_MEDIR));
     this.a = Uint32Array.from(puntos, (p) => p.a);
     this.b0 = Uint32Array.from(puntos, (p) => p.b0);
     this.b1 = Uint32Array.from(puntos, (p) => p.b1);
@@ -306,7 +330,7 @@ export class Costuras {
     const d = [0, 0, 0];
     this.separacion(e, x, d);
     const r = Math.hypot(d[0], d[1], d[2]) - this.L[e];
-    return r > 0 ? 0.5 * this.k * r * r : 0;
+    return r > 0 ? 0.5 * this.k[e] * r * r : 0;
   }
 
   energia(x: ArrayLike<number>): number {
@@ -317,10 +341,10 @@ export class Costuras {
 
   /** Guarda d y los factores de ∇E = g·d y H = c1·I + c2·d·dᵀ de cada punto, en las posiciones x. */
   linealizar(x: ArrayLike<number>): void {
-    const d = [0, 0, 0], st = this.estado, k = this.k;
+    const d = [0, 0, 0], st = this.estado;
     for (let e = 0; e < this.n; e++) {
       this.separacion(e, x, d);
-      const r = Math.hypot(d[0], d[1], d[2]), L = this.L[e], o = 6 * e;
+      const r = Math.hypot(d[0], d[1], d[2]), L = this.L[e], o = 6 * e, k = this.k[e];
       st[o] = d[0];
       st[o + 1] = d[1];
       st[o + 2] = d[2];
