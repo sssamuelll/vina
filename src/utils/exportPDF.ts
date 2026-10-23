@@ -1,6 +1,7 @@
 import { PatternPiece, PathCommand, Seam } from '../types/types';
 import { preparePieces } from './export/pipeline';
 import { escapePdfString } from './sanitizeName';
+import { grainlineArrowheads, grainlineEndpoints } from './grainLine';
 
 /**
  * Export pattern pieces to PDF at 1:1 scale.
@@ -81,9 +82,10 @@ export function generatePDF(pieces: PatternPiece[], seams?: Seam[]): string {
   let totalW = MARGIN * 2;
   let maxH = 0;
   for (const pp of prepared) {
-    const rightEdge = pp.offsetX + pp.boundingBox.maxX + MARGIN;
+    // ox shifts every piece right by MARGIN, so the page needs MARGIN twice.
+    const rightEdge = pp.offsetX + pp.cutBox.maxX + MARGIN * 2;
     if (rightEdge > totalW) totalW = rightEdge;
-    if (pp.boundingBox.height > maxH) maxH = pp.boundingBox.height;
+    if (pp.cutBox.height > maxH) maxH = pp.cutBox.height;
   }
   const totalH = maxH + MARGIN * 2;
 
@@ -117,7 +119,7 @@ export function generatePDF(pieces: PatternPiece[], seams?: Seam[]): string {
     // Internals
     for (const line of piece.internals) {
       const cmds = line.path;
-      if (cmds.length < 2) continue;
+      if (cmds.length < 2 || cmds[0].type !== 'M') continue;
 
       if (line.type === 'notch') {
         stream += '1 0 0 RG\n0.4 w\n[] 0 d\n'; // red
@@ -127,26 +129,28 @@ export function generatePDF(pieces: PatternPiece[], seams?: Seam[]): string {
         stream += '0 0 0 RG\n0.3 w\n[] 0 d\n';
       }
 
-      if (cmds[0].type === 'M' && cmds[1].type === 'L') {
-        const x1 = (cmds[0].values[0] + ox) * MM_TO_PT;
-        const y1 = (totalH - (cmds[0].values[1] + oy)) * MM_TO_PT;
-        const x2 = (cmds[1].values[0] + ox) * MM_TO_PT;
-        const y2 = (totalH - (cmds[1].values[1] + oy)) * MM_TO_PT;
-        stream += `${x1.toFixed(2)} ${y1.toFixed(2)} m\n`;
-        stream += `${x2.toFixed(2)} ${y2.toFixed(2)} l\nS\n`;
-
-        // Arrow for grainline
-        if (line.type === 'grainline') {
-          const dx = x2 - x1, dy = y2 - y1;
-          const len = Math.hypot(dx, dy);
-          if (len > 0) {
-            const ux = dx/len, uy = dy/len;
-            const as = 4 * MM_TO_PT; // arrow size
-            stream += `${x2.toFixed(2)} ${y2.toFixed(2)} m\n`;
-            stream += `${(x2 - ux*as + uy*as*0.4).toFixed(2)} ${(y2 - uy*as - ux*as*0.4).toFixed(2)} l\n`;
-            stream += `${(x2 - ux*as - uy*as*0.4).toFixed(2)} ${(y2 - uy*as + ux*as*0.4).toFixed(2)} l\nf\n`;
-          }
+      if (line.type === 'grainline') {
+        // Straight by definition: shaft and arrow read only its two endpoints,
+        // as the canvas and the DXF do.
+        const ends = grainlineEndpoints(cmds);
+        if (!ends) continue;
+        const [a, b] = ends;
+        stream += commandsToPDFPath([
+          { type: 'M', values: [a.x, a.y] },
+          { type: 'L', values: [b.x, b.y] },
+        ], ox, oy, totalH);
+        stream += 'S\n';
+        for (const [tip, w1, w2] of grainlineArrowheads(cmds, 4)) { // 4 mm arrow
+          stream += commandsToPDFPath([
+            { type: 'M', values: [tip.x, tip.y] },
+            { type: 'L', values: [w1.x, w1.y] },
+            { type: 'L', values: [w2.x, w2.y] },
+          ], ox, oy, totalH);
+          stream += 'f\n';
         }
+      } else {
+        stream += commandsToPDFPath(cmds, ox, oy, totalH);
+        stream += 'S\n';
       }
     }
 
