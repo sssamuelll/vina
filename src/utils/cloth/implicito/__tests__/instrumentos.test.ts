@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { costurasPorClase, ladoDeCara, LadosDeLosPares } from '../banco/instrumentos';
+import { aristasQueAtraviesan, costurasPorClase, ladoDeCara, LadosDeLosPares } from '../banco/instrumentos';
+import { rectangulo } from '../banco/escenas';
+import { mallaDeContorno } from '../malla';
+import { armarPrenda } from '../prenda';
 
 // la cara (0, 0, 0)-(1, 0, 0)-(0, 1, 0), normal +z, y el vértice 3 encima o debajo
 const conVertice = (x: number, y: number, z: number) => Float64Array.from([0, 0, 0, 1, 0, 0, 0, 1, 0, x, y, z]);
@@ -85,5 +88,32 @@ describe('la separación de las costuras por clase de punto', () => {
     const vistas: number[][] = [];
     costurasPorClase(x, costuras, [0, 0, 0, 0], (_e, d) => (vistas.push([...d]), false));
     expect(vistas[3]).toEqual([0, 0, 0.008]);
+  });
+});
+
+describe('la tela que atraviesa la tela', () => {
+  /** dos láminas de 10 mm: la de arriba a 2 mm, o inclinada 20° alrededor del eje x por el centro */
+  const dosLaminas = (inclinada: boolean) => {
+    const abajo = mallaDeContorno(rectangulo(-50, -50, 50, 50), 10), arriba = mallaDeContorno(rectangulo(-40, -40, 40, 40), 10, 0.002);
+    const prenda = armarPrenda([
+      { id: 'abajo', ...abajo },
+      { id: 'arriba', ...arriba, x: inclinada ? Float64Array.from(arriba.x, (q, k) => (k % 3 === 1 ? Math.tan(0.35) * arriba.x[k + 1] : q)) : arriba.x },
+    ]);
+    return { prenda, excluidos: Array.from({ length: prenda.malla.x.length / 3 }, (_, i) => [i]) };
+  };
+
+  it('dos capas paralelas no se cruzan; una inclinada que pasa por la otra, sí', () => {
+    const paralelas = dosLaminas(false);
+    expect(aristasQueAtraviesan(paralelas.prenda.malla.x, paralelas.prenda.malla.tris, paralelas.excluidos).cruces).toBe(0);
+    const cruzadas = dosLaminas(true);
+    const r = aristasQueAtraviesan(cruzadas.prenda.malla.x, cruzadas.prenda.malla.tris, cruzadas.excluidos);
+    expect(r.cruces).toBeGreaterThan(0);
+    expect(r.vertices).toBeGreaterThan(0);
+  });
+
+  it('una arista que toca a un compañero de costura del triángulo no cuenta', () => {
+    const { prenda, excluidos } = dosLaminas(true);
+    const todos = Array.from({ length: prenda.malla.x.length / 3 }, (_, i) => i);
+    expect(aristasQueAtraviesan(prenda.malla.x, prenda.malla.tris, excluidos.map(() => todos)).cruces).toBe(0);
   });
 });

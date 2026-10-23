@@ -395,7 +395,8 @@ El banco corre también sobre el XPBD actual, para medir cada entrega contra él
 Mandan sobre las secciones que citan. Samuel aprobó E1-E4 el 2026-10-14 con el plan de la parte 1, y E5, E6, R13 y E7
 el 2026-10-16 (el valor de E7 espera su ratificación), y E8 y E9 el mismo día. El mismo día ordenó usar las telas de
 la referencia y dar un motor eficiente para la web y natural: de ahí E10 en adelante, cada una con lo que se midió.
-Aprobó E12 y E13 el 2026-10-18, y E14 el 2026-10-19.
+Aprobó E12 y E13 el 2026-10-18, y E14 el 2026-10-19. El 2026-10-23 ordenó la rama 1, el contacto entre capas: E15
+y E16, y el mismo día ratificó el valor de E15 (27,8 N/m en el jersey medido).
 
 - **E1 (§4.3.3).** Cada vértice de una costura se cose a un punto del otro lado, ubicado por largo de arco en el
   patrón, y no a un vértice: los dos lados se mallan por separado y casi nunca tienen la misma cantidad de vértices.
@@ -524,3 +525,40 @@ Aprobó E12 y E13 el 2026-10-18, y E14 el 2026-10-19.
   quedar quieta en 10 s con 50 iteraciones, y la velocidad (17 ms y luego 8 ms) es la meta del subproyecto de
   velocidad. El banco la sigue midiendo y reportando. *Costo:* este subproyecto puede cerrar con la camiseta a más de
   17 ms por cuadro.
+- **E15 (§4.3.2). La rigidez entre capas es la de la tela.** Un par entre dos capas de tela lleva la tracción más rígida
+  de la tela, `max(kTrama, kUrdimbre)` (27,8 N/m en el jersey medido), y no los 2000 N/m del cuerpo; las puntas del
+  cuerpo siguen con `kContacto` (R13) y `kPropio` manda si se pasa. La rigidez de membrana de un vértice es de ese orden
+  y no depende de la malla: el par no agrega al sistema nada más rígido que la tela. Medido el 2026-10-23 en la CPU con
+  la camiseta de 10 mm, el jersey medido y 50 iteraciones, a los 60 cuadros: con 2000 N/m, 6429 aristas atraviesan la
+  tela, 1,54 % de los triángulos quedan aplastados y el estiramiento p95 es 39,7 %; con 27,8 N/m, 2586 aristas, 0,10 % y
+  11,7 %. A los 600 cuadros, con 27,8 N/m: 2027 aristas, 0,06 % y 7,2 %. Con E16, en la GPU a 5 mm (tres corridas de 600
+  cuadros, mismo jersey y 50 iteraciones) contra main: 4717-6773 aristas que atraviesan contra 48287-155051, 0,04-0,16 %
+  de aplastados contra 1,16-2,10 %, estiramiento p95 de 4,5-5,4 % contra 38,9-77,7 %, 136-195 pliegues de más de 150°
+  contra 1161-2303 y 41-43 ms por cuadro contra 56-63; la distancia p90 a la asentada de la referencia sube de 25-29 a
+  31-32 mm, y ninguna corrida queda quieta. *Costo:* el par blando cede. Las costuras que cierran (1000 N/m por punto)
+  arrastran la tela a través de la otra capa desde el primer cuadro, y lo que cruza no vuelve: de 129 aristas en la
+  colocación a 2490 a los 20 cuadros, y a esa altura más de la mitad de los vértices que atraviesan están a dos anillos
+  o menos de una costura. Plan `2026-10-23-rama-1-contacto-entre-capas.md`.
+- **E16 (§4.2.1 y §4.3.2; corrige E10). El par entre capas solo empuja.** El par de dos capas de tela empuja en el paso
+  si el cuadro sin fuerzas lo deja dentro de la separación, `p0 − n·U > 0` con `U = Σ w·(y − x_t)`: el que entra y el
+  que se queda, y ya no el que sale. Con E10 entraba además todo el que estaba dentro (`p0 > 0`), y el resorte de dos
+  lados de la solución jalaba a las capas que se separaban: dos capas a 1 mm que se alejan a 0,3 m/s quedaban pegadas un
+  cuadro. La búsqueda en línea suma la energía de un lado, `½·k·max(p0 − n·U, 0)²`, de todos los candidatos, activos o
+  no, y la fricción de los activos: antes no veía al candidato que el paso metía en la separación. La GPU hace lo mismo
+  (`wgslPropio.ts`, `parDeVertice` y `difPar`). Medido el 2026-10-23 con la camiseta de la CPU a 10 mm, el jersey
+  medido, E15 y 50 iteraciones, 600 cuadros, contra E15 solo: 1994 aristas que atraviesan contra 2128 (media de las
+  muestras cada 60 cuadros del 300 al 600), estiramiento p95 final 4,9 % contra 7,2 % y 32 pasos recortados por la
+  búsqueda contra 57; pero 0,10 % de aplastados contra 0,06 %, 73 pliegues de más de 150° contra 56 y la distancia a la
+  asentada de la referencia, p90, 28,1 mm contra 22,9 (una corrida de cada una). *Costo:* la camiseta llega al tope de
+  50 iteraciones en todos los cuadros, así que cada par decide con el cuadro sin fuerzas: el que ese cuadro saca y el
+  paso deja dentro no empuja (solo lo cobra la búsqueda en línea), y el activo que el paso saca todavía jala en la
+  solución. Se probó y se descartó revisar los pares dentro del gradiente conjugado: cada 10 iteraciones, el gradiente
+  conjugado dejaba de converger y quedaban pares hasta 2 mm adentro; solo al converger, en la camiseta nunca corre. Plan
+  `2026-10-23-rama-1-contacto-entre-capas.md`.
+- **Probado y descartado: la memoria de lado.** Cada par vértice-triángulo guardaba el lado de la cara en que se lo vio
+  primero, y el vértice que cruzaba recibía un par que lo empujaba de vuelta. Medido el 2026-10-23 igual que E16, con
+  E15 y E16: 3019 aristas que atraviesan a los 600 cuadros contra 2106 sin memoria, una costura de la manga abierta 62
+  mm contra 13 y 0,24 % de aplastados contra 0,10 %. A los 60 cuadros, el 42 % de los pares del lado malo recordaba su
+  lado y empujaba, y perdía contra la costura; otro 41 % se había anotado ya cruzado. Heredar el lado a las caras
+  vecinas no ayudaba: a los 60 cuadros, 526 vértices del lado malo sin heredar, 1983 heredando sin cuidar los pliegues y
+  540 cuidándolos.

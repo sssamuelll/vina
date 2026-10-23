@@ -87,6 +87,86 @@ export class LadosDeLosPares {
   }
 }
 
+/**
+ * La tela que atraviesa la tela, sin juzgar lados: las aristas de la malla que cruzan un triángulo, fuera de las que
+ * comparten un vértice con él o tocan a un compañero de costura de sus vértices (`excluidos`, el de SistemaTela). Cuenta
+ * los cruces arista-triángulo y los vértices de esas aristas. Una tela que pasó por el costado de otra no cuenta: solo
+ * la que la perfora.
+ */
+export function aristasQueAtraviesan(x: ArrayLike<number>, tris: ArrayLike<number>, excluidos: readonly (readonly number[])[]): { cruces: number; vertices: number } {
+  const r = cruzar(x, tris, excluidos);
+  return { cruces: r.cruces, vertices: r.vertices.size };
+}
+
+/** Los vértices de las aristas que atraviesan un triángulo (`aristasQueAtraviesan`). */
+export function verticesQueAtraviesan(x: ArrayLike<number>, tris: ArrayLike<number>, excluidos: readonly (readonly number[])[]): Set<number> {
+  return cruzar(x, tris, excluidos).vertices;
+}
+
+function cruzar(x: ArrayLike<number>, tris: ArrayLike<number>, excluidos: readonly (readonly number[])[]): { cruces: number; vertices: Set<number> } {
+  const nt = tris.length / 3;
+  let largo = 0;
+  const aristas = new Map<number, [number, number]>();
+  for (let t = 0; t < nt; t++) {
+    for (let k = 0; k < 3; k++) {
+      const a = tris[3 * t + k], b = tris[3 * t + ((k + 1) % 3)], i = Math.min(a, b), j = Math.max(a, b);
+      if (aristas.has(i * nt * 3 + j)) continue;
+      aristas.set(i * nt * 3 + j, [i, j]);
+      largo += Math.hypot(x[3 * j] - x[3 * i], x[3 * j + 1] - x[3 * i + 1], x[3 * j + 2] - x[3 * i + 2]);
+    }
+  }
+  // los triángulos en una rejilla de celdas del doble de la arista media, por su caja
+  const lado = (2 * largo) / Math.max(1, aristas.size), celdas = new Map<string, number[]>();
+  const celda = (q: number) => Math.floor(q / lado);
+  for (let t = 0; t < nt; t++) {
+    const v = [tris[3 * t], tris[3 * t + 1], tris[3 * t + 2]];
+    const lo = [0, 1, 2].map((d) => celda(Math.min(...v.map((i) => x[3 * i + d]))));
+    const hi = [0, 1, 2].map((d) => celda(Math.max(...v.map((i) => x[3 * i + d]))));
+    for (let a = lo[0]; a <= hi[0]; a++) for (let b = lo[1]; b <= hi[1]; b++) for (let c = lo[2]; c <= hi[2]; c++) {
+      const k = `${a},${b},${c}`, l = celdas.get(k);
+      if (l) l.push(t);
+      else celdas.set(k, [t]);
+    }
+  }
+  let cruces = 0;
+  const vertices = new Set<number>();
+  for (const [i, j] of aristas.values()) {
+    const vistos = new Set<number>();
+    const lo = [0, 1, 2].map((d) => celda(Math.min(x[3 * i + d], x[3 * j + d])));
+    const hi = [0, 1, 2].map((d) => celda(Math.max(x[3 * i + d], x[3 * j + d])));
+    for (let a = lo[0]; a <= hi[0]; a++) for (let b = lo[1]; b <= hi[1]; b++) for (let c = lo[2]; c <= hi[2]; c++) {
+      for (const t of celdas.get(`${a},${b},${c}`) ?? []) {
+        if (vistos.has(t)) continue;
+        vistos.add(t);
+        const v = [tris[3 * t], tris[3 * t + 1], tris[3 * t + 2]];
+        if (v.some((q) => q === i || q === j || excluidos[i].includes(q) || excluidos[j].includes(q))) continue;
+        if (segmentoCruzaTriangulo(x, i, j, v[0], v[1], v[2])) {
+          cruces++;
+          vertices.add(i).add(j);
+        }
+      }
+    }
+  }
+  return { cruces, vertices };
+}
+
+/** El segmento ij atraviesa el triángulo abc por su interior (Möller y Trumbore, sin las puntas ni los bordes). */
+function segmentoCruzaTriangulo(x: ArrayLike<number>, i: number, j: number, a: number, b: number, c: number): boolean {
+  const o = [x[3 * i], x[3 * i + 1], x[3 * i + 2]], d = [x[3 * j] - o[0], x[3 * j + 1] - o[1], x[3 * j + 2] - o[2]];
+  const e1 = [0, 1, 2].map((k) => x[3 * b + k] - x[3 * a + k]), e2 = [0, 1, 2].map((k) => x[3 * c + k] - x[3 * a + k]);
+  const p = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
+  const det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2];
+  if (Math.abs(det) < 1e-18) return false;
+  const s = [0, 1, 2].map((k) => o[k] - x[3 * a + k]);
+  const u = (s[0] * p[0] + s[1] * p[1] + s[2] * p[2]) / det;
+  if (u <= 0 || u >= 1) return false;
+  const q = [s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0]];
+  const v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) / det;
+  if (v <= 0 || u + v >= 1) return false;
+  const t = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) / det;
+  return t > 0 && t < 1;
+}
+
 type Clase = 'cuerpo' | 'esquina' | 'cosido' | 'resorte';
 
 /**

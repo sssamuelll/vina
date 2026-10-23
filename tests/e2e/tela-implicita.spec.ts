@@ -52,10 +52,11 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
   // gradiente conjugado no converge y la precisión simple y la doble siguen caminos distintos; con 400 converge, y la
   // paridad mide la física y no el redondeo. Los pares del contacto propio unen cuatro vértices que el precondicionador
   // de bloques no absorbe: con la rigidez de contacto de 2000 N/m, ni convergido la precisión simple baja de 0,08 mm en
-  // un cuadro (0,55 mm en tres); con 20 N/m baja de 1 µm
+  // un cuadro (0,55 mm en tres); con 20 N/m baja de 1 µm. Los pares entre capas llevan la rigidez de la tela (E15, 600
+  // N/m en la de laboratorio): kp los deja en 20
   const PARIDAD: Array<[string, string]> = [
     ['chica', 'cg=50'], ['apoyada', 'cg=50'], ['costura', 'cg=400'], ['costura-cerrada', 'cg=400'], ['esfera', 'cg=50'],
-    ['inclinada', 'cg=50'], ['capas', 'cg=400&kc=20'], ['punta', 'cg=50'], ['hundida', 'cg=400&kc=20'], ['aplastada', 'cg=400'],
+    ['inclinada', 'cg=50'], ['capas', 'cg=400&kc=20&kp=20'], ['punta', 'cg=50'], ['hundida', 'cg=400&kc=20&kp=20'], ['aplastada', 'cg=400'],
   ];
   for (const [escena, ajustes] of PARIDAD) {
     test(`da lo mismo que la CPU tras 3 cuadros (${escena})`, async ({ page }) => {
@@ -94,7 +95,7 @@ test.describe('La tela nueva en la GPU @gpu-local', () => {
 
   test('la búsqueda en línea cuenta la energía de los pares como la CPU', async ({ page }) => {
     // en el primer cuadro de las capas entran 61 pares activos: sin su energía, G1 − G0 se corre un 24 %
-    const r = await correr(page, 'modo=paridad&escena=capas&cg=400&kc=20&cuadros=1');
+    const r = await correr(page, 'modo=paridad&escena=capas&cg=400&kc=20&kp=20&cuadros=1');
     const dg = r.estado?.dg ?? NaN, dgCpu = r.dgCpu ?? NaN;
     expect(r.estado?.alfa).toBe(1);
     expect(Math.abs(dg - dgCpu)).toBeLessThan(1e-3 * Math.abs(dgCpu));

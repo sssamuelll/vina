@@ -56,9 +56,27 @@ export interface Corrida {
   /** el cuadro en que cerró la primera costura y el cuadro en que cerraron todas; null si no llegó (solo el motor implícito) */
   primeraCerrada?: number | null;
   todasCerradas?: number | null;
+  /** lo que miden los instrumentos de la camiseta en la CPU (solo el motor implícito) */
+  instrumentos?: InstrumentosDeCorrida;
 }
 
 export type Corredor = (e: Escena) => Corrida;
+
+/**
+ * Cuadros corridos, cuántos llegaron al tope de iteraciones y cuántos recortó la búsqueda en línea, la quietud al
+ * terminar y los pares del lado malo de su cara (banco/instrumentos.ts): cuántos, y sus vértices junto a una costura,
+ * lejos y por hondura (bajo 0,01 mm, 0,1, 1 y de 1 mm o más).
+ */
+export interface InstrumentosDeCorrida {
+  cuadros: number;
+  alTope: number;
+  recortados: number;
+  quietudFinal: number;
+  ladoMalo: { pares: number; vertices: number };
+  cruces: { enCostura: number; lejos: number; porHondura: number[] };
+  /** las aristas que perforan un triángulo de tela y sus vértices (banco/instrumentos.ts, aristasQueAtraviesan) */
+  atraviesan: { cruces: number; vertices: number };
+}
 
 /**
  * El motor de hoy: XPBD de CPU con el jersey de la biblioteca y el mapeo de producción (el mismo de
@@ -196,6 +214,7 @@ export interface FilaCamiseta extends MedidasDeCamiseta {
   cgMedio?: number;
   primeraCerrada?: number | null;
   todasCerradas?: number | null;
+  instrumentos?: InstrumentosDeCorrida;
 }
 
 /** La camiseta sobre el avatar de la referencia, desde su colocación (E5), en la CPU hasta quieta o 10 s de tela. */
@@ -210,7 +229,7 @@ export function ensayoCamiseta(tela: TelaFisica, mallas: number[], ajustes: Part
     const r = correrImplicito(tela, ajustes, topePlaca)(c.escena);
     return {
       malla, quieta: r.quieta, msPorCuadro: r.msPorCuadro, errorDeColocacion: c.errorDeColocacion,
-      cgMedio: r.cgMedio, primeraCerrada: r.primeraCerrada, todasCerradas: r.todasCerradas, ...medirCamiseta(r.x, c),
+      cgMedio: r.cgMedio, primeraCerrada: r.primeraCerrada, todasCerradas: r.todasCerradas, instrumentos: r.instrumentos, ...medirCamiseta(r.x, c),
     };
   });
 }
@@ -229,6 +248,12 @@ export function imprimirCamiseta(filas: FilaCamiseta[]): void {
     console.log(`  pliegues p50/p95 ${f.pliegues.p50.toFixed(1)}°/${f.pliegues.p95.toFixed(1)}°, >90° ${f.pliegues.sobre90}, >150° ${f.pliegues.sobre150}${ref ? ` (referencia ${ref.pliegues.p50.toFixed(1)}°/${ref.pliegues.p95.toFixed(1)}°, ${ref.pliegues.sobre90}, ${ref.pliegues.sobre150})` : ''}`);
     console.log(`  al cuerpo p05/p50/p95 ${mm(f.alCuerpo.p05)}/${mm(f.alCuerpo.p50)}/${mm(f.alCuerpo.p95)} mm${ref ? ` (referencia ${mm(ref.alCuerpo.p05)}/${mm(ref.alCuerpo.p50)}/${mm(ref.alCuerpo.p95)})` : ''}`);
     if (f.contraLaReferencia) console.log(`  contra la asentada de la referencia: p50 ${mm(f.contraLaReferencia.p50)} · p90 ${mm(f.contraLaReferencia.p90)} · p99 ${mm(f.contraLaReferencia.p99)} · máx ${mm(f.contraLaReferencia.maxima)} mm`);
+    const ins = f.instrumentos;
+    if (ins) {
+      console.log(`  ${ins.cuadros} cuadros: ${ins.alTope} al tope de iteraciones, ${ins.recortados} recortados por la búsqueda · quietud al final ${ins.quietudFinal.toExponential(2)}`);
+      console.log(`  aristas que atraviesan la tela: ${ins.atraviesan.cruces} (${ins.atraviesan.vertices} vértices)`);
+      console.log(`  lado malo: ${ins.ladoMalo.vertices} vértices (${ins.ladoMalo.pares} pares), ${ins.cruces.enCostura} junto a una costura y ${ins.cruces.lejos} lejos · pares por hondura <0,01/<0,1/<1/≥1 mm: ${ins.cruces.porHondura.join('/')}`);
+    }
     // la mediana «0 mm» de §2 se cuenta como menos de 0,05 mm: la referencia trae un decimal
     const pasa = f.aplastados < 0.1 && f.costuras.mediana < 5e-5 && f.costuras.maxima <= 1e-3 && f.quieta !== null && f.quieta <= 10;
     console.log(`  §2 de la camiseta (sin la velocidad, que es de la GPU): ${pasa ? 'pasa' : 'no pasa'}`);

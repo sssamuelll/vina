@@ -3,8 +3,8 @@
  * vértice de tela y un triángulo de tela cuando el vértice cae sobre la cara del triángulo más cerca que la
  * separación entre capas, y pares de un vértice del cuerpo y un triángulo de tela, para las puntas del cuerpo que
  * la malla de la tela no ve. Los halla una rejilla de puntos que cada triángulo recorre en su caja. Cada par es un
- * plano fijado al empezar el paso, como el contacto con el cuerpo (contactos.ts): la misma energía en la solución y
- * en la búsqueda en línea, con fricción, y la misma anticipación sobre el plano fijo.
+ * plano fijado al empezar el paso, como el contacto con el cuerpo (contactos.ts), con fricción, y solo empuja: la
+ * búsqueda en línea cuenta la energía de un lado de cada candidato (E16). La rigidez entre capas es la de la tela (E15).
  */
 
 /**
@@ -25,13 +25,24 @@ export interface ParPropio {
   k: number;
   /** rigidez tangencial de la fricción (N/m); 0 si el par no estaba dentro al empezar */
   kt: number;
-  /** entra al cuadro: estaba dentro al empezar, o el primer paso lo iba a cruzar */
+  /** empuja en el paso: el cuadro sin fuerzas lo deja dentro de la separación (E16); la punta del cuerpo, si estaba dentro */
   activo: boolean;
 }
 
 /** La separación entre dos capas de tela (§4.3.2): dos medios grosores más 1 mm. */
 export function separacionPropia(grosor: number): number {
   return grosor + 0.001;
+}
+
+/**
+ * E15: la rigidez de un par entre capas (N/m) es la tracción más rígida de la tela. La membrana de un vértice tiene una
+ * rigidez de ese orden, sin depender de la malla: el par no agrega al sistema nada más rígido que la tela y cede ante
+ * ella lo mismo que ella ante él. Con la del cuerpo (2000 N/m, unas 75 veces el jersey), la camiseta del jersey medido
+ * en la CPU a 10 mm tenía a los 60 cuadros 2,5 veces más aristas que atraviesan la tela, 15 veces más triángulos
+ * aplastados y el estiramiento p95 en 40 % en vez de 12 % (corridas del 2026-10-23).
+ */
+export function rigidezEntreCapas(tela: { kTrama: number; kUrdimbre: number }): number {
+  return Math.max(tela.kTrama, tela.kUrdimbre);
 }
 
 /** Hasta dónde (m) se buscan candidatos más allá de la separación: lo que un cuadro de 2 m/s alcanza a mover. */
@@ -122,8 +133,11 @@ export class RejillaDePuntos {
   }
 }
 
-/** ½·kc·max(p0 − n·U, 0)² + ½·kt·|U − (n·U)·n|², con U = Σ w·(x − x_t): el par en la búsqueda en línea. */
-export function energiaDelPar(par: ParPropio, kc: number, x: ArrayLike<number>, xt: ArrayLike<number>): number {
+/**
+ * ½·k·max(p0 − n·U, 0)² + ½·kt·|U − (n·U)·n|², con U = Σ w·(x − x_t): el par en la búsqueda en línea, esté activo o no
+ * (E16: el paso que mete un candidato inactivo en la separación paga). La fricción es la de un par activo.
+ */
+export function energiaDelPar(par: ParPropio, x: ArrayLike<number>, xt: ArrayLike<number>): number {
   let ux = 0, uy = 0, uz = 0;
   for (let k = 0; k < par.v.length; k++) {
     const q = 3 * par.v[k];
@@ -133,5 +147,5 @@ export function energiaDelPar(par: ParPropio, kc: number, x: ArrayLike<number>, 
   }
   const un = par.nx * ux + par.ny * uy + par.nz * uz, p = par.p0 - un;
   const tx = ux - un * par.nx, ty = uy - un * par.ny, tz = uz - un * par.nz;
-  return (p > 0 ? 0.5 * kc * p * p : 0) + 0.5 * par.kt * (tx * tx + ty * ty + tz * tz);
+  return (p > 0 ? 0.5 * par.k * p * p : 0) + (par.activo ? 0.5 * par.kt * (tx * tx + ty * ty + tz * tz) : 0);
 }
