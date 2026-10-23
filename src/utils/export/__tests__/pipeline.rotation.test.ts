@@ -12,7 +12,7 @@ import type { PatternPiece, PathCommand } from '../../../types/types';
  * dos, los bloques se pisan.
  *
  * Al girar en `preparePiece` se arregla en un solo sitio, y de paso para los
- * cuatro consumidores: AAMA, PDF, DXF plano y el layout de corte.
+ * tres consumidores: AAMA, PDF y el layout de corte.
  */
 
 /** Barra alta: 100 de ancho por 400 de alto. Girada 90° pasa a 400 × 100. */
