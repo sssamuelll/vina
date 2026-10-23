@@ -22,7 +22,6 @@ const exportDXFTool: ToolDefinition = {
         items: { type: 'string' },
         description: 'Pieces to export (default: all) / Piezas a exportar (defecto: todas)',
       },
-      includeSeamAllowance: { type: 'boolean', description: 'Include SA in export / Incluir margen de costura' },
       filename: { type: 'string', description: 'Output filename / Nombre del archivo' },
     },
   },
@@ -41,7 +40,8 @@ const exportDXFTool: ToolDefinition = {
 
     try {
       const { downloadDXFAAMA } = await import('../../../../utils/dxf/exportAAMA');
-      downloadDXFAAMA(pieces, filename);
+      // Seams resolve `match` corners; the UI export passes them too (uiExport.ts).
+      downloadDXFAAMA(pieces, filename, undefined, state.project.seams);
 
       return {
         success: true,
@@ -90,7 +90,7 @@ const exportPDFTool: ToolDefinition = {
 
     try {
       const { downloadPDF } = await import('../../../../utils/exportPDF');
-      downloadPDF(pieces, filename);
+      downloadPDF(pieces, filename, state.project.seams);
 
       return {
         success: true,
