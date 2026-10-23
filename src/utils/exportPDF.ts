@@ -82,7 +82,9 @@ export function generatePDF(pieces: PatternPiece[], seams?: Seam[]): string {
   let totalW = MARGIN * 2;
   let maxH = 0;
   for (const pp of prepared) {
-    const rightEdge = pp.offsetX + pp.boundingBox.maxX + MARGIN;
+    // ox shifts every piece right by MARGIN, so the page needs MARGIN twice.
+    // The box is the outline's: an allowance wider than MARGIN still clips.
+    const rightEdge = pp.offsetX + pp.boundingBox.maxX + MARGIN * 2;
     if (rightEdge > totalW) totalW = rightEdge;
     if (pp.boundingBox.height > maxH) maxH = pp.boundingBox.height;
   }

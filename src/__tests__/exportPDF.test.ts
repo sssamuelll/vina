@@ -159,6 +159,13 @@ describe('exportPDF', () => {
     expect(stroke).toMatch(/ c\n/);
   });
 
+  it('keeps the seam allowance of the rightmost piece inside the page', () => {
+    const pdf = generatePDF([makePiece({ seamAllowance: 10 })]);
+    const pageW = Number(pdf.match(/MediaBox \[0 0 ([\d.]+) /)![1]);
+    const xs = [...pdf.matchAll(/(-?[\d.]+) -?[\d.]+ [ml]\n/g)].map((m) => Number(m[1]));
+    expect(Math.max(...xs)).toBeLessThan(pageW);
+  });
+
   it('has xref table', () => {
     const pdf = generatePDF([makePiece()]);
     expect(pdf).toContain('xref');
