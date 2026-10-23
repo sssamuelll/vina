@@ -1,8 +1,9 @@
 # Rama 1: el contacto entre capas — plan
 
 **Goal:** la tela deja de atravesar la tela y de quedarse del otro lado. El primer parche de física del contacto propio
-lleva tres cosas: una rigidez entre capas que sale de la tela, una sola regla de contacto en la solución y en la
-búsqueda en línea, y la memoria del lado de cada par.
+llevaba tres cosas: una rigidez entre capas que sale de la tela, una sola regla de contacto en la solución y en la
+búsqueda en línea, y la memoria del lado de cada par. Quedan las dos primeras (E15 y E16 en §7 del spec, con lo que se
+midió); la memoria de lado empeoró la camiseta y se descartó.
 
 **Spec:** `docs/superpowers/specs/2026-10-13-tela-nueva-design.md` (§4.2.1, §4.3.2, §7). El diagnóstico y la decisión
 están en el doc «Cloth Engine: Shirt Diagnosis» (corridas del 2026-10-19, PR #1264): en las nueve corridas la tela
@@ -25,49 +26,35 @@ alcance de la rama 1 y ordenó empezarla el 2026-10-23. El valor de la rigidez e
 **E15. La rigidez entre capas es la de la tela.** `kPropio` por defecto = `max(kTrama, kUrdimbre)`. En la
 discretización del motor, la rigidez de membrana de un vértice es del orden de la tracción de la tela en N/m, y no
 depende de la malla; un par con esa rigidez no agrega al sistema nada más rígido que la tela (el gradiente conjugado
-converge como con la tela sola) y cede ante las fuerzas de la tela lo mismo que la tela cede ante él. El cruce que se
-escape lo corrige la memoria de lado, no la rigidez. Jersey: 27,8 N/m. Las puntas del cuerpo siguen con `kContacto`
-(R13). `kPropio` sigue mandando si se pasa (banco).
+converge como con la tela sola) y cede ante las fuerzas de la tela lo mismo que la tela cede ante él. Jersey: 27,8 N/m.
+Las puntas del cuerpo siguen con `kContacto` (R13). `kPropio` sigue mandando si se pasa (banco).
 
-**E16. Una sola regla: el par solo empuja.** La energía de cada par es `½·k·max(p0 − n·U, 0)²` más su fricción, en la
-solución y en la búsqueda en línea, con `U = Σ w·(x − x_t)` y el plano fijo al empezar el paso. Los candidatos son todos
-los pares que encuentra la rejilla; arrancan activos los que están dentro de la separación en `x_t` (`p0 > 0`). Cada
-`REVISION_DE_PARES` = 10 iteraciones del gradiente conjugado, cada candidato se mira en el `Δ` de ese momento: queda
-activo si `p0 − n·U(Δ) > 0`. Si alguno cambió, el residuo se corrige con lo que ese par suma o deja de sumar en `Δ`
-(exacto: `r = b − A·Δ` es lineal en cada par), y el gradiente conjugado sigue desde `Δ` con `p = z`. El
-precondicionador no cambia. La búsqueda en línea suma la energía de un lado de todos los candidatos, y la fricción de
-los activos al terminar. Reemplaza la predicción de E10 («el par de dos capas de tela entra activo también cuando el
-cuadro sin fuerzas lo metería en la separación»): el par que el paso mete en la separación entra porque el paso lo
-mete, sea por la velocidad, la costura o la flexión. Las iteraciones siguen en 50.
+**E16. El par solo empuja.** El par de dos capas empuja en el paso si el cuadro sin fuerzas lo deja dentro de la
+separación (`p0 − n·U(y − x_t) > 0`): el que entra y el que se queda, y ya no el que sale, que E10 sostenía y dejaba a
+las capas pegadas un cuadro. La búsqueda en línea suma la energía de un lado de todos los candidatos y la fricción de
+los activos. Se probaron dos maneras de revisar los pares dentro del gradiente conjugado: cada 10 iteraciones, el
+gradiente conjugado dejaba de converger y quedaban pares hasta 2 mm adentro; solo al converger, la revisión deja cada
+par empujando o sin hacer nada (en dos láminas al azar, convergidas, nada jala más de 0,01 µm), pero la camiseta llega
+al tope de 50 iteraciones en todos los cuadros y nunca corre. No entra.
 
-**E17. La memoria de lado.** Cada par vértice-triángulo guarda el lado `σ = signo(t̂·e)` de la primera vez que la
-rejilla lo encuentra, con `t̂` la normal orientada del triángulo; mientras siga siendo candidato cuadro a cuadro, lo
-conserva. Con memoria, `n = σ·t̂` y `s0 = σ·(t̂·e)`, con signo: el vértice que cruzó tiene `s0 < 0` y `p0 = sep − s0`
-lo empuja de vuelta a su lado. Sin memoria (par nuevo), `σ` es el lado de hoy y el par queda como antes. El par que
-deja de ser candidato olvida su lado: un cruce que pasa entero fuera del radio de búsqueda no se ve (el mismo piso del
-instrumento). En la GPU, cada vértice guarda hasta 16 pares con su lado, en dos listas que se alternan por cuadro; los
-que no caben se cuentan.
+**Descartado: la memoria de lado (E17 del plan).** Cada par vértice-triángulo guardaba el lado de la primera vez que se
+lo vio; con memoria, `n = σ·t̂` y `s0` con signo, y el vértice que cruzó recibía un par que lo empujaba de vuelta. En la
+camiseta empeoró los cruces y abrió una costura de la manga (§7 del spec). El código de la CPU y de la GPU quedó fuera.
 
 ## Tareas
 
-1. **E15 en la CPU y la GPU.** La rigidez por defecto sale de la tela; prueba: sin `kPropio`, los pares de tela llevan
-   `max(kTrama, kUrdimbre)` y las puntas `kContacto`.
-2. **E17 en la CPU, con TDD.** Pruebas: un vértice anotado de un lado y llevado al otro (a menos del radio) recibe un
-   par que lo empuja de vuelta; una lámina que cae sobre otra queda del lado en que llegó; un par nuevo ya cruzado queda
-   como hoy (piso).
-3. **E16 en la CPU, con TDD.** Pruebas: al terminar el gradiente conjugado ningún par activo jala (`p0 − n·U ≥ 0` o
-   inactivo); la capa que viene rápido no atraviesa (la prueba de la anticipación sigue); el par que la velocidad no mete
-   no jala; el residuo y la energía de la búsqueda coinciden con las diferencias finitas; `contactos.test.ts`,
-   `paso.test.ts` y el resto de `src/utils/cloth/implicito` siguen en verde. La prueba que miraba la predicción («forman
-   par activo antes de tocarse») pasa a mirar el resultado.
-4. **La camiseta en la CPU, antes y después.** El banco de la CPU suma el instrumento del lado malo y el argumento `kp`.
-   A 10 mm (y a 5 mm si cabe en el día): quietud, lado malo, aplastados, estiramiento, costuras, con el jersey medido;
-   antes (main) y después, cada número con su montaje.
-5. **La GPU.** E16 y E17 en WGSL, con la misma regla y el mismo orden. Paridad: las escenas de `PARIDAD` y una nueva
-   con un vértice cruzado bajo otra capa.
-6. **La camiseta en la GPU.** Tres corridas con instrumentos a 5 mm y 50 iteraciones, con el jersey medido y la rigidez
-   de E15, contra la tabla del 2026-10-19.
-7. **Cierre.** E15-E17 en §7 del spec con lo que se midió, los resultados en el doc, gates y PR.
+1. **E15 en la CPU y la GPU.** Hecho, con su prueba.
+2. **E16 en la CPU y la GPU, con TDD.** Hecho: las capas que se separan no quedan pegadas, la búsqueda en línea cuenta
+   cada candidato, las capas que se acercan quedan a la separación en el cuadro en que se tocan. Cada prueba se vio caer
+   con su mutación.
+3. **La memoria de lado.** Hecha en la CPU y la GPU, medida y descartada.
+4. **La camiseta en la CPU, antes y después.** Hecho: tres corridas de 600 cuadros a 10 mm con el jersey medido (E15
+   solo, E15 y E16, E15 a E17), con el instrumento de las aristas que atraviesan la tela.
+5. **La GPU.** Hecho: E15 y E16 en WGSL; la paridad pasa en todas las escenas de `PARIDAD` (las de 20 N/m pasan
+   `kp=20`, porque E15 deja los pares de la tela de laboratorio en 600 N/m).
+6. **La camiseta en la GPU.** Hecho: tres corridas con instrumentos a 5 mm y 50 iteraciones, con el jersey medido, en
+   la rama y en main, con el instrumento de las aristas que atraviesan la tela (§7 del spec, E15).
+7. **Cierre.** E15 y E16 en §7 del spec, los resultados en el doc, gates y PR.
 
 ## Fuera de alcance
 
