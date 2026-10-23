@@ -4,7 +4,7 @@
  *   G(x) = ½·|x − y|²_M / h² + ½·aire·|x − x_t|²_M / h + E(x) + contacto,  con y = x_t + h·v_t + h²·g.
  */
 import {
-  celdaDeLaRejilla, celdaDeRegion, energiaDelPar, radioDeBusqueda, RegionesDeRapidez, RejillaDePuntos, separacionPropia, type ParPropio,
+  celdaDeLaRejilla, celdaDeRegion, energiaDelPar, radioDeBusqueda, RegionesDeRapidez, RejillaDePuntos, rigidezEntreCapas, separacionPropia, type ParPropio,
 } from './contactoPropio';
 import { energiaDeFriccion, HOLGURA_DE_APOYO, rigidezDeFriccion, VELOCIDAD_DE_DESPEGUE, type ApoyoEnCuerpo } from './contactos';
 import { Costuras, MUESTRAS_DE_PUNTADA, type BisagraDeCostura, type PuntoDeCostura } from './costuras';
@@ -29,7 +29,7 @@ export interface AjustesImplicito {
    * vértice de tela apoyado en el cuerpo no lleva resorte: es un piso duro (E10, contactos.ts)
    */
   kContacto: number;
-  /** rigidez de los pares entre capas de tela (N/m); sin ella, kContacto */
+  /** rigidez de los pares entre capas de tela (N/m); sin ella, la de la tela (`rigidezEntreCapas`, E15) */
   kPropio?: number;
   /**
    * rigidez de cada punto de costura (N/m). Con 1000, una costura que sostiene 1 N/m de tela con puntos cada
@@ -121,6 +121,8 @@ export class SistemaTela {
   readonly fuerzaDeApoyo: Float64Array;
   /** separación entre dos capas de la tela (m) */
   readonly sepPropia: number;
+  /** rigidez de los pares entre capas de tela (N/m): la del ajuste o la de la tela (E15) */
+  readonly kPropio: number;
   /** los pares del contacto propio del cuadro en curso: candidatos y activos (contactoPropio.ts) */
   paresPropios: ParPropio[] = [];
   private readonly rejilla = new RejillaDePuntos();
@@ -164,6 +166,7 @@ export class SistemaTela {
     this.vPedida = new Float64Array(3 * this.n);
     this.fuerzaDeApoyo = new Float64Array(this.n);
     this.sepPropia = separacionPropia(this.tela.grosor);
+    this.kPropio = this.aj.kPropio ?? rigidezEntreCapas(this.tela);
     // la arista media del patrón: con dos separaciones y el radio de búsqueda, decide la celda de la rejilla
     let largo = 0;
     for (let t = 0; t < malla.tris.length / 3; t++) {
@@ -217,7 +220,7 @@ export class SistemaTela {
       const q = 3 * c.i;
       E += energiaDeFriccion(c, x[q] - this.xt[q], x[q + 1] - this.xt[q + 1], x[q + 2] - this.xt[q + 2]);
     }
-    for (const par of this.paresPropios) if (par.activo) E += energiaDelPar(par, par.k, x, this.xt);
+    for (const par of this.paresPropios) E += energiaDelPar(par, x, this.xt);
     return E;
   }
 
@@ -378,15 +381,16 @@ export class SistemaTela {
    * Los pares del contacto propio en x_t (§4.3.2, E3 y E6): cada triángulo de tela mira, en la rejilla de puntos, los
    * que caen en su caja agrandada por el radio de búsqueda. Un vértice libre de tela entra si cae sobre la cara a menos
    * del radio (salvo los vértices del triángulo y sus compañeros de costura); un vértice del cuerpo, si atravesó la
-   * tela por la cara o la sostenía el cuadro anterior. Entra activo el que ya está dentro de la separación, con su
-   * fricción, y el par de dos capas que el cuadro sin fuerzas (y = x_t + h·v + h²·g) metería en la separación (E10: sin
-   * segunda ronda, la predicción reemplaza a la anticipación). Cada triángulo busca hasta su propio radio, el de su
+   * tela por la cara o la sostenía el cuadro anterior. Todos quedan de candidatos: la búsqueda en línea los cuenta a
+   * todos (E16). Empuja en el paso el par de dos capas que el cuadro sin fuerzas (y = x_t + h·v + h²·g) deja dentro de
+   * la separación, el que entra y el que se queda (E10 y E16: sin segunda ronda, la predicción reemplaza a la
+   * anticipación), y la punta del cuerpo que ya está dentro. Cada triángulo busca hasta su propio radio, el de su
    * rapidez y la de su región (contactoPropio.ts, radioDeBusqueda).
    */
   armarParesPropios(): void {
     this.paresPropios = [];
     if (!this.aj.contactoPropio) return;
-    const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto, kPropio, h, gravedad } = this.aj, kp = kPropio ?? kContacto;
+    const { x, v, tris, fijo, n, punto: q } = this, sep = this.sepPropia, { kContacto, h, gravedad } = this.aj, kp = this.kPropio;
     const rapidez = (i: number) => Math.hypot(v[3 * i], v[3 * i + 1], v[3 * i + 2]);
     // la gravedad acerca un par solo si uno de sus lados está empotrado y no cae
     const gravedadRelativa = fijo.some((f) => f !== 0) ? gravedad : 0;
@@ -408,9 +412,10 @@ export class SistemaTela {
       }
       const vn = vx * nx + vy * ny + vz * nz;
       const kt = p0 > 0 ? rigidezDeFriccion(mu, k * p0, Math.hypot(vx - vn * nx, vy - vn * ny, vz - vn * nz), h) : 0;
-      // E10: entra también el que el cuadro sin fuerzas metería en la separación; uno más lejos, con el resorte de dos
-      // lados de la solución, jalaría las capas una contra otra
-      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, k, kt, activo: p0 > 0 || (predecir && p0 - un > 0) });
+      // E16: el par de dos capas empuja en el paso si el cuadro sin fuerzas lo deja dentro de la separación: el que entra
+      // y el que se queda; el que sale no (antes lo sostenía, y las capas que se separaban quedaban pegadas un cuadro).
+      // Uno más lejos, con el resorte de dos lados de la solución, jalaría las capas una contra otra (E10)
+      this.paresPropios.push({ v: vs, w: ws, nx, ny, nz, p0, k, kt, activo: predecir ? p0 - un > 0 : p0 > 0 });
     };
     const ahora = this.cuerpos.map((c) => new Uint8Array(c.vertices.length / 3));
     for (let t = 0; t < tris.length / 3; t++) {

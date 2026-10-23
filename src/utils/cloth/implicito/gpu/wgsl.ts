@@ -213,7 +213,7 @@ ${Object.entries(ESC).map(([k, v]) => `const E_${k} = ${u(v)};`).join('\n')}
 const H = ${f(aj.h)};
 const AIRE = ${f(aj.aire)};
 const KC = ${f(aj.kContacto)};
-const KCP = ${f(aj.kPropio ?? aj.kContacto)};
+const KCP = ${f(s.kPropio)};
 const GRAV = ${f(aj.gravedad)};
 const SEP = ${f(s.sep)};
 // E10: el apoyo en el cuerpo (contactos.ts)

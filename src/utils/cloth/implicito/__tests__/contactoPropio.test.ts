@@ -71,12 +71,34 @@ describe('la tela contra sí misma', () => {
       return { E: s.energiaIncremental(s.x), res, Ap, B };
     };
     // sin obstáculos solo hay pares: el contacto propio en 20 con el del cuerpo en 2000 es todo en 20
-    const propio = medir(armar({ kContacto: 2000, kPropio: 20 })), todo20 = medir(armar({ kContacto: 20 }));
+    const propio = medir(armar({ kContacto: 2000, kPropio: 20 })), todo20 = medir(armar({ kContacto: 20, kPropio: 20 }));
     expect(propio.E).toBeCloseTo(todo20.E, 12);
     for (const k of ['res', 'Ap', 'B'] as const) {
       expect(propio[k].reduce((m, q, i) => Math.max(m, Math.abs(q - todo20[k][i])), 0)).toBeLessThan(1e-12 * (1 + Math.max(...todo20[k].map(Math.abs))));
     }
-    expect(Math.abs(medir(armar({ kContacto: 2000 })).E - propio.E)).toBeGreaterThan(1e-9);
+    expect(Math.abs(medir(armar({ kContacto: 2000, kPropio: 2000 })).E - propio.E)).toBeGreaterThan(1e-9);
+  });
+
+  it('sin kPropio, los pares entre capas llevan la tracción más rígida de la tela (E15) y las puntas, la del cuerpo', () => {
+    const abajo = mallaDeContorno(rectangulo(-50, -50, 50, 50), 20), arriba = mallaDeContorno(rectangulo(-40, -40, 40, 40), 20);
+    const prenda = armarPrenda([
+      { id: 'abajo', ...abajo },
+      { id: 'arriba', ...arriba, x: Float64Array.from(arriba.x, (q, k) => (k % 3 === 1 ? q + 0.001 : q)) },
+    ]);
+    const capas = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0, kContacto: 2000 } });
+    capas.armarParesPropios();
+    expect(capas.paresPropios.length).toBeGreaterThan(0);
+    expect(capas.paresPropios.every((p) => p.k === Math.max(TELA_DE_LABORATORIO.kTrama, TELA_DE_LABORATORIO.kUrdimbre))).toBe(true);
+
+    const m = mallaDeContorno(rectangulo(-60, -60, 60, 60), 20);
+    // la punta ya pasó la tela 1 mm, en medio de un triángulo (los corrimientos de la prueba de la pirámide)
+    m.x = Float64Array.from(m.x, (q, k) => (k % 3 === 0 ? q + 0.007 : k % 3 === 1 ? q + 0.099 : q + 0.003));
+    const cuerpo = new CuerpoRigido(buildLinearBVH(piramideDeColision(0.3, 0.1)));
+    const punta = new SistemaTela(m, TELA_DE_LABORATORIO, { obstaculos: [{ tipo: 'cuerpo', cuerpo }], ajustes: { kContacto: 2000 } });
+    punta.armarParesPropios();
+    const puntas = punta.paresPropios.filter((p) => p.v.length === 3);
+    expect(puntas.length).toBeGreaterThan(0);
+    expect(puntas.every((p) => p.k === 2000)).toBe(true);
   });
 
   it('una lámina cae sobre otra apoyada en el suelo y queda encima, a la separación entre capas', () => {
@@ -173,17 +195,64 @@ describe('la tela contra sí misma', () => {
     expect(masBajo).toBeGreaterThan(sepTela - 0.0005);
   });
 
-  it('dos capas que se acercan forman par activo antes de tocarse, por la velocidad del cuadro anterior', () => {
-    // la de arriba 2 mm más allá de la separación y bajando 5 mm por cuadro
+  it('dos capas que se acercan quedan a la separación en el cuadro en que se tocan, sin cruzarse ni rebotar', () => {
+    // la de arriba 2 mm más allá de la separación de una empotrada y bajando 5 mm por cuadro
     const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-45, -45, 45, 45), 10, sepTela + 0.002);
     const nAbajo = abajo.x.length / 3;
-    const s = new SistemaTela(armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }]).malla, TELA_DE_LABORATORIO);
+    const prenda = armarPrenda([{ id: 'abajo', ...abajo, fijos: new Uint8Array(nAbajo).fill(1) }, { id: 'arriba', ...arriba }]);
+    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0, aire: 0 } });
     for (let i = nAbajo; i < s.n; i++) s.v[3 * i + 1] = -0.3;
-    s.xt.set(s.x);
+    pasoImplicito(s);
+    let y = 0, vy = 0, masBajo = Infinity;
+    for (let i = nAbajo; i < s.n; i++) {
+      y += s.x[3 * i + 1] / (s.n - nAbajo);
+      vy += s.v[3 * i + 1] / (s.n - nAbajo);
+      masBajo = Math.min(masBajo, s.x[3 * i + 1]);
+    }
+    expect(y).toBeCloseTo(sepTela, 3);
+    expect(masBajo).toBeGreaterThan(sepTela - 0.0005);
+    expect(vy).toBeLessThanOrEqual(0);
+  });
+
+  it('E16: la búsqueda en línea cuenta cada candidato con su energía de un lado, esté activo o no', () => {
+    // dos capas libres a 2 mm más que la separación, bajando juntas a 0,1 m/s: la rapidez agranda el radio de búsqueda
+    // (son candidatos) y el cuadro sin fuerzas no las acerca (ninguno empuja)
+    const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-40, -40, 40, 40), 10, sepTela + 0.002);
+    const nAbajo = abajo.x.length / 3;
+    const s = new SistemaTela(armarPrenda([{ id: 'abajo', ...abajo }, { id: 'arriba', ...arriba }]).malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0 } });
+    for (let i = 0; i < s.n; i++) s.v[3 * i + 1] = -0.1;
     s.armarParesPropios();
-    const activos = s.paresPropios.filter((p) => p.activo);
-    expect(activos.length).toBeGreaterThan(0);
-    expect(activos.every((p) => p.p0 < 0)).toBe(true);
+    expect(s.paresPropios.length).toBeGreaterThan(0);
+    expect(s.paresPropios.every((p) => !p.activo)).toBe(true);
+    // un paso de prueba que la baja 3 mm la mete 1 mm en la separación: paga ½·k·(p0 − n·U)²
+    const x = Float64Array.from(s.x);
+    for (let i = nAbajo; i < s.n; i++) x[3 * i + 1] -= 0.003;
+    const adentro = (p: (typeof s.paresPropios)[number]) =>
+      p.p0 - p.v.reduce((un, v, k) => un + p.w[k] * (p.nx * (x[3 * v] - s.x[3 * v]) + p.ny * (x[3 * v + 1] - s.x[3 * v + 1]) + p.nz * (x[3 * v + 2] - s.x[3 * v + 2])), 0);
+    const esperada = s.paresPropios.reduce((E, p) => E + 0.5 * p.k * Math.max(adentro(p), 0) ** 2, 0);
+    expect(esperada).toBeGreaterThan(0);
+    expect(s.energiaContactos(x)).toBeCloseTo(esperada, 12);
+    // subirla no cuesta nada: el par no jala
+    for (let i = nAbajo; i < s.n; i++) x[3 * i + 1] += 0.006;
+    expect(s.energiaContactos(x)).toBe(0);
+  });
+
+  /** Una lámina empotrada y otra encima, a `y` (m), en piezas distintas; la de arriba empieza en el vértice `nAbajo`. */
+  const dosCapas = (y: number) => {
+    const abajo = mallaDeContorno(rectangulo(-60, -60, 60, 60), 10), arriba = mallaDeContorno(rectangulo(-40, -40, 40, 40), 10, y);
+    const nAbajo = abajo.x.length / 3;
+    const prenda = armarPrenda([{ id: 'abajo', ...abajo, fijos: new Uint8Array(nAbajo).fill(1) }, { id: 'arriba', ...arriba }]);
+    return { malla: prenda.malla, nAbajo };
+  };
+
+  it('E16: dos capas dentro de la separación que se alejan no quedan pegadas', () => {
+    const { malla, nAbajo } = dosCapas(0.001);
+    const s = new SistemaTela(malla, TELA_DE_LABORATORIO, { ajustes: { gravedad: 0, aire: 0 } });
+    for (let i = nAbajo; i < s.n; i++) s.v[3 * i + 1] = 0.3;
+    pasoImplicito(s);
+    let vy = 0;
+    for (let i = nAbajo; i < s.n; i++) vy += s.v[3 * i + 1] / (s.n - nAbajo);
+    expect(vy).toBeCloseTo(0.3, 3);
   });
 
   it('el par que la velocidad todavía no mete en la separación no jala las capas', () => {

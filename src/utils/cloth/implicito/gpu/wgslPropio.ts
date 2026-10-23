@@ -143,10 +143,11 @@ fn parDeVertice(i: u32, ia: u32, ib: u32, ic: u32, a: vec3<f32>, b: vec3<f32>, c
   let vn = dot(n, vr);
   var kt = 0.0;
   if (p0 > 0.0) { kt = rigidez(MU_T, KCP * p0, length(vr - vn * n)); }
-  // E10: entra también el que el cuadro sin fuerzas (y = x_t + h·v + h²·g) metería en la separación (sistema.ts)
+  // E16: empuja en el paso si el cuadro sin fuerzas (y = x_t + h·v + h²·g) lo deja dentro de la separación: el que entra
+  // y el que se queda; el que sale no (sistema.ts, agregar)
   let uf = (prediccion(i) - ld(O_XT, i)) - e.w.x * (prediccion(ia) - ld(O_XT, ia)) - e.w.y * (prediccion(ib) - ld(O_XT, ib))
     - e.w.z * (prediccion(ic) - ld(O_XT, ic));
-  guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt, p0 > 0.0 || p0 - dot(n, uf) > 0.0);
+  guardarPar(vec4<f32>(f32(i), f32(ia), f32(ib), f32(ic)), vec4<f32>(1.0, -e.w.x, -e.w.y, -e.w.z), n, p0, kt, p0 - dot(n, uf) > 0.0);
 }
 
 // 1 = ese vértice del cuerpo sostenía la tela: el arreglo de este cuadro y el del anterior se alternan por paridad
@@ -284,31 +285,31 @@ ${wgslScan('scanV', 'A_CNTV', 'N', 'O_OFFV')}
   }
 }
 
-// 9b. la energía de los pares activos en la búsqueda en línea (contactoPropio.ts, energiaDelPar)
-// lo que cambia la energía del par k en el paso de prueba (wgsl.ts, difElementos); 0 fuera de los pares o sin activar
+// 9b. la energía de los pares en la búsqueda en línea (contactoPropio.ts, energiaDelPar): E16, la de un lado de todos
+// los candidatos y la fricción de los activos. Lo que cambia la energía del par k en el paso de prueba (wgsl.ts,
+// difElementos); 0 fuera de los pares
 fn difPar(k: u32) -> f32 {
   var de = 0.0;
   if (k < nPares()) {
     let o = O_PAR + 14u * k;
-    if (tf[o + 13u] > 0.5) {
-      var U = vec3<f32>(0.0);
-      for (var j = 0u; j < 4u; j++) {
-        let v = tf[o + j];
-        // U = Σ w·α·Δ, sin restar posiciones (en precisión simple, x_p − x_t pierde dígitos)
-        if (v >= 0.0) { U += tf[o + 4u + j] * red[R_SC + E_ALFA_LS] * ld(O_DX, u32(v)); }
-      }
-      let nn = v3tf(o + 8u);
-      let p0 = tf[o + 11u];
-      let un = dot(nn, U);
-      let p = p0 - un;
-      let tt = U - un * nn;
-      var e = 0.5 * tf[o + 12u] * dot(tt, tt);
-      let kp = rigidezDelPar(o);
-      if (p > 0.0) { e += 0.5 * kp * p * p; }
-      var e0 = 0.0;
-      if (p0 > 0.0) { e0 = 0.5 * kp * p0 * p0; }
-      de = e - e0;
+    var U = vec3<f32>(0.0);
+    for (var j = 0u; j < 4u; j++) {
+      let v = tf[o + j];
+      // U = Σ w·α·Δ, sin restar posiciones (en precisión simple, x_p − x_t pierde dígitos)
+      if (v >= 0.0) { U += tf[o + 4u + j] * red[R_SC + E_ALFA_LS] * ld(O_DX, u32(v)); }
     }
+    let nn = v3tf(o + 8u);
+    let p0 = tf[o + 11u];
+    let un = dot(nn, U);
+    let p = p0 - un;
+    let tt = U - un * nn;
+    var e = 0.0;
+    if (tf[o + 13u] > 0.5) { e = 0.5 * tf[o + 12u] * dot(tt, tt); }
+    let kp = rigidezDelPar(o);
+    if (p > 0.0) { e += 0.5 * kp * p * p; }
+    var e0 = 0.0;
+    if (p0 > 0.0) { e0 = 0.5 * kp * p0 * p0; }
+    de = e - e0;
   }
   return de;
 }`;
