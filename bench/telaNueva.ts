@@ -2,7 +2,7 @@
  * El banco de la tela nueva contra la referencia privada (spec 2026-10-13 §4.4.2) y contra el motor de
  * hoy (§4.4.4).
  *
- *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--topePandeo=<fracción>] [--kTrama=<N/m>] [--kUrdimbre=<N/m>] [--kCizalla=<N/m>] [--ensayo=cusick|voladizo|todo|camiseta] [--mallas=5,10,20] [--cg=<n>] [--cierre=<mm por cuadro>] [--kCostura=<N/m>] [--kContacto=<N/m>] [--kp=<N/m>] [--bTrama=<µN·m>] [--bUrdimbre=<µN·m>] [--bBies=<µN·m>] [--topePlaca=<veces la mediana>] [--flexionDelMargen=<f>]
+ *   VINA_REFERENCIAS=<carpeta privada> npm run bench:tela -- [--motor=implicito|xpbd] [--pandeo=<factor>] [--topePandeo=<fracción>] [--kTrama=<N/m>] [--kUrdimbre=<N/m>] [--kCizalla=<N/m>] [--ensayo=cusick|voladizo|todo|camiseta] [--mallas=5,10,20] [--cg=<n>] [--cierre=<mm por cuadro>] [--kCosturaPorLargo=<N/m²>] [--kContacto=<N/m>] [--kp=<N/m>] [--bTrama=<µN·m>] [--bUrdimbre=<µN·m>] [--bBies=<µN·m>] [--topePlaca=<veces la mediana>] [--flexionDelMargen=<f>]
  *
  * `camiseta` no entra en `todo`: corre la camiseta de María sobre el avatar y desde la colocación de la referencia
  * (camiseta.json en la carpeta privada), solo con el motor implícito.
@@ -42,7 +42,7 @@ function ajustesDelBanco(args: Map<string, string>): Partial<AjustesImplicito> {
     ...(args.has('cg') ? { maxCG: Number(args.get('cg')) } : {}),
     ...(args.has('flexionDelMargen') ? { flexionDelMargen: Number(args.get('flexionDelMargen')) } : {}),
     ...(args.has('cierre') ? { cierreMaximo: Number(args.get('cierre')) / 1000 } : {}),
-    ...(args.has('kCostura') ? { kCostura: Number(args.get('kCostura')) } : {}),
+    ...(args.has('kCosturaPorLargo') ? { kCosturaPorLargo: Number(args.get('kCosturaPorLargo')) } : {}),
     ...(args.has('kContacto') ? { kContacto: Number(args.get('kContacto')) } : {}),
     ...(args.has('kp') ? { kPropio: Number(args.get('kp')) } : {}),
   };

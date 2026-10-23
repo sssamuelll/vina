@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CIERRE_POR_CUADRO, Costuras, LARGO_CERRADO, puntosDeCostura, type PuntoDeCostura } from '../costuras';
+import { CIERRE_POR_CUADRO, Costuras, LARGO_CERRADO, LARGO_SIN_MEDIR, puntosDeCostura, type PuntoDeCostura } from '../costuras';
 import { armarPrenda } from '../prenda';
 import { mallaDeContorno } from '../malla';
 import { AJUSTES_IMPLICITO, SistemaTela } from '../sistema';
@@ -60,7 +60,54 @@ describe('las costuras', () => {
     // A y B con los mismos t (0; 0,5; 1): la costura soldada
     const patron = [0, 0, 0, 0.5, 0, 1, 1, 0, 1, 0.5, 1, 1];
     const p = puntosDeCostura(patron, [0, 1, 2], [3, 4, 5]);
-    expect(p).toEqual([{ a: 0, b0: 3, b1: 3, s: 0 }, { a: 1, b0: 4, b1: 4, s: 0 }, { a: 2, b0: 5, b1: 5, s: 0 }]);
+    expect(p).toEqual([{ a: 0, b0: 3, b1: 3, s: 0, largo: 0.25 }, { a: 1, b0: 4, b1: 4, s: 0, largo: 0.5 }, { a: 2, b0: 5, b1: 5, s: 0, largo: 0.25 }]);
+  });
+
+  it('cada punto lleva el largo de costura que representa: hasta la mitad del camino a sus vecinos, los de vuelta incluidos', () => {
+    // A: 11 vértices cada 10 mm; B: 21 cada 5 mm, y los 10 que no caen en uno de A van de vuelta
+    const patron: number[] = [];
+    for (let i = 0; i <= 10; i++) patron.push(0.01 * i, 0);
+    for (let i = 0; i <= 20; i++) patron.push(0.005 * i, 1);
+    const p = puntosDeCostura(patron, [...Array(11).keys()], [...Array(21).keys()].map((i) => 11 + i));
+    expect(p.length).toBe(21);
+    expect(p.reduce((l, q) => l + q.largo!, 0)).toBeCloseTo(0.1, 12);
+    expect(p[0].largo).toBeCloseTo(0.0025, 12);
+    expect(p[5].largo).toBeCloseTo(0.005, 12);
+    expect(p[11].largo).toBeCloseTo(0.005, 12);
+  });
+
+  it('en una costura parcial, los puntos de las puntas llevan el largo hasta la punta del tramo', () => {
+    // A: 100 mm entre t 0,25 y 0,75, así que el tramo mide 200 mm
+    const patron = [0, 0, 0.05, 0, 0.1, 0, 0, 1, 0.1, 1];
+    const p = puntosDeCostura(patron, [0, 1, 2], [3, 4], [0.25, 0.5, 0.75], [0.25, 0.75]);
+    expect(p.map((q) => q.largo)).toEqual([0.075, 0.05, 0.075].map((l) => expect.closeTo(l, 12)));
+  });
+
+  it('la fuerza de una costura abierta no depende de la malla: la misma con puntos cada 5 y cada 10 mm', () => {
+    // dos lados de 100 mm con los mismos t, a 10 mm uno del otro, con la costura ya cerrada (L = 0)
+    const fuerza = (h: number) => {
+      const n = Math.round(0.1 / h) + 1, patron: number[] = [], x: number[] = [];
+      for (const z of [0, 0.01]) {
+        for (let i = 0; i < n; i++) {
+          patron.push(h * i, z);
+          x.push(h * i, 0, z);
+        }
+      }
+      const A = [...Array(n).keys()];
+      const c = new Costuras(puntosDeCostura(patron, A, A.map((i) => n + i)), x, AJUSTES_IMPLICITO.kCosturaPorLargo);
+      c.L.fill(0);
+      c.linealizar(x);
+      const g = new Float64Array(x.length);
+      c.gradiente(g);
+      return A.reduce((f, v) => f + g[3 * v + 2], 0);
+    };
+    expect(fuerza(0.005)).toBeCloseTo(fuerza(0.01), 6);
+    expect(fuerza(0.01)).toBeCloseTo(-AJUSTES_IMPLICITO.kCosturaPorLargo * 0.1 * 0.01, 6);
+  });
+
+  it('un punto sin largo (hecho a mano) cuenta LARGO_SIN_MEDIR', () => {
+    const c = new Costuras([{ a: 0, b0: 1, b1: 1, s: 0 }, { a: 2, b0: 3, b1: 3, s: 0, largo: 0.01 }], new Float64Array(12), 2e5);
+    expect(Array.from(c.k)).toEqual([2e5 * LARGO_SIN_MEDIR, 2000]);
   });
 
   it('fuerza = −∂E/∂x y H·p por diferencias finitas, con el largo abierto y cerrado', () => {
@@ -276,8 +323,8 @@ describe('la puntada (E8)', () => {
     const n = prenda.malla.x.length / 3;
     prenda.malla.fijos = Uint8Array.from({ length: n }, (_, i) => (prenda.malla.x[3 * i] <= 1e-9 ? 1 : 0));
     const puntos = puntosDeCostura(prenda.malla.patron, borde(A, 0.1), borde(B, 0, A.x.length / 3));
-    // con 1 N/m, el peso de B abre la costura más de un milímetro
-    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { costuras: { puntos }, ajustes: { kCostura: 1 } });
+    // con 1 N/m por punto (100 N/m² con puntos cada 10 mm), el peso de B abre la costura más de un milímetro
+    const s = new SistemaTela(prenda.malla, TELA_DE_LABORATORIO, { costuras: { puntos }, ajustes: { kCosturaPorLargo: 100 } });
     for (let c = 0; c < 30; c++) pasoImplicito(s);
     expect(peorSeparacion(s)).toBeLessThan(1e-6);
   });

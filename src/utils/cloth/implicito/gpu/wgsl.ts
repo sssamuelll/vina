@@ -47,7 +47,7 @@ function zonas<K extends string>(tamanos: Record<K, number>): Record<K, number> 
 
 type ZonaVf = 'XT' | 'V' | 'R' | 'Z' | 'AP' | 'DX' | 'XP' | 'MASA' | 'EV0' | 'PINV' | 'CONT' | 'RN' | 'DC';
 type ZonaTf =
-  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'CONTRIB' | 'CS' | 'CL' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
+  | 'COEF' | 'KP' | 'PCR' | 'TRI' | 'E0' | 'HD' | 'CONTRIB' | 'CS' | 'CL' | 'CKP' | 'CST' | 'CE0' | 'CKH' | 'CCOS' | 'CDES'
   | 'CUN' | 'CUT' | 'CUNT' | 'CUPA' | 'CUPV' | 'CUV' | 'CUVN' | 'SOST' | 'HP' | 'OFFC' | 'ORD4' | 'PAR' | 'OFFV' | 'ENT' | 'SCB'
   | 'APORTE';
 /** el búfer atómico del contacto propio: cuentas y cursores de la rejilla y de las listas, los pares y los desbordes */
@@ -89,7 +89,7 @@ export function distribuir(p: PaqueteGpu, cuadrosDeHistoria: number): Distribuci
   const vf = zonas<ZonaVf>({ XT: 3 * n, V: 3 * n, R: 3 * n, Z: 3 * n, AP: 3 * n, DX: 3 * n, XP: 3 * n, MASA: n, EV0: n, PINV: 9 * n, CONT: 6 * n, RN: n, DC: n });
   const tf = zonas<ZonaTf>({
     COEF: 7 * nt, KP: 9 * nt, PCR: 2 * nt, TRI: ESTADO_MEMBRANA * nt, E0: nt, HD: 16 * nh, CONTRIB: 45 * nt + 9 * p.nc,
-    CS: p.nc, CL: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
+    CS: p.nc, CL: p.nc, CKP: p.nc, CST: 5 * p.nc, CE0: p.nc, CKH: p.nch, CCOS: p.nc, CDES: 3 * p.nc,
     CUN: p.f32.cuNodos.length, CUT: p.f32.cuTri.length, CUNT: p.f32.cuNt.length, CUPA: p.f32.cuPa.length, CUPV: p.f32.cuPv.length,
     CUV: 3 * p.nvb, CUVN: 3 * p.nvb, SOST: 2 * p.nvb, HP: p.np, OFFC: p.nceldas + 1, ORD4: 4 * p.np, PAR: 14 * p.maxPares, OFFV: n + 1, ENT: 4 * p.maxPares,
     SCB: Math.max(Math.ceil(p.nceldas / WG), Math.ceil(n / WG)) + 1,
@@ -195,7 +195,6 @@ const NC = ${u(p.nc)};
 const NCH = ${u(p.nch)};
 const GC = ${u(d.gc)};
 const I_CV = ${u(iu.costura)}; const I_CK = ${u(iu.costuraK)};
-const KCOST = ${f(aj.kCostura)};
 const NCU = ${u(p.ncu)};
 const I_CUS = ${u(iu.cuSalto)};
 const RADIO_B = ${f(RADIO_DE_BUSQUEDA)};
@@ -728,22 +727,23 @@ const MARGEN_DC = 1e-5;
   let d = sepCostura(e, ldx(iu[b]), ldx(iu[b + 1u]), ldx(iu[b + 2u]));
   let r = length(d);
   let L = tf[O_CL + e];
+  let k = tf[O_CKP + e];
   // E8: el punto cosido o que quedó entre puntadas no lleva resorte
   let act = activa(e);
   var gg = 0.0;
   var c2 = 0.0;
   if (!act) {
   } else if (L == 0.0) {
-    gg = KCOST;
+    gg = k;
   } else if (r > L) {
     let q = L / r;
-    gg = KCOST * (1.0 - q);
-    c2 = KCOST * q / (r * r);
+    gg = k * (1.0 - q);
+    c2 = k * q / (r * r);
   }
   let o = O_CST + 5u * e;
   tf[o] = d.x; tf[o + 1u] = d.y; tf[o + 2u] = d.z; tf[o + 3u] = gg; tf[o + 4u] = c2;
   var e0 = 0.0;
-  if (act && r > L) { e0 = 0.5 * KCOST * (r - L) * (r - L); }
+  if (act && r > L) { e0 = 0.5 * k * (r - L) * (r - L); }
   tf[O_CE0 + e] = e0;
   for (var m = 0u; m < 3u; m++) { stc(SLOT_C + 3u * e + m, pesoCostura(e, m) * gg * d); }
 }
@@ -1078,7 +1078,7 @@ fn difDeCostura(e: u32) -> f32 {
   let r = length(sepCostura(e, ld(O_XP, iu[b]), ld(O_XP, iu[b + 1u]), ld(O_XP, iu[b + 2u])));
   let L = tf[O_CL + e];
   var en = 0.0;
-  if (activa(e) && r > L) { en = 0.5 * KCOST * (r - L) * (r - L); }
+  if (activa(e) && r > L) { en = 0.5 * tf[O_CKP + e] * (r - L) * (r - L); }
   return en - tf[O_CE0 + e];
 }
 

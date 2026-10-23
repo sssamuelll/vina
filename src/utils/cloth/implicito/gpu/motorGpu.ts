@@ -61,6 +61,7 @@ export class MotorGpu {
     tf.set(p.f32.pcr, d.tf.PCR);
     tf.set(p.f32.cs, d.tf.CS);
     tf.set(p.f32.cl, d.tf.CL);
+    tf.set(p.f32.ck, d.tf.CKP);
     tf.set(p.f32.ckh, d.tf.CKH);
     tf.set(p.f32.ccos, d.tf.CCOS);
     tf.set(p.f32.cdes, d.tf.CDES);

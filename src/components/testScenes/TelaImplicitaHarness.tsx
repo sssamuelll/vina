@@ -190,7 +190,7 @@ async function correr(q: URLSearchParams): Promise<Resultado> {
     // el tope del cierre de las costuras (mm por cuadro), si se pide otro
     ...(q.get('cierre') ? { cierreMaximo: Number(q.get('cierre')) / 1000 } : {}),
     // la rigidez de los puntos de costura (N/m), si se pide otra
-    ...(q.get('kcost') ? { kCostura: Number(q.get('kcost')) } : {}),
+    ...(q.get('kcost') ? { kCosturaPorLargo: Number(q.get('kcost')) } : {}),
   };
   // la tela, con el gramaje, el pandeo, su tope y las rigideces de tracción y de flexión que pida el banco (p. ej. topePandeo=0.2&bUrdimbre=7.6)
   const tela: TelaFisica = { ...telaEnCurso };
