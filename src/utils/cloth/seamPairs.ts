@@ -149,7 +149,8 @@ function toPathCommands(outline: PieceWithOutline['outline']): PathCommand[] {
   return outline as PathCommand[];
 }
 
-function resolveSegmentRange(
+/** The flattened-outline range [start, end] (end may wrap) of a named edge, or null when the piece has no such edge. */
+export function resolveSegmentRange(
   piece: PieceWithOutline,
   edgeName: string,
 ): [number, number] | null {

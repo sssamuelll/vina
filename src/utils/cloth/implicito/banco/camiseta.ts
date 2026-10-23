@@ -12,12 +12,14 @@ import { autoSew } from '../../../autoSew';
 import { refineSeamsInWorld } from '../../../autoSew/worldRefine';
 import { grainlineEndpoints } from '../../../grainLine';
 import { meshPiece } from '../../../mesh';
+import type { TramoDelBorde } from '../../../mesh/cdtMesher';
 import { resolveArrangementWithFrames } from '../../arrangement/arrangementBinding';
 import { seamInitDataToPairs, type PieceWithOutline } from '../../seamPairs';
 import { seamsToInitData } from '../../../../components/Viewport3D/costurasDeLaSimulacion';
 import type { BodyMeasurements, InternalLineType, PatternPiece, Seam } from '../../../../types/types';
 import { buildLinearBVH } from '../../gpu/bvh';
 import { puntosDeCostura, type BisagraDeCostura, type PuntoDeCostura } from '../costuras';
+import { ladosSoldados, soldadura, type ParDeCostura } from '../soldadura';
 import { CuerpoRigido } from '../cuerpo';
 import type { MallaDeTela } from '../malla';
 import { armarPrenda, bisagrasDePrenda, costurasDePrenda, franjaDePrenda, type LadosDeCostura, type Prenda } from '../prenda';
@@ -62,9 +64,9 @@ export function costurasDeMaria(piezas: PatternPiece[]): Seam[] {
 export type PiezaMallada = PieceWithOutline & { vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array };
 
 /** Las piezas malladas con las opciones de SimulationInitClient.meshPiece, listas para seamInitDataToPairs. */
-export function mallarPiezas(piezas: PatternPiece[], aristaMm: number): PiezaMallada[] {
-  return piezas.map((p) => {
-    const m = meshPiece(p, { yHeight: 0, scale: 0.001, maxEdgeLength: aristaMm, minAngle: 25, maxRefinementPasses: 3, curveResolution: 12 });
+export function mallarPiezas(piezas: PatternPiece[], aristaMm: number, tramos?: readonly TramoDelBorde[][]): PiezaMallada[] {
+  return piezas.map((p, k) => {
+    const m = meshPiece(p, { yHeight: 0, scale: 0.001, maxEdgeLength: aristaMm, minAngle: 25, maxRefinementPasses: 3, curveResolution: 12 }, undefined, tramos?.[k]);
     return {
       pieceId: p.id, vertices: m.vertices, triIds: m.triIds, uvs: m.uvs,
       outline: p.outline, edges: p.edges, boundaryOrig: m.boundaryOrig, meshMaxEdgeLength: aristaMm,
@@ -79,9 +81,12 @@ export function mallarPiezas(piezas: PatternPiece[], aristaMm: number): PiezaMal
  */
 const LINEAS_DE_TELA: ReadonlySet<InternalLineType> = new Set<InternalLineType>(['dart', 'fold', 'pleat', 'seam']);
 
-/** Las piezas malladas para el motor implícito: como mallarPiezas, pero sin las líneas internas de dibujo. */
-export function mallarParaElMotor(piezas: PatternPiece[], aristaMm: number): PiezaMallada[] {
-  return mallarPiezas(piezas.map((p) => ({ ...p, internals: (p.internals ?? []).filter((l) => LINEAS_DE_TELA.has(l.type)) })), aristaMm);
+/**
+ * Las piezas malladas para el motor implícito: como mallarPiezas, pero sin las líneas internas de dibujo, y con los
+ * tramos de cada pieza (la costura soldada, E17) si llegan.
+ */
+export function mallarParaElMotor(piezas: PatternPiece[], aristaMm: number, tramos?: readonly TramoDelBorde[][]): PiezaMallada[] {
+  return mallarPiezas(piezas.map((p) => ({ ...p, internals: (p.internals ?? []).filter((l) => LINEAS_DE_TELA.has(l.type)) })), aristaMm, tramos);
 }
 
 /** El dibujo de una pieza mallada (m): el mallador la acuesta en y = 0 con (x, z) = (x, y) del dibujo, centrada. */
@@ -117,8 +122,14 @@ export interface Camiseta {
 
 export function camisetaDeMaria(dxf: string, aristaMm: number, tela: TelaFisica, colocar: Colocacion): Camiseta {
   const piezas = piezasDeMaria(dxf);
-  const mallas = mallarParaElMotor(piezas, aristaMm);
-  const pares = seamInitDataToPairs(seamsToInitData(costurasDeMaria(piezas)), mallas);
+  // E17: las costuras soldadas, con los mismos vértices en sus dos lados; la que no se suelda se cose con E1
+  const init = seamsToInitData(costurasDeMaria(piezas)), sold = soldadura(piezas, init, aristaMm);
+  const mallas = mallarParaElMotor(piezas, aristaMm, sold.tramos);
+  const soldados = ladosSoldados(sold, piezas, mallas), porCostura = new Map(soldados.pares.map((p) => [p.costura, p]));
+  const pares = init.flatMap((s, j): ParDeCostura[] => {
+    const p = porCostura.get(j);
+    return p ? [p] : seamInitDataToPairs([s], mallas);
+  });
   const x = colocar(piezas, mallas);
   const prenda = armarPrenda(piezas.map((p, k) => ({
     id: p.id, x: x[k], patron: patronDe(mallas[k]), tris: mallas[k].triIds, hilo: hiloDe(p), margenMm: p.seamAllowance,

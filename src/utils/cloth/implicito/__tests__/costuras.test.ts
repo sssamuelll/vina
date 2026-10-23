@@ -35,9 +35,9 @@ describe('las costuras', () => {
     const patron = [0, 0, 0, 0.5, 0, 1, 1, 0, 1, 1 / 3, 1, 2 / 3, 1, 1];
     const p = puntosDeCostura(patron, [0, 1, 2], [3, 4, 5, 6]);
     const esperado: PuntoDeCostura[] = [
-      { a: 0, b0: 3, b1: 4, s: 0 },
+      { a: 0, b0: 3, b1: 3, s: 0 },
       { a: 1, b0: 4, b1: 5, s: 0.5 },
-      { a: 2, b0: 5, b1: 6, s: 1 },
+      { a: 2, b0: 6, b1: 6, s: 0 },
       { a: 4, b0: 0, b1: 1, s: 2 / 3 },
       { a: 5, b0: 1, b1: 2, s: 1 / 3 },
     ];
@@ -54,6 +54,13 @@ describe('las costuras', () => {
     // los dos lados comparten la punta 0: ese punto no es costura
     const patron = [0, 0, 1, 0, 0, 1];
     expect(puntosDeCostura(patron, [0, 1], [0, 2]).some((q) => q.a === q.b0 || q.a === q.b1)).toBe(false);
+  });
+
+  it('un vértice que cae en un vértice del otro lado se cose a ese vértice solo, y el de enfrente no vuelve', () => {
+    // A y B con los mismos t (0; 0,5; 1): la costura soldada
+    const patron = [0, 0, 0, 0.5, 0, 1, 1, 0, 1, 0.5, 1, 1];
+    const p = puntosDeCostura(patron, [0, 1, 2], [3, 4, 5]);
+    expect(p).toEqual([{ a: 0, b0: 3, b1: 3, s: 0 }, { a: 1, b0: 4, b1: 4, s: 0 }, { a: 2, b0: 5, b1: 5, s: 0 }]);
   });
 
   it('fuerza = −∂E/∂x y H·p por diferencias finitas, con el largo abierto y cerrado', () => {

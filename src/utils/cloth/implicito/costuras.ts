@@ -64,6 +64,9 @@ function sobre(t: number, lado: readonly number[], tl: readonly number[], vecino
     return { b0: lado[n - 1], b1: v, s: Math.min(1, Math.max(0, (t - tl[n - 1]) / (tv - tl[n - 1]))) };
   }
   if (n === 1) return { b0: lado[0], b1: lado[0], s: 0 };
+  // E17: el t de un vértice del otro lado es ese vértice solo (con el vecino a peso 0, su contacto propio lo eximía)
+  const enVertice = tl.findIndex((u) => Math.abs(u - t) < 1e-9);
+  if (enVertice >= 0) return { b0: lado[enVertice], b1: lado[enVertice], s: 0 };
   let j = 0;
   while (j < lado.length - 2 && tl[j + 1] < t) j++;
   const tramo = tl[j + 1] - tl[j];
